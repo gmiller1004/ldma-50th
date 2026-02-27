@@ -6,39 +6,51 @@ import { motion, useInView } from "framer-motion";
 const milestones = [
   {
     year: "1976",
-    title: "The Founding",
+    title: "LDMA Founded",
     description:
-      "LDMA is founded by a group of passionate prospectors, united by a shared love for gold hunting and the great outdoors.",
+      'George "Buzzard" Massie establishes the Lost Dutchman\'s Mining Association with a vision of gold, grit, and brotherhood.',
   },
   {
-    year: "1982",
-    title: "First Claims",
+    year: "1976",
+    title: "First Outing – Italian Bar",
     description:
-      "The association secures its first mining claims, establishing a foothold in the rich gold-bearing regions of the Southwest.",
+      "Thanksgiving at Italian Bar, CA — the very first LDMA adventure on the historic South Fork Stanislaus River gravel bar.",
   },
   {
-    year: "1995",
-    title: "Club Growth",
+    year: "1977",
+    title: "Italian Bar Acquired",
     description:
-      "Membership grows significantly as word spreads about the camaraderie, expertise, and prime mining opportunities LDMA offers.",
+      "First official camp purchased — 160 acres of patented mining claims rebuilt from the ground up on 1850s gold rush grounds.",
   },
   {
-    year: "2008",
-    title: "Major Finds",
+    year: "Early 1980s",
+    title: "Stanton, AZ – Camp #2",
     description:
-      "Several members report substantial discoveries, solidifying LDMA's reputation as a premier prospecting organization.",
+      "Iconic ghost town purchased and lovingly restored by members into one of America's best-preserved gold camps.",
   },
   {
-    year: "2018",
-    title: "Stanton Camp Expansions",
+    year: "1980s–1990s",
+    title: "Nationwide Expansion",
     description:
-      "Major improvements and expansions at Stanton campground enhance facilities for members and their families.",
+      "Camps added across CA, AZ, OR, GA, NC, SC and beyond — thousands of acres of private gold-bearing claims.",
+  },
+  {
+    year: "2000s",
+    title: "Membership Boom",
+    description:
+      "Grows to thousands of families enjoying year-round access, hook-ups, and legendary finds.",
+  },
+  {
+    year: "2010s",
+    title: "Modern Era",
+    description:
+      "12 premier RV campgrounds, caretaker program, and the birth of signature events like DirtFest.",
   },
   {
     year: "2026",
-    title: "50th Anniversary",
+    title: "50 Years Strong",
     description:
-      "Five decades of gold, grit, and brotherhood. The legacy continues as we celebrate our past and look to the future.",
+      "Celebrating half a century of gold prospecting, camaraderie, and living history. The legacy continues with YOU.",
   },
 ];
 
@@ -101,7 +113,7 @@ export function Timeline() {
 
         <div className="relative">
           {milestones.map((m, i) => (
-            <TimelineCard key={m.year} {...m} index={i} />
+            <TimelineCard key={`${m.year}-${m.title}-${i}`} {...m} index={i} />
           ))}
         </div>
       </div>

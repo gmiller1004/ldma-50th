@@ -101,8 +101,8 @@ function MemberStoryCard({
               src={story.photo}
               alt={story.name}
               fill
-              className="object-cover"
-              sizes="(max-width: 768px) 200px, 300px"
+              className="object-cover md:object-top"
+              sizes="(max-width: 768px) 220px, 400px"
               onError={() => setImgError(true)}
             />
           ) : (
