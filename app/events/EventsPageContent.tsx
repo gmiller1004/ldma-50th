@@ -8,12 +8,9 @@ import { MapPin, Calendar, Info, X, ChevronLeft, ChevronRight } from "lucide-rea
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { EVENT_TYPES, CAMP_FILTERS } from "@/lib/events-config";
-import type { EventProduct } from "@/lib/shopify";
+import type { EventProduct, EventVariant } from "@/lib/shopify";
 
-type EventWithVariant = EventProduct & {
-  variantId: string;
-  price: string;
-};
+type EventWithVariant = EventProduct;
 
 type EventDates = {
   startDate: Date | null;
@@ -181,6 +178,192 @@ function matchesCamp(product: EventWithVariant, campId: string): boolean {
   return slug === campId || (campId === "other" && !slug);
 }
 
+/** Get flat array of variants from product */
+function getVariants(product: EventProduct): EventVariant[] {
+  return (product.variants?.edges ?? []).map((e) => e.node).filter(Boolean);
+}
+
+/** Get displayable options (exclude Title if only "Default Title") for variant selection */
+function getVariantOptions(product: EventProduct): Array<{
+  name: string;
+  values: string[];
+}> {
+  const opts = product.options ?? [];
+  return opts
+    .filter((opt) => {
+      const vals = opt.optionValues?.map((v) => v.name) ?? [];
+      if (opt.name === "Title" && vals.length <= 1) return false;
+      return vals.length > 1;
+    })
+    .map((opt) => ({
+      name: opt.name,
+      values: opt.optionValues?.map((v) => v.name) ?? [],
+    }));
+}
+
+/** Find variant matching selected option values */
+function findVariantByOptions(
+  product: EventProduct,
+  selected: Record<string, string>
+): EventVariant | null {
+  const variants = getVariants(product);
+  for (const v of variants) {
+    const match = (v.selectedOptions ?? []).every(
+      (opt) => selected[opt.name] === opt.value
+    );
+    if (match) return v;
+  }
+  return variants[0] ?? null;
+}
+
+/** Variant selector: dropdown(s) for multi-variant products */
+function EventVariantSelector({
+  event,
+  selectedVariantId,
+  onSelect,
+  className = "",
+}: {
+  event: EventProduct;
+  selectedVariantId: string;
+  onSelect: (variantId: string) => void;
+  className?: string;
+}) {
+  const variants = getVariants(event);
+  const options = getVariantOptions(event);
+
+  if (variants.length <= 1) return null;
+
+  const isAvailable = (v: EventVariant) => v.availableForSale !== false;
+
+  // Fallback: no multi-value options but multiple variants — list by variant label
+  if (options.length === 0) {
+    const label = (v: EventVariant) =>
+      (v.selectedOptions ?? [])
+        .map((o) => o.value)
+        .filter(Boolean)
+        .join(" / ") || "Option";
+    return (
+      <div className={className}>
+        <label
+          htmlFor={`variant-${event.id}`}
+          className="block text-sm font-medium text-[#e8e0d5]/70 mb-1"
+        >
+          Option
+        </label>
+        <select
+          id={`variant-${event.id}`}
+          value={selectedVariantId}
+          onChange={(e) => onSelect(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] text-sm focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50"
+        >
+          {variants.map((v) => (
+            <option key={v.id} value={v.id} disabled={!isAvailable(v)}>
+              {label(v)} — ${parseFloat(v.price.amount).toFixed(2)}
+              {!isAvailable(v) ? " (Sold out)" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  // Single option with multiple values: one select
+  if (options.length === 1) {
+    const opt = options[0]!;
+    const selectedVariant = variants.find((v) => v.id === selectedVariantId);
+    const currentValue =
+      selectedVariant?.selectedOptions?.find((o) => o.name === opt.name)
+        ?.value ?? opt.values[0];
+
+    return (
+      <div className={className}>
+        <label
+          htmlFor={`variant-${event.id}-${opt.name}`}
+          className="block text-sm font-medium text-[#e8e0d5]/70 mb-1"
+        >
+          {opt.name}
+        </label>
+        <select
+          id={`variant-${event.id}-${opt.name}`}
+          value={currentValue}
+          onChange={(e) => {
+            const val = e.target.value;
+            const v = variants.find(
+              (x) =>
+                x.selectedOptions?.find((o) => o.name === opt.name)?.value ===
+                val
+            );
+            if (v) onSelect(v.id);
+          }}
+          className="w-full px-3 py-2 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] text-sm focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50"
+        >
+          {opt.values.map((val) => {
+            const v = variants.find(
+              (x) =>
+                x.selectedOptions?.find((o) => o.name === opt.name)?.value ===
+                val
+            );
+            const available = v ? isAvailable(v) : true;
+            return (
+              <option
+                key={val}
+                value={val}
+                disabled={!available}
+              >
+                {val}
+                {!available ? " (Sold out)" : ""}
+              </option>
+            );
+          })}
+        </select>
+      </div>
+    );
+  }
+
+  // Multiple options: select per option, find matching variant
+  const selectedVariant = variants.find((v) => v.id === selectedVariantId);
+  const selectedOptions: Record<string, string> = {};
+  for (const o of selectedVariant?.selectedOptions ?? []) {
+    selectedOptions[o.name] = o.value;
+  }
+  const selectedIsSoldOut =
+    selectedVariant && !isAvailable(selectedVariant);
+
+  return (
+    <div className={`space-y-3 ${className}`}>
+      {selectedIsSoldOut && (
+        <p className="text-amber-400/90 text-sm font-medium">This option is sold out</p>
+      )}
+      {options.map((opt) => (
+        <div key={opt.name}>
+          <label
+            htmlFor={`variant-${event.id}-${opt.name}`}
+            className="block text-sm font-medium text-[#e8e0d5]/70 mb-1"
+          >
+            {opt.name}
+          </label>
+          <select
+            id={`variant-${event.id}-${opt.name}`}
+            value={selectedOptions[opt.name] ?? opt.values[0]}
+            onChange={(e) => {
+              const next = { ...selectedOptions, [opt.name]: e.target.value };
+              const v = findVariantByOptions(event, next);
+              if (v) onSelect(v.id);
+            }}
+            className="w-full px-3 py-2 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] text-sm focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50"
+          >
+            {opt.values.map((val) => (
+              <option key={val} value={val}>
+                {val}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function EventsPageContent({
   events,
 }: {
@@ -191,17 +374,9 @@ export function EventsPageContent({
   const [detailEvent, setDetailEvent] = useState<EventWithVariant | null>(null);
 
   const eventsWithVariant: EventWithVariant[] = useMemo(() => {
-    return events
-      .map((e) => {
-        const variant = e.variants?.edges?.[0]?.node;
-        if (!variant) return null;
-        return {
-          ...e,
-          variantId: variant.id,
-          price: variant.price.amount,
-        };
-      })
-      .filter((e): e is EventWithVariant => e !== null);
+    return events.filter(
+      (e) => (e.variants?.edges?.length ?? 0) > 0
+    ) as EventWithVariant[];
   }, [events]);
 
   const filtered = useMemo(() => {
@@ -392,6 +567,16 @@ function EventDetailModal({
     return imgs;
   }, [event]);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const variants = getVariants(event);
+  const defaultVariant =
+    variants.find((v) => v.availableForSale !== false) ?? variants[0];
+  const [selectedVariantId, setSelectedVariantId] = useState(
+    defaultVariant?.id ?? ""
+  );
+  const selectedVariant =
+    variants.find((v) => v.id === selectedVariantId) ?? defaultVariant;
+  const isSoldOut =
+    selectedVariant ? selectedVariant.availableForSale === false : false;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -511,16 +696,33 @@ function EventDetailModal({
               />
             )}
 
+            <EventVariantSelector
+              event={event}
+              selectedVariantId={selectedVariantId}
+              onSelect={setSelectedVariantId}
+              className="mb-6"
+            />
+
             <div className="flex items-center justify-between gap-4 pt-4 border-t border-[#d4af37]/20">
               <span className="text-[#d4af37] font-bold text-xl">
-                ${parseFloat(event.price).toFixed(2)}
+                $
+                {selectedVariant
+                  ? parseFloat(selectedVariant.price.amount).toFixed(2)
+                  : "0.00"}
               </span>
-              <AddToCartButton
-                variantId={event.variantId}
-                className="!py-3 !px-6"
-                label="Register"
-                addingLabel="Registering…"
-              />
+              {isSoldOut ? (
+                <span className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-[#e8e0d5]/60 bg-[#d4af37]/10 rounded-lg cursor-not-allowed border border-[#d4af37]/20">
+                  Sold out
+                </span>
+              ) : (
+                <AddToCartButton
+                  variantId={selectedVariant?.id ?? ""}
+                  className="!py-3 !px-6"
+                  label="Register"
+                  addingLabel="Registering…"
+                  disabled={!selectedVariant}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -544,6 +746,17 @@ function EventCard({
   index: number;
   onMoreInfo: () => void;
 }) {
+  const variants = getVariants(event);
+  const defaultVariant =
+    variants.find((v) => v.availableForSale !== false) ?? variants[0];
+  const [selectedVariantId, setSelectedVariantId] = useState(
+    defaultVariant?.id ?? ""
+  );
+  const selectedVariant =
+    variants.find((v) => v.id === selectedVariantId) ?? defaultVariant;
+  const isSoldOut =
+    selectedVariant ? selectedVariant.availableForSale === false : false;
+
   const campSlug = getCampSlug(event);
   const campLabel =
     CAMP_FILTERS.find((c) => c.id === campSlug)?.label ?? null;
@@ -609,9 +822,18 @@ function EventCard({
               {campLabel}
             </p>
           )}
+          <EventVariantSelector
+            event={event}
+            selectedVariantId={selectedVariantId}
+            onSelect={setSelectedVariantId}
+            className="mb-4"
+          />
           <div className="mt-auto pt-2 flex flex-wrap items-center justify-between gap-3">
             <span className="text-[#d4af37] font-bold">
-              ${parseFloat(event.price).toFixed(2)}
+              $
+              {selectedVariant
+                ? parseFloat(selectedVariant.price.amount).toFixed(2)
+                : "0.00"}
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -625,12 +847,19 @@ function EventCard({
                 <Info className="w-4 h-4" />
                 More Info
               </button>
-              <AddToCartButton
-                variantId={event.variantId}
-                className="!py-2 !px-4 text-sm"
-                label="Register"
-                addingLabel="Registering…"
-              />
+              {isSoldOut ? (
+                <span className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-[#e8e0d5]/60 bg-[#d4af37]/10 rounded-lg cursor-not-allowed border border-[#d4af37]/20">
+                  Sold out
+                </span>
+              ) : (
+                <AddToCartButton
+                  variantId={selectedVariant?.id ?? ""}
+                  className="!py-2 !px-4 text-sm"
+                  label="Register"
+                  addingLabel="Registering…"
+                  disabled={!selectedVariant}
+                />
+              )}
             </div>
           </div>
         </div>

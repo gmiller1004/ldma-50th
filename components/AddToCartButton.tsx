@@ -10,11 +10,13 @@ export function AddToCartButton({
   className = "",
   label = "Add to Cart",
   addingLabel = "Adding...",
+  disabled = false,
 }: {
   variantId: string;
   className?: string;
   label?: string;
   addingLabel?: string;
+  disabled?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +40,7 @@ export function AddToCartButton({
     <div>
       <button
         onClick={handleClick}
-        disabled={loading}
+        disabled={loading || disabled}
         className={`inline-flex items-center justify-center gap-2 w-full px-4 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-70 disabled:cursor-not-allowed transition-colors ${className}`}
       >
         {loading ? (

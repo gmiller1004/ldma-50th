@@ -87,6 +87,19 @@ export type EventProductImage = {
   height: number;
 };
 
+export type EventVariant = {
+  id: string;
+  availableForSale: boolean;
+  price: { amount: string; currencyCode: string };
+  compareAtPrice: { amount: string; currencyCode: string } | null;
+  selectedOptions: Array<{ name: string; value: string }>;
+};
+
+export type EventProductOption = {
+  name: string;
+  optionValues: Array<{ name: string }>;
+};
+
 export type EventProduct = {
   id: string;
   title: string;
@@ -98,14 +111,9 @@ export type EventProduct = {
   images?: {
     edges: Array<{ node: EventProductImage }>;
   };
+  options?: EventProductOption[];
   variants: {
-    edges: Array<{
-      node: {
-        id: string;
-        price: { amount: string; currencyCode: string };
-        compareAtPrice: { amount: string; currencyCode: string } | null;
-      };
-    }>;
+    edges: Array<{ node: EventVariant }>;
   };
 };
 
@@ -179,12 +187,18 @@ const EVENT_PRODUCT_FRAGMENT = `
         }
       }
     }
-    variants(first: 1) {
+    options(first: 10) {
+      name
+      optionValues { name }
+    }
+    variants(first: 50) {
       edges {
         node {
           id
+          availableForSale
           price { amount currencyCode }
           compareAtPrice { amount currencyCode }
+          selectedOptions { name value }
         }
       }
     }
