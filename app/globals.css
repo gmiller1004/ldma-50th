@@ -1,0 +1,58 @@
+/* Vintage serif + clean sans - LDMA theme */
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+@import "tailwindcss";
+
+:root {
+  --background: #1a120b;
+  --foreground: #e8e0d5;
+  --accent-gold: #d4af37;
+  --accent-gold-light: #f0d48f;
+  --forest-green: #0f3d1e;
+  --font-sans-family: 'DM Sans', system-ui, sans-serif;
+  --font-serif-family: 'Crimson Pro', Georgia, serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans-family);
+  --font-serif: var(--font-serif-family);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans-family);
+}
+
+/* Hero CTA button shine effects */
+.hero-cta-shine {
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+}
+.hero-cta-shine-gold {
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(212, 175, 55, 0.25) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+}
+.hero-cta-primary:hover .hero-cta-shine,
+.hero-cta-secondary:hover .hero-cta-shine-gold {
+  animation: hero-shine 0.8s ease-in-out;
+}
+@keyframes hero-shine {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
