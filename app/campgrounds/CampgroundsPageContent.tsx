@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { MapPin, ArrowRight, Mountain } from "lucide-react";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 type MainCamp = {
   name: string;
@@ -31,6 +32,14 @@ export function CampgroundsPageContent({
 }) {
   return (
     <>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Campgrounds" },
+          ]}
+        />
+      </div>
       {/* Hero */}
       <section className="relative py-20 md:py-28 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-[#0f3d1e]/40 via-transparent to-transparent" />
