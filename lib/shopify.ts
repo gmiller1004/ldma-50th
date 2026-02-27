@@ -1,4 +1,9 @@
 import { GraphQLClient } from "graphql-request";
+import {
+  MEMBERSHIP_COLLECTION_HANDLE,
+  getMembershipKeyFromTitle,
+  type MembershipProductKey,
+} from "./membership-config";
 
 const SHOPIFY_API_VERSION = "2026-01";
 
@@ -54,6 +59,7 @@ export type ProductOption = {
 export type ProductVariant = {
   id: string;
   price: { amount: string; currencyCode: string };
+  compareAtPrice: { amount: string; currencyCode: string } | null;
   selectedOptions: Array<{ name: string; value: string }>;
 };
 
@@ -95,6 +101,10 @@ const PRODUCT_FRAGMENT = `
         node {
           id
           price {
+            amount
+            currencyCode
+          }
+          compareAtPrice {
             amount
             currencyCode
           }
@@ -175,7 +185,59 @@ export async function getFeaturedProducts(
   }
 }
 
+export type MembershipProductsMap = Partial<
+  Record<MembershipProductKey, ShopifyProduct>
+>;
+
+/** Fetch membership collection products and map by key (lifetime, companion, paydirt, minelab, gpaa) */
+export async function getMembershipCollectionProducts(): Promise<MembershipProductsMap> {
+  try {
+    const result = await shopifyFetch<{
+      collection: {
+        products: {
+          edges: Array<{ node: ShopifyProduct }>;
+        };
+      } | null;
+    }>({
+      query: `
+        ${PRODUCT_FRAGMENT}
+        query GetMembershipProducts($handle: String!) {
+          collection(handle: $handle) {
+            products(first: 50) {
+              edges {
+                node {
+                  ...ProductFields
+                }
+              }
+            }
+          }
+        }
+      `,
+      variables: { handle: MEMBERSHIP_COLLECTION_HANDLE },
+    });
+
+    const products = result?.collection?.products?.edges ?? [];
+    const map: MembershipProductsMap = {};
+
+    for (const { node } of products) {
+      const key = getMembershipKeyFromTitle(node.title);
+      if (key && !map[key]) {
+        map[key] = node;
+      }
+    }
+
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 export async function createCartAndAddLine(variantId: string) {
+  return createCartAndAddLines([variantId]);
+}
+
+export async function createCartAndAddLines(variantIds: string[]) {
+  const lines = variantIds.map((id) => ({ merchandiseId: id, quantity: 1 }));
   const result = await shopifyFetch<{
     cartCreate: {
       cart: { checkoutUrl: string; id: string } | null;
@@ -196,9 +258,7 @@ export async function createCartAndAddLine(variantId: string) {
       }
     `,
     variables: {
-      input: {
-        lines: [{ merchandiseId: variantId, quantity: 1 }],
-      },
+      input: { lines },
     },
   });
 
@@ -213,6 +273,14 @@ export async function createCartAndAddLine(variantId: string) {
 }
 
 export async function addLineToExistingCart(cartId: string, variantId: string) {
+  return addLinesToExistingCart(cartId, [variantId]);
+}
+
+export async function addLinesToExistingCart(
+  cartId: string,
+  variantIds: string[]
+) {
+  const lines = variantIds.map((id) => ({ merchandiseId: id, quantity: 1 }));
   const result = await shopifyFetch<{
     cartLinesAdd: {
       cart: { checkoutUrl: string } | null;
@@ -231,10 +299,7 @@ export async function addLineToExistingCart(cartId: string, variantId: string) {
         }
       }
     `,
-    variables: {
-      cartId,
-      lines: [{ merchandiseId: variantId, quantity: 1 }],
-    },
+    variables: { cartId, lines },
   });
 
   const { cart, userErrors } = result.cartLinesAdd;
@@ -252,9 +317,14 @@ export type CartLine = {
   quantity: number;
   merchandise: {
     id: string;
-    product: { title: string; featuredImage: { url: string } | null };
+    product: {
+      title: string;
+      handle: string;
+      featuredImage: { url: string } | null;
+    };
     title: string;
     price: { amount: string; currencyCode: string };
+    compareAtPrice: { amount: string; currencyCode: string } | null;
   };
   cost: { totalAmount: { amount: string; currencyCode: string } };
 };
@@ -286,9 +356,10 @@ export async function getCart(cartId: string): Promise<CartData | null> {
                 merchandise {
                   ... on ProductVariant {
                     id
-                    product { title featuredImage { url } }
+                    product { title handle featuredImage { url } }
                     title
                     price { amount currencyCode }
+                    compareAtPrice { amount currencyCode }
                   }
                 }
                 cost { totalAmount { amount currencyCode } }

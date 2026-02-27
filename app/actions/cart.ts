@@ -2,11 +2,15 @@
 
 import {
   createCartAndAddLine,
+  createCartAndAddLines,
   addLineToExistingCart,
+  addLinesToExistingCart,
   cartLinesUpdate,
   cartLinesRemove,
+  getCart,
 } from "@/lib/shopify";
 import { cookies } from "next/headers";
+import { isLdmaLifetimeProduct, isMembershipProduct } from "@/lib/membership-config";
 
 const CART_ID_COOKIE = "shopify_cart_id";
 
@@ -34,6 +38,32 @@ export async function addToCart(variantId: string) {
   return { checkoutUrl };
 }
 
+/** Add multiple membership products to cart (e.g. from customization flow) */
+export async function addMembershipToCart(variantIds: string[]) {
+  if (variantIds.length === 0) throw new Error("No variants to add");
+  const cookieStore = await cookies();
+  const existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
+
+  let checkoutUrl: string;
+
+  if (existingCartId) {
+    const result = await addLinesToExistingCart(existingCartId, variantIds);
+    checkoutUrl = result.checkoutUrl;
+  } else {
+    const result = await createCartAndAddLines(variantIds);
+    checkoutUrl = result.checkoutUrl;
+    if (result.cartId) {
+      cookieStore.set(CART_ID_COOKIE, result.cartId, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+        sameSite: "lax",
+      });
+    }
+  }
+
+  return { checkoutUrl };
+}
+
 export async function updateCartLineQuantity(lineId: string, quantity: number) {
   const cookieStore = await cookies();
   const cartId = cookieStore.get(CART_ID_COOKIE)?.value;
@@ -46,5 +76,23 @@ export async function removeCartLine(lineId: string) {
   const cookieStore = await cookies();
   const cartId = cookieStore.get(CART_ID_COOKIE)?.value;
   if (!cartId) throw new Error("No cart");
+
+  const cart = await getCart(cartId);
+  if (!cart) throw new Error("Cart not found");
+
+  const line = cart.lines.edges.find((e) => e.node.id === lineId)?.node;
+  const productTitle = line?.merchandise?.product?.title ?? "";
+
+  // If removing LDMA Lifetime, remove all membership collection items
+  if (isLdmaLifetimeProduct(productTitle)) {
+    const membershipLineIds = cart.lines.edges
+      .filter((e) => isMembershipProduct(e.node.merchandise.product.title))
+      .map((e) => e.node.id);
+    if (membershipLineIds.length > 0) {
+      await cartLinesRemove(cartId, membershipLineIds);
+      return;
+    }
+  }
+
   await cartLinesRemove(cartId, [lineId]);
 }

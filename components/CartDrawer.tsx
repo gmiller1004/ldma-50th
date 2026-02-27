@@ -120,9 +120,32 @@ export function CartDrawer() {
                               {line.merchandise.title}
                             </p>
                           )}
-                          <p className="text-[#d4af37] font-medium mt-0.5">
-                            ${parseFloat(line.cost.totalAmount.amount).toFixed(2)}
-                          </p>
+                          <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
+                            {line.merchandise.compareAtPrice &&
+                            parseFloat(line.merchandise.compareAtPrice.amount) >
+                              parseFloat(line.cost.totalAmount.amount) ? (
+                              <>
+                                <span className="text-[#e8e0d5]/60 line-through text-sm">
+                                  $
+                                  {(
+                                    parseFloat(line.merchandise.compareAtPrice.amount) *
+                                    line.quantity
+                                  ).toFixed(2)}
+                                </span>
+                                <span className="text-[#6dd472] text-xs font-medium">
+                                  Save $
+                                  {(
+                                    parseFloat(line.merchandise.compareAtPrice.amount) *
+                                      line.quantity -
+                                    parseFloat(line.cost.totalAmount.amount)
+                                  ).toFixed(2)}
+                                </span>
+                              </>
+                            ) : null}
+                            <span className="text-[#d4af37] font-medium">
+                              ${parseFloat(line.cost.totalAmount.amount).toFixed(2)}
+                            </span>
+                          </div>
                           <div className="flex items-center gap-2 mt-2">
                             <div className="flex items-center rounded-md border border-[#d4af37]/30 overflow-hidden">
                               <button
@@ -172,12 +195,44 @@ export function CartDrawer() {
 
             {!isEmpty && cart && (
               <div className="p-4 border-t border-[#d4af37]/20 space-y-4">
-                <div className="flex justify-between text-[#e8e0d5]">
-                  <span>Subtotal</span>
-                  <span className="font-semibold text-[#d4af37]">
-                    ${parseFloat(cart.cost.subtotalAmount.amount).toFixed(2)}
-                  </span>
-                </div>
+                {(() => {
+                  const compareAtTotal = cart.lines.reduce((sum, line) => {
+                    const cap = line.merchandise.compareAtPrice;
+                    if (
+                      cap &&
+                      parseFloat(cap.amount) > parseFloat(line.merchandise.price.amount)
+                    ) {
+                      return sum + parseFloat(cap.amount) * line.quantity;
+                    }
+                    return sum;
+                  }, 0);
+                  const subtotal = parseFloat(cart.cost.subtotalAmount.amount);
+                  const savings = compareAtTotal > subtotal ? compareAtTotal - subtotal : 0;
+                  return (
+                    <div className="space-y-1">
+                      {savings > 0 && (
+                        <div className="flex justify-between text-[#e8e0d5]/70 text-sm">
+                          <span>Compare at</span>
+                          <span className="line-through">
+                            ${compareAtTotal.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-[#e8e0d5]">
+                        <span>Subtotal</span>
+                        <span className="font-semibold text-[#d4af37]">
+                          ${subtotal.toFixed(2)}
+                        </span>
+                      </div>
+                      {savings > 0 && (
+                        <div className="flex justify-between text-[#6dd472] text-sm font-medium">
+                          <span>You save</span>
+                          <span>${savings.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <button
                   onClick={handleCheckout}
                   className="w-full py-3 px-4 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"

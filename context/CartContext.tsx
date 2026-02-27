@@ -14,9 +14,14 @@ export type CartLine = {
   quantity: number;
   merchandise: {
     id: string;
-    product: { title: string; featuredImage: { url: string } | null };
+    product: {
+      title: string;
+      handle?: string;
+      featuredImage: { url: string } | null;
+    };
     title: string;
     price: { amount: string; currencyCode: string };
+    compareAtPrice?: { amount: string; currencyCode: string } | null;
   };
   cost: { totalAmount: { amount: string; currencyCode: string } };
 };
