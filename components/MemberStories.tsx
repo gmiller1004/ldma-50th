@@ -95,13 +95,13 @@ function MemberStoryCard({
     >
       {/* Photo - square with rounded corners */}
       <div className="flex-shrink-0 flex justify-center">
-        <div className="relative w-[180px] h-[180px] sm:w-[220px] sm:h-[220px] md:w-full md:aspect-square md:max-h-[280px] rounded-xl overflow-hidden bg-[#0f3d1e]/40 mx-auto md:mx-0">
+        <div className="relative w-[180px] h-[180px] sm:w-[220px] sm:h-[220px] md:aspect-square md:w-full md:max-w-[340px] rounded-xl overflow-hidden bg-[#0f3d1e]/40 mx-auto md:mx-0">
           {!imgError ? (
             <Image
               src={story.photo}
               alt={story.name}
               fill
-              className="object-cover md:object-top"
+              className="object-cover object-[50%_25%]"
               sizes="(max-width: 768px) 220px, 400px"
               onError={() => setImgError(true)}
             />

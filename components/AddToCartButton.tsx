@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { addToCart } from "@/app/actions/cart";
+import { useCart } from "@/context/CartContext";
 import { ShoppingBag, Loader2 } from "lucide-react";
 
 export function AddToCartButton({
@@ -13,15 +14,18 @@ export function AddToCartButton({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { openDrawer, refreshCart } = useCart();
 
   async function handleClick() {
     setLoading(true);
     setError(null);
     try {
-      const { checkoutUrl } = await addToCart(variantId);
-      window.location.href = checkoutUrl;
+      await addToCart(variantId);
+      await refreshCart();
+      openDrawer();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to add to cart");
+    } finally {
       setLoading(false);
     }
   }

@@ -46,20 +46,24 @@ const MERCH_COLLECTION_HANDLES = [
   "all",
 ];
 
+export type ProductOption = {
+  name: string;
+  optionValues: Array<{ name: string }>;
+};
+
+export type ProductVariant = {
+  id: string;
+  price: { amount: string; currencyCode: string };
+  selectedOptions: Array<{ name: string; value: string }>;
+};
+
 export type ShopifyProduct = {
   id: string;
   title: string;
   handle: string;
+  options: ProductOption[];
   variants: {
-    edges: Array<{
-      node: {
-        id: string;
-        price: {
-          amount: string;
-          currencyCode: string;
-        };
-      };
-    }>;
+    edges: Array<{ node: ProductVariant }>;
   };
   featuredImage: {
     url: string;
@@ -80,13 +84,23 @@ const PRODUCT_FRAGMENT = `
       width
       height
     }
-    variants(first: 1) {
+    options(first: 10) {
+      name
+      optionValues {
+        name
+      }
+    }
+    variants(first: 100) {
       edges {
         node {
           id
           price {
             amount
             currencyCode
+          }
+          selectedOptions {
+            name
+            value
           }
         }
       }
@@ -231,4 +245,116 @@ export async function addLineToExistingCart(cartId: string, variantId: string) {
     throw new Error("Failed to add to cart");
   }
   return { checkoutUrl: cart.checkoutUrl };
+}
+
+export type CartLine = {
+  id: string;
+  quantity: number;
+  merchandise: {
+    id: string;
+    product: { title: string; featuredImage: { url: string } | null };
+    title: string;
+    price: { amount: string; currencyCode: string };
+  };
+  cost: { totalAmount: { amount: string; currencyCode: string } };
+};
+
+export type CartData = {
+  id: string;
+  checkoutUrl: string;
+  totalQuantity: number;
+  cost: { subtotalAmount: { amount: string; currencyCode: string } };
+  lines: { edges: Array<{ node: CartLine }> };
+};
+
+export async function getCart(cartId: string): Promise<CartData | null> {
+  const result = await shopifyFetch<{ cart: CartData | null }>({
+    query: `
+      query GetCart($cartId: ID!) {
+        cart(id: $cartId) {
+          id
+          checkoutUrl
+          totalQuantity
+          cost {
+            subtotalAmount { amount currencyCode }
+          }
+          lines(first: 100) {
+            edges {
+              node {
+                id
+                quantity
+                merchandise {
+                  ... on ProductVariant {
+                    id
+                    product { title featuredImage { url } }
+                    title
+                    price { amount currencyCode }
+                  }
+                }
+                cost { totalAmount { amount currencyCode } }
+              }
+            }
+          }
+        }
+      }
+    `,
+    variables: { cartId },
+  });
+  return result?.cart ?? null;
+}
+
+export async function cartLinesUpdate(
+  cartId: string,
+  lines: Array<{ id: string; quantity: number }>
+) {
+  const result = await shopifyFetch<{
+    cartLinesUpdate: {
+      cart: { checkoutUrl: string } | null;
+      userErrors: Array<{ message: string }>;
+    };
+  }>({
+    query: `
+      mutation cartLinesUpdate($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
+        cartLinesUpdate(cartId: $cartId, lines: $lines) {
+          cart { checkoutUrl }
+          userErrors { message }
+        }
+      }
+    `,
+    variables: { cartId, lines },
+  });
+
+  const { cart, userErrors } = result.cartLinesUpdate;
+  if (userErrors?.length) {
+    throw new Error(userErrors[0].message);
+  }
+  if (!cart?.checkoutUrl) {
+    throw new Error("Failed to update cart");
+  }
+  return { checkoutUrl: cart.checkoutUrl };
+}
+
+export async function cartLinesRemove(cartId: string, lineIds: string[]) {
+  const result = await shopifyFetch<{
+    cartLinesRemove: {
+      cart: { checkoutUrl: string } | null;
+      userErrors: Array<{ message: string }>;
+    };
+  }>({
+    query: `
+      mutation cartLinesRemove($cartId: ID!, $lineIds: [ID!]!) {
+        cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
+          cart { checkoutUrl }
+          userErrors { message }
+        }
+      }
+    `,
+    variables: { cartId, lineIds },
+  });
+
+  const { cart, userErrors } = result.cartLinesRemove;
+  if (userErrors?.length) {
+    throw new Error(userErrors[0].message);
+  }
+  return { checkoutUrl: cart?.checkoutUrl };
 }

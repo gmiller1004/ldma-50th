@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Pickaxe, Menu, X, ShoppingBag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CartBadge } from "./CartCount";
+import { useCart } from "@/context/CartContext";
 
 function NavbarLogo() {
   const [logoError, setLogoError] = useState(false);
@@ -45,6 +45,24 @@ const navLinks = [
   { href: "/50-years", label: "50 Years" },
 ];
 
+function CartButton() {
+  const { count, openDrawer } = useCart();
+  return (
+    <button
+      onClick={openDrawer}
+      className="relative p-2 text-[#e8e0d5]/90 hover:text-[#d4af37] transition-colors"
+      aria-label="Open cart"
+    >
+      <ShoppingBag className="w-5 h-5" />
+      {count > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold bg-[#d4af37] text-[#1a120b] rounded-full">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -70,14 +88,7 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <Link
-              href="/shop"
-              className="relative p-2 text-[#e8e0d5]/90 hover:text-[#d4af37] transition-colors"
-              aria-label="Cart"
-            >
-              <ShoppingBag className="w-5 h-5" />
-              <CartBadge />
-            </Link>
+            <CartButton />
             <Link
               href="/memberships"
               className="px-5 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
@@ -88,14 +99,7 @@ export function Navbar() {
 
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center gap-3">
-            <Link
-              href="/shop"
-              className="relative p-2 text-[#e8e0d5]/90"
-              aria-label="Cart"
-            >
-              <ShoppingBag className="w-5 h-5" />
-              <CartBadge />
-            </Link>
+            <CartButton />
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="p-2 text-[#e8e0d5]/90 hover:text-[#d4af37]"

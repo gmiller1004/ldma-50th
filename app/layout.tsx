@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
+import { CartProvider } from "@/context/CartContext";
+import { CartDrawer } from "@/components/CartDrawer";
 
 export const metadata: Metadata = {
   title: "LDMA | 50 Years of Gold, Grit & Brotherhood • 1976–2026",
@@ -26,7 +28,10 @@ export default function RootLayout({
           src="https://static.klaviyo.com/onsite/js/WvfeJF/klaviyo.js"
           strategy="beforeInteractive"
         />
-        {children}
+        <CartProvider>
+          {children}
+          <CartDrawer />
+        </CartProvider>
       </body>
     </html>
   );
