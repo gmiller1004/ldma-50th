@@ -4,6 +4,7 @@ import {
   getMembershipKeyFromTitle,
   type MembershipProductKey,
 } from "./membership-config";
+import { EVENT_COLLECTION_HANDLE } from "./events-config";
 
 const SHOPIFY_API_VERSION = "2026-01";
 
@@ -79,6 +80,29 @@ export type ShopifyProduct = {
   } | null;
 };
 
+export type EventProduct = {
+  id: string;
+  title: string;
+  handle: string;
+  tags: string[];
+  metafields?: Array<{ key: string; value: string }>;
+  featuredImage: {
+    url: string;
+    altText: string | null;
+    width: number;
+    height: number;
+  } | null;
+  variants: {
+    edges: Array<{
+      node: {
+        id: string;
+        price: { amount: string; currencyCode: string };
+        compareAtPrice: { amount: string; currencyCode: string } | null;
+      };
+    }>;
+  };
+};
+
 const PRODUCT_FRAGMENT = `
   fragment ProductFields on Product {
     id
@@ -117,6 +141,39 @@ const PRODUCT_FRAGMENT = `
     }
   }
 `;
+
+/** Product fragment for events. Requires unauthenticated_read_product_tags scope for tags. */
+const EVENT_PRODUCT_FRAGMENT = `
+  fragment EventProductFields on Product {
+    id
+    title
+    handle
+    tags
+    metafields(identifiers: [
+      { namespace: "event", key: "start_date" },
+      { namespace: "event", key: "end_date" }
+    ]) {
+      key
+      value
+    }
+    featuredImage {
+      url
+      altText
+      width
+      height
+    }
+    variants(first: 1) {
+      edges {
+        node {
+          id
+          price { amount currencyCode }
+          compareAtPrice { amount currencyCode }
+        }
+      }
+    }
+  }
+`;
+
 
 export async function getFeaturedProducts(
   limit = 4
@@ -229,6 +286,44 @@ export async function getMembershipCollectionProducts(): Promise<MembershipProdu
     return map;
   } catch {
     return {};
+  }
+}
+
+/** Fetch event products from the events collection only. */
+export async function getEventProducts(): Promise<EventProduct[]> {
+  try {
+    const result = await shopifyFetch<{
+      collection: {
+        products: {
+          edges: Array<{ node: EventProduct }>;
+        };
+      } | null;
+    }>({
+      query: `
+        ${EVENT_PRODUCT_FRAGMENT}
+        query GetEventProducts($handle: String!) {
+          collection(handle: $handle) {
+            products(first: 50, sortKey: TITLE) {
+              edges {
+                node {
+                  ...EventProductFields
+                }
+              }
+            }
+          }
+        }
+      `,
+      variables: { handle: EVENT_COLLECTION_HANDLE },
+    });
+
+    const products = result?.collection?.products?.edges ?? [];
+    return products.map(({ node }) => ({
+      ...node,
+      tags: (node as { tags?: string[] }).tags ?? [],
+      metafields: node.metafields,
+    }));
+  } catch (e) {
+    throw e;
   }
 }
 

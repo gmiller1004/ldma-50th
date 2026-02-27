@@ -8,9 +8,13 @@ import { ShoppingBag, Loader2 } from "lucide-react";
 export function AddToCartButton({
   variantId,
   className = "",
+  label = "Add to Cart",
+  addingLabel = "Adding...",
 }: {
   variantId: string;
   className?: string;
+  label?: string;
+  addingLabel?: string;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +46,7 @@ export function AddToCartButton({
         ) : (
           <ShoppingBag className="w-4 h-4" />
         )}
-        {loading ? "Adding..." : "Add to Cart"}
+        {loading ? addingLabel : label}
       </button>
       {error && (
         <p className="mt-2 text-sm text-red-400">{error}</p>
