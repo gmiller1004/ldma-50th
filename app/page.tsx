@@ -4,6 +4,7 @@ import { Timeline } from "@/components/Timeline";
 import { MemberStories } from "@/components/MemberStories";
 import { Campgrounds } from "@/components/Campgrounds";
 import { MerchSpotlight } from "@/components/MerchSpotlight";
+import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { CTABanner } from "@/components/CTABanner";
 import { Footer } from "@/components/Footer";
 
@@ -20,6 +21,7 @@ export default function Home() {
         <MemberStories />
         <Campgrounds />
         <MerchSpotlight />
+        <NewsletterSignup />
         <CTABanner />
         <Footer />
       </main>

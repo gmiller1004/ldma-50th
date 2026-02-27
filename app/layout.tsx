@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,6 +22,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="antialiased bg-[#1a120b] text-[#e8e0d5] font-sans">
+        <Script
+          src="https://static.klaviyo.com/onsite/js/WvfeJF/klaviyo.js"
+          strategy="beforeInteractive"
+        />
         {children}
       </body>
     </html>
