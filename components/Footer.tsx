@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Pickaxe } from "lucide-react";
+import Image from "next/image";
 
 const footerLinks = {
   Explore: [
@@ -26,10 +26,15 @@ export function Footer() {
           <div className="md:col-span-1">
             <Link
               href="/"
-              className="flex items-center gap-2 text-[#f0d48f] hover:text-[#d4af37] transition-colors"
+              className="inline-block hover:opacity-90 transition-opacity"
             >
-              <Pickaxe className="w-8 h-8" strokeWidth={1.5} />
-              <span className="font-serif text-2xl font-semibold">LDMA</span>
+              <Image
+                src="/images/LDMA_50_Badge_2-02.png"
+                alt="LDMA 50th Anniversary"
+                width={120}
+                height={60}
+                className="h-12 w-auto"
+              />
             </Link>
             <p className="mt-4 text-[#e8e0d5]/70 text-sm">
               The Lost Dutchman&apos;s Mining Association — 50 years of gold,

@@ -1,52 +1,93 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { MapPin, ArrowRight } from "lucide-react";
+import {
+  MapPin,
+  ArrowRight,
+  Pickaxe,
+  Tent,
+  ShowerHead,
+  Flame,
+  Mountain,
+} from "lucide-react";
 
-const campgrounds = [
+const featuredCamps = [
   {
-    name: "Stanton Campground",
+    name: "Italian Bar, California",
+    subtitle: "The Original — First LDMA Camp (1977)",
     description:
-      "Our flagship facility with full RV hookups, tent sites, and access to some of the richest claims in the region.",
-    image:
-      "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=600&h=400&fit=crop&q=80",
-    location: "Arizona",
-    href: "/campgrounds/stanton",
+      "Built on the historic 1850s gold rush site along the South Fork Stanislaus River. Gold panning, sluicing, and river relaxation — many members find their first gold here.",
+    amenities: [
+      "Showers & Restrooms",
+      "Clubhouse & Fire Pit",
+      "160 Patented Acres",
+      "Trash & Dump Station",
+    ],
+    address: "24997 Italian Bar Rd, Columbia, CA 95310",
+    image: "/images/camp-italian-bar.jpg",
+    link: "https://myldma.com/collections/italian-bar-california",
   },
   {
-    name: "Coolidge Camp",
+    name: "Stanton, Arizona",
+    subtitle: "The Flagship Ghost-Town Camp",
     description:
-      "A quieter retreat with excellent dry-washing opportunities and stunning desert vistas.",
-    image:
-      "https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=600&h=400&fit=crop&q=80",
-    location: "Arizona",
-    href: "/campgrounds/coolidge",
+      "Former 1800s outlaw hideout turned premier prospecting destination at the base of Rich Hill. History and gold everywhere you look.",
+    amenities: [
+      "132 Full Hookups",
+      "Laundry & Museum",
+      "Craft Room",
+      "Community Events",
+    ],
+    address: "15650 Stanton Rd, Congress, AZ 85332",
+    image: "/images/camp-stanton.jpg",
+    link: "https://myldma.com/collections/stanton-arizona",
   },
   {
-    name: "Rye Patch",
+    name: "Burnt River, Oregon",
+    subtitle: "Eastern Oregon Wilderness",
     description:
-      "Nevada gold country. Prime metal detecting and sluicing with RV and tent accommodations.",
-    image:
-      "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=600&h=400&fit=crop&q=80",
-    location: "Nevada",
-    href: "/campgrounds/rye-patch",
+      "Breathtaking river canyon views and peaceful prospecting. Spot deer, turkeys & bighorn sheep while you chase gold in the wild.",
+    amenities: [
+      "RV + Tent Sites",
+      "Showers & Fire Pit",
+      "Water & Trash",
+      "Dump Station",
+    ],
+    address: "28089 Burnt River Canyon Ln, Durkee, OR 97905",
+    image: "/images/camp-burnt-river.jpg",
+    link: "https://myldma.com/collections/burnt-river-oregon",
   },
   {
-    name: "Porterville",
+    name: "Loud Mine, Georgia",
+    subtitle: "Southern Gold Country",
     description:
-      "California foothills campground with seasonal streams and rich history.",
-    image:
-      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=600&h=400&fit=crop&q=80",
-    location: "California",
-    href: "/campgrounds/porterville",
+      "Tranquil wooded hills just 5 miles from Cleveland Town Square. Swim, fish, kayak, hike — and find gold in the streams and benches.",
+    amenities: [
+      "RV Hookups",
+      "Laundry & Craft Room",
+      "Game Room & Fire Pit",
+      "Family Activities",
+    ],
+    address: "575 Abb Helton Rd, Cleveland, GA 30528",
+    image: "/images/camp-loud-mine.jpg",
+    link: "https://myldma.com/collections/loud-mine-georgia",
   },
 ];
 
+const amenityIcons = [Pickaxe, Tent, ShowerHead, Flame, Mountain];
+
 export function Campgrounds() {
   return (
-    <section className="py-20 md:py-28 bg-[#0f3d1e]/30">
+    <motion.section
+      className="py-20 md:py-28 bg-[#0f3d1e]/30"
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.6 }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <motion.h2
           className="font-serif text-3xl md:text-4xl font-bold text-[#f0d48f] text-center mb-4"
@@ -54,61 +95,111 @@ export function Campgrounds() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
         >
-          Featured Campgrounds
+          Featured LDMA Campgrounds
         </motion.h2>
         <motion.p
-          className="text-center text-[#e8e0d5]/70 mb-16"
+          className="text-center text-[#e8e0d5] mb-16 max-w-2xl mx-auto text-lg"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
         >
-          Your home base for adventure
+          50 Years of Private Gold-Bearing Land — Start Your Adventure at These
+          Iconic Sites
         </motion.p>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-          {campgrounds.map((camp, i) => (
-            <motion.article
-              key={camp.name}
-              className="group bg-[#1a120b] rounded-xl overflow-hidden border border-[#d4af37]/20 hover:border-[#d4af37]/50 transition-all"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.08 }}
-            >
-              <Link href={camp.href} className="block">
-                <div className="relative aspect-[4/3] overflow-hidden">
-                  <Image
-                    src={camp.image}
-                    alt={camp.name}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                    sizes="(max-width: 768px) 100vw, 25vw"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#1a120b] via-transparent to-transparent" />
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 text-[#d4af37] text-sm">
-                    <MapPin className="w-4 h-4" />
-                    {camp.location}
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <h3 className="font-serif text-xl font-semibold text-[#f0d48f] group-hover:text-[#f0d48f]">
-                      {camp.name}
-                    </h3>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <p className="text-[#e8e0d5]/70 text-sm mb-4 line-clamp-3">
-                    {camp.description}
-                  </p>
-                  <span className="inline-flex items-center gap-2 text-[#d4af37] font-medium text-sm group-hover:gap-3 transition-all">
-                    Learn More
-                    <ArrowRight className="w-4 h-4" />
-                  </span>
-                </div>
-              </Link>
-            </motion.article>
+        <div className="grid md:grid-cols-2 gap-8 lg:gap-10">
+          {featuredCamps.map((camp, i) => (
+            <CampCard key={camp.name} camp={camp} index={i} />
           ))}
         </div>
       </div>
-    </section>
+    </motion.section>
+  );
+}
+
+function CampCard({
+  camp,
+  index,
+}: {
+  camp: (typeof featuredCamps)[0];
+  index: number;
+}) {
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <motion.article
+      className="group bg-[#1a120b] rounded-2xl overflow-hidden border border-[#d4af37]/25 hover:border-[#d4af37]/50 transition-all duration-300"
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay: index * 0.1 }}
+      whileHover={{ y: -6, scale: 1.02, transition: { duration: 0.2 } }}
+      style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}
+    >
+      {/* Image - 4:3 aspect */}
+      <div className="relative aspect-[4/3] overflow-hidden">
+        {!imgError ? (
+          <Image
+            src={camp.image}
+            alt={camp.name}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            sizes="(max-width: 768px) 100vw, 50vw"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-[#0f3d1e]/40 flex items-center justify-center">
+            <Mountain className="w-20 h-20 text-[#d4af37]/30" strokeWidth={1} />
+          </div>
+        )}
+        {/* Gold overlay on hover */}
+        <div className="absolute inset-0 bg-[#d4af37]/0 group-hover:bg-[#d4af37]/10 transition-colors duration-300" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#1a120b] via-transparent to-transparent" />
+      </div>
+
+      <div className="p-6">
+        <h3 className="font-serif text-xl font-bold text-[#f0d48f] mb-1">
+          {camp.name}
+        </h3>
+        <p className="text-[#d4af37]/90 text-sm italic mb-4">{camp.subtitle}</p>
+        <p className="text-[#e8e0d5]/85 text-sm leading-relaxed mb-4 line-clamp-2">
+          {camp.description}
+        </p>
+
+        {/* Amenities - gold pills with icons */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {camp.amenities.map((amenity, ai) => {
+            const Icon =
+              amenityIcons[ai % amenityIcons.length];
+            return (
+              <span
+                key={amenity}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#d4af37]/10 border border-[#d4af37]/30 text-[#d4af37] text-xs font-medium"
+              >
+                <Icon className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2} />
+                {amenity}
+              </span>
+            );
+          })}
+        </div>
+
+        {/* Address */}
+        <div className="flex items-start gap-2 text-[#e8e0d5]/60 text-xs mb-6">
+          <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{camp.address}</span>
+        </div>
+
+        {/* CTA */}
+        <Link
+          href={camp.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 w-full justify-center sm:w-auto px-6 py-3.5 bg-[#d4af37] text-[#1a120b] font-bold rounded-lg hover:bg-[#f0d48f] transition-all shadow-[0_0_15px_rgba(212,175,55,0.2)] group-hover:shadow-[0_0_25px_rgba(212,175,55,0.35)]"
+        >
+          Explore Camp
+          <ArrowRight className="w-5 h-5" strokeWidth={2} />
+        </Link>
+      </div>
+    </motion.article>
   );
 }
