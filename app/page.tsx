@@ -7,6 +7,9 @@ import { MerchSpotlight } from "@/components/MerchSpotlight";
 import { CTABanner } from "@/components/CTABanner";
 import { Footer } from "@/components/Footer";
 
+// Revalidate every 5 min — merch section stays fresh when you add products
+export const revalidate = 300;
+
 export default function Home() {
   return (
     <>

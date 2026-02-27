@@ -3,7 +3,7 @@ import { getFeaturedProducts } from "@/lib/shopify";
 import { MerchProductGrid } from "./MerchProductGrid";
 
 export async function MerchSpotlight() {
-  const products = await getFeaturedProducts(4);
+  const products = await getFeaturedProducts(8);
 
   if (products.length === 0) {
     return (

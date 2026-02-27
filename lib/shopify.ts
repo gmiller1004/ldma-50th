@@ -36,12 +36,13 @@ export function shopifyFetch<T>({
 }
 
 // Collection handles to try for 50th merch (in order of preference)
+// "merch" first — main merch collection where new products are typically added
 const MERCH_COLLECTION_HANDLES = [
+  "merch",
   "50th-anniversary",
   "50th anniversary",
   "membership",
   "dirtfest",
-  "merch",
   "all",
 ];
 
