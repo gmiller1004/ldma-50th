@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { MapPin, Calendar, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { MapPin, Calendar, Info, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { EVENT_TYPES, CAMP_FILTERS } from "@/lib/events-config";
@@ -188,6 +188,7 @@ export function EventsPageContent({
 }) {
   const [eventType, setEventType] = useState<string>("all");
   const [camp, setCamp] = useState<string>("all");
+  const [detailEvent, setDetailEvent] = useState<EventWithVariant | null>(null);
 
   const eventsWithVariant: EventWithVariant[] = useMemo(() => {
     return events
@@ -337,13 +338,194 @@ export function EventsPageContent({
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
               {filtered.map((event, i) => (
-                <EventCard key={event.id} event={event} index={i} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  index={i}
+                  onMoreInfo={() => setDetailEvent(event)}
+                />
               ))}
             </div>
           )}
+
+          <AnimatePresence>
+            {detailEvent && (
+              <EventDetailModal
+                key={detailEvent.id}
+                event={detailEvent}
+                onClose={() => setDetailEvent(null)}
+              />
+            )}
+          </AnimatePresence>
         </div>
       </section>
     </>
+  );
+}
+
+/** Modal with full event details: title, date, description, gallery, Register */
+function EventDetailModal({
+  event,
+  onClose,
+}: {
+  event: EventWithVariant;
+  onClose: () => void;
+}) {
+  const dates = getEventDates(event);
+  const campSlug = getCampSlug(event);
+  const campLabel =
+    CAMP_FILTERS.find((c) => c.id === campSlug)?.label ?? null;
+  const galleryImages = useMemo(() => {
+    const imgs: Array<{ url: string; altText: string | null }> = [];
+    if (event.featuredImage?.url) {
+      imgs.push({
+        url: event.featuredImage.url,
+        altText: event.featuredImage.altText,
+      });
+    }
+    for (const edge of event.images?.edges ?? []) {
+      const node = edge?.node;
+      if (node?.url && !imgs.some((i) => i.url === node.url)) {
+        imgs.push({ url: node.url, altText: node.altText });
+      }
+    }
+    return imgs;
+  }, [event]);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/80" aria-hidden="true" />
+      <motion.div
+        className="relative w-full max-w-2xl bg-[#1a120b] border border-[#d4af37]/30 rounded-2xl shadow-2xl overflow-hidden"
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 p-2 rounded-lg text-[#e8e0d5]/80 hover:text-[#e8e0d5] hover:bg-[#d4af37]/10 transition-colors"
+          aria-label="Close"
+        >
+          <X className="w-6 h-6" />
+        </button>
+
+        <div className="max-h-[90vh] overflow-y-auto">
+          {/* Gallery */}
+          {galleryImages.length > 0 && (
+            <div className="relative aspect-[16/10] bg-[#0f3d1e]/30">
+              <Image
+                src={galleryImages[galleryIndex]?.url ?? galleryImages[0]!.url}
+                alt={galleryImages[galleryIndex]?.altText ?? event.title}
+                fill
+                className="object-cover"
+                sizes="(max-width: 672px) 100vw, 672px"
+              />
+              {galleryImages.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGalleryIndex((i) =>
+                        i === 0 ? galleryImages.length - 1 : i - 1
+                      )
+                    }
+                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGalleryIndex((i) =>
+                        i === galleryImages.length - 1 ? 0 : i + 1
+                      )
+                    }
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {galleryImages.map((_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setGalleryIndex(i)}
+                        className={`w-2 h-2 rounded-full transition-colors ${
+                          i === galleryIndex ? "bg-[#d4af37]" : "bg-white/50"
+                        }`}
+                        aria-label={`View image ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="p-6 md:p-8">
+            <h2 className="font-serif text-2xl md:text-3xl font-bold text-[#f0d48f] mb-2">
+              {event.title}
+            </h2>
+            <div className="flex flex-wrap items-center gap-4 text-[#e8e0d5]/80 text-sm mb-6">
+              {dates.formatted && (
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-[#d4af37]/70" />
+                  {dates.formatted}
+                </span>
+              )}
+              {campLabel && (
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-[#d4af37]/70" />
+                  {campLabel}
+                </span>
+              )}
+            </div>
+
+            {event.descriptionHtml && (
+              <div
+                className="event-description mb-6 text-[#e8e0d5]/90 text-sm leading-relaxed [&_h2]:font-serif [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-[#f0d48f] [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-serif [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-[#f0d48f] [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3 [&_li]:mb-1 [&_a]:text-[#d4af37] [&_a]:underline [&_a:hover]:no-underline [&_strong]:text-[#e8e0d5]"
+                dangerouslySetInnerHTML={{ __html: event.descriptionHtml }}
+              />
+            )}
+
+            <div className="flex items-center justify-between gap-4 pt-4 border-t border-[#d4af37]/20">
+              <span className="text-[#d4af37] font-bold text-xl">
+                ${parseFloat(event.price).toFixed(2)}
+              </span>
+              <AddToCartButton
+                variantId={event.variantId}
+                className="!py-3 !px-6"
+                label="Register"
+                addingLabel="Registering…"
+              />
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -356,9 +538,11 @@ function getCardTitle(fullTitle: string): string {
 function EventCard({
   event,
   index,
+  onMoreInfo,
 }: {
   event: EventWithVariant;
   index: number;
+  onMoreInfo: () => void;
 }) {
   const campSlug = getCampSlug(event);
   const campLabel =
@@ -388,9 +572,9 @@ function EventCard({
             <Calendar className="w-16 h-16" />
           </div>
         )}
-        {/* Gradient overlay for text readability — hidden on hover when details panel shows */}
+        {/* Gradient overlay for text readability — hidden on hover when details panel shows (sm+) */}
         <div
-          className="absolute inset-x-0 bottom-0 pt-20 pb-4 px-4 transition-opacity duration-200 group-hover:opacity-0 pointer-events-none"
+          className="absolute inset-x-0 bottom-0 pt-20 pb-4 px-4 transition-opacity duration-200 sm:group-hover:opacity-0"
           style={{
             background:
               "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 45%, transparent 100%)",
@@ -407,8 +591,8 @@ function EventCard({
         </div>
       </div>
 
-      {/* Full details panel — slides down on hover */}
-      <div className="max-h-0 overflow-hidden transition-[max-height] duration-300 ease-out group-hover:max-h-80 border-t border-transparent group-hover:border-[#d4af37]/20">
+      {/* Full details panel — always expanded on mobile; slides down on hover for sm+ */}
+      <div className="max-h-80 sm:max-h-0 overflow-hidden transition-[max-height] duration-300 ease-out sm:group-hover:max-h-80 border-t border-[#d4af37]/20 sm:border-transparent sm:group-hover:border-[#d4af37]/20">
         <div className="flex flex-col p-5 bg-[#1a120b]/95">
           {dates.formatted && (
             <p className="flex items-center gap-1.5 text-[#e8e0d5]/80 text-sm mb-2">
@@ -425,16 +609,29 @@ function EventCard({
               {campLabel}
             </p>
           )}
-          <div className="mt-auto pt-2 flex items-center justify-between gap-4">
+          <div className="mt-auto pt-2 flex flex-wrap items-center justify-between gap-3">
             <span className="text-[#d4af37] font-bold">
               ${parseFloat(event.price).toFixed(2)}
             </span>
-            <AddToCartButton
-              variantId={event.variantId}
-              className="!py-2 !px-4 text-sm"
-              label="Register"
-              addingLabel="Registering…"
-            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoreInfo();
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#e8e0d5] border border-[#d4af37]/40 rounded-lg hover:bg-[#d4af37]/10 hover:border-[#d4af37]/60 transition-colors"
+              >
+                <Info className="w-4 h-4" />
+                More Info
+              </button>
+              <AddToCartButton
+                variantId={event.variantId}
+                className="!py-2 !px-4 text-sm"
+                label="Register"
+                addingLabel="Registering…"
+              />
+            </div>
           </div>
         </div>
       </div>

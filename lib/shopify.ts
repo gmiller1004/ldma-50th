@@ -80,18 +80,24 @@ export type ShopifyProduct = {
   } | null;
 };
 
+export type EventProductImage = {
+  url: string;
+  altText: string | null;
+  width: number;
+  height: number;
+};
+
 export type EventProduct = {
   id: string;
   title: string;
   handle: string;
+  descriptionHtml?: string;
   tags: string[];
   metafields?: Array<{ key: string; value: string }>;
-  featuredImage: {
-    url: string;
-    altText: string | null;
-    width: number;
-    height: number;
-  } | null;
+  featuredImage: EventProductImage | null;
+  images?: {
+    edges: Array<{ node: EventProductImage }>;
+  };
   variants: {
     edges: Array<{
       node: {
@@ -148,6 +154,7 @@ const EVENT_PRODUCT_FRAGMENT = `
     id
     title
     handle
+    descriptionHtml
     tags
     metafields(identifiers: [
       { namespace: "event", key: "start_date" },
@@ -161,6 +168,16 @@ const EVENT_PRODUCT_FRAGMENT = `
       altText
       width
       height
+    }
+    images(first: 10) {
+      edges {
+        node {
+          url
+          altText
+          width
+          height
+        }
+      }
     }
     variants(first: 1) {
       edges {
