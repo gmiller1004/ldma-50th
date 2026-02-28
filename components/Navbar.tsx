@@ -41,6 +41,7 @@ const navLinks = [
   { href: "/campgrounds", label: "Campgrounds" },
   { href: "/events", label: "Events 2026" },
   { href: "/memberships", label: "Memberships" },
+  { href: "/members", label: "Members" },
   { href: "/shop", label: "Shop" },
   { href: "/50-years", label: "50 Years" },
 ];
