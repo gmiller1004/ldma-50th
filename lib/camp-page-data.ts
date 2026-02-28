@@ -39,14 +39,16 @@ export type CampPageData = {
   galleryTitle: string;
   galleryImages: { src: string; caption?: string }[];
   ctaTitle: string;
+  /** Optional Facebook group URL — shows "Follow on Facebook" CTA under gallery */
+  facebookGroupUrl?: string;
 };
 
 export const italianBarData: CampPageData = {
   name: "Italian Bar",
   state: "California",
   slug: "italian-bar-california",
-  heroImage: "/images/camp-italian-bar.jpg",
-  heroImageFallback: "/images/camp-italian-bar.jpg",
+  heroImage: "/images/campgrounds/italian-bar-california/camp-italian-bar.jpg",
+  heroImageFallback: "/images/campgrounds/italian-bar-california/camp-italian-bar.jpg",
   tagline: "First LDMA Camp • River Gold on the Stanislaus",
   overview:
     "The very first LDMA camp, built from the ground up in the 1970s on the historic 1850s gold rush site along the South Fork of the Stanislaus River. Italian Bar has long been a destination for gold prospecting, camaraderie, and relaxing by the river. Many LDMA members found their first gold here. Owned by LDMA (Lost Dutchman's Mining Association).",
@@ -98,22 +100,23 @@ export const italianBarData: CampPageData = {
   ],
   galleryTitle: "Italian Bar Through the Years",
   galleryImages: [
-    { src: "/images/italian-bar-1.jpg", caption: "South Fork Stanislaus River" },
-    { src: "/images/italian-bar-2.jpg", caption: "Campground & river access" },
-    { src: "/images/italian-bar-3.jpg", caption: "Gold panning on the river" },
-    { src: "/images/italian-bar-4.jpg", caption: "Clubhouse & gathering space" },
-    { src: "/images/italian-bar-5.jpg", caption: "First LDMA camp" },
-    { src: "/images/italian-bar-6.jpg", caption: "50 years of LDMA history" },
+    { src: "/images/campgrounds/italian-bar-california/italian-bar-1.jpg", caption: "Welcome to Italian Bar — group gathering" },
+    { src: "/images/campgrounds/italian-bar-california/italian-bar-2.jpg", caption: "Clubhouse & fire pit" },
+    { src: "/images/campgrounds/italian-bar-california/italian-bar-3.jpg", caption: "Nervie's Store — member upkeep" },
+    { src: "/images/campgrounds/italian-bar-california/italian-bar-4.jpg", caption: "Gold panning on the Stanislaus" },
+    { src: "/images/campgrounds/italian-bar-california/italian-bar-5.jpg", caption: "Running a recirculator in camp" },
+    { src: "/images/campgrounds/italian-bar-california/italian-bar-6.jpg", caption: "I-Bar Mine display" },
   ],
   ctaTitle: "Ready to Visit Italian Bar?",
+  facebookGroupUrl: "https://www.facebook.com/groups/650550111736019",
 };
 
 export const duisenburgData: CampPageData = {
   name: "Duisenburg",
   state: "California",
   slug: "duisenburg-california",
-  heroImage: "/images/camp-duisenburg.jpg",
-  heroImageFallback: "/images/camp-duisenburg.jpg",
+  heroImage: "/images/campgrounds/duisenburg-california/camp-duisenburg.jpg",
+  heroImageFallback: "/images/campgrounds/duisenburg-california/camp-duisenburg.jpg",
   tagline: "High Desert Oasis • Mojave Gold & Wide-Open Skies",
   overview:
     "160 acres of high desert near Randsburg in Southern California gold country. Duisenburg offers primitive RV and tent camping amid breathtaking Mojave landscapes. A family-oriented camp with over 40 years of prospecting history. Metal detecting, dry washing, and desert gold. Owned by LDMA (Lost Dutchman's Mining Association).",
@@ -150,22 +153,23 @@ export const duisenburgData: CampPageData = {
   ],
   galleryTitle: "Duisenburg Through the Years",
   galleryImages: [
-    { src: "/images/duisenburg-1.jpg", caption: "High desert landscape" },
-    { src: "/images/duisenburg-2.jpg", caption: "Campground & clubhouse" },
-    { src: "/images/duisenburg-3.jpg", caption: "Metal detecting & dry washing" },
-    { src: "/images/duisenburg-4.jpg", caption: "Mojave gold country" },
-    { src: "/images/duisenburg-5.jpg", caption: "Family prospecting" },
-    { src: "/images/duisenburg-6.jpg", caption: "50 years of LDMA history" },
+    { src: "/images/campgrounds/duisenburg-california/duisenburg-1.jpg", caption: "Duisenburg LDMA sign" },
+    { src: "/images/campgrounds/duisenburg-california/duisenburg-2.jpg", caption: "Camp dig — material processing" },
+    { src: "/images/campgrounds/duisenburg-california/duisenburg-3.jpg", caption: "Desert camping" },
+    { src: "/images/campgrounds/duisenburg-california/duisenburg-4.jpg", caption: "Clubhouse gathering" },
+    { src: "/images/campgrounds/duisenburg-california/duisenburg-5.jpg", caption: "Dirt Party finds" },
+    { src: "/images/campgrounds/duisenburg-california/duisenburg-6.jpg", caption: "Camp Duisenburg clubhouse" },
   ],
   ctaTitle: "Ready to Visit Duisenburg?",
+  facebookGroupUrl: "https://www.facebook.com/groups/561212040898484",
 };
 
 export const blueBucketData: CampPageData = {
   name: "Blue Bucket",
   state: "Oregon",
   slug: "blue-bucket-oregon",
-  heroImage: "/images/camp-blue-bucket.jpg",
-  heroImageFallback: "/images/camp-blue-bucket.jpg",
+  heroImage: "/images/campgrounds/blue-bucket-oregon/camp-blue-bucket.jpg",
+  heroImageFallback: "/images/campgrounds/blue-bucket-oregon/camp-blue-bucket.jpg",
   tagline: "Scenic Gold & Wildlife • Stream & Bench Gravel",
   overview:
     "118 acres of patented land near Huntington with flat terrain and rolling hills. Gold in stream gravel, bench gravel, and high bench deposits. Elk, deer, and chukar abound. Family-friendly with RV hookups, clubhouse, and scenic Burnt River access. Owned by LDMA (Lost Dutchman's Mining Association).",
@@ -201,22 +205,23 @@ export const blueBucketData: CampPageData = {
   ],
   galleryTitle: "Blue Bucket Through the Years",
   galleryImages: [
-    { src: "/images/blue-bucket-1.jpg", caption: "Scenic Oregon terrain" },
-    { src: "/images/blue-bucket-2.jpg", caption: "RV hookups & campground" },
-    { src: "/images/blue-bucket-3.jpg", caption: "Gold in stream gravel" },
-    { src: "/images/blue-bucket-4.jpg", caption: "Clubhouse & gathering" },
-    { src: "/images/blue-bucket-5.jpg", caption: "Wildlife & nature" },
-    { src: "/images/blue-bucket-6.jpg", caption: "50 years of LDMA history" },
+    { src: "/images/campgrounds/blue-bucket-oregon/blue-bucket-1.jpg", caption: "Blue Bucket Camp sign" },
+    { src: "/images/campgrounds/blue-bucket-oregon/blue-bucket-2.jpg", caption: "Sluice box & blue buckets" },
+    { src: "/images/campgrounds/blue-bucket-oregon/blue-bucket-3.jpg", caption: "River prospecting" },
+    { src: "/images/campgrounds/blue-bucket-oregon/blue-bucket-4.jpg", caption: "Campground & valley views" },
+    { src: "/images/campgrounds/blue-bucket-oregon/blue-bucket-5.jpg", caption: "Member work day — creek maintenance" },
+    { src: "/images/campgrounds/blue-bucket-oregon/blue-bucket-6.jpg", caption: "Campground & RV sites" },
   ],
   ctaTitle: "Ready to Visit Blue Bucket?",
+  facebookGroupUrl: "https://www.facebook.com/groups/2043925965894572",
 };
 
 export const burntRiverData: CampPageData = {
   name: "Burnt River",
   state: "Oregon",
   slug: "burnt-river-oregon",
-  heroImage: "/images/camp-burnt-river.jpg",
-  heroImageFallback: "/images/camp-burnt-river.jpg",
+  heroImage: "/images/campgrounds/burnt-river-oregon/camp-burnt-river.jpg",
+  heroImageFallback: "/images/campgrounds/burnt-river-oregon/camp-burnt-river.jpg",
   tagline: "Wilderness River Camp • Rose Gold in Eastern Oregon",
   overview:
     "136 acres along Burnt River and Deer Creek in Eastern Oregon. Self-contained primitive camping with showers, clubhouse, and dump station. Breathtaking canyon views, wildlife (turkeys, deer, bighorn sheep), and the famed \"rose gold\" of the area. Regular camp digs and potluck events. Owned by LDMA (Lost Dutchman's Mining Association).",
@@ -250,22 +255,23 @@ export const burntRiverData: CampPageData = {
   ],
   galleryTitle: "Burnt River Through the Years",
   galleryImages: [
-    { src: "/images/burnt-river-1.jpg", caption: "River canyon views" },
-    { src: "/images/burnt-river-2.jpg", caption: "Campground & river" },
-    { src: "/images/burnt-river-3.jpg", caption: "Rose gold country" },
-    { src: "/images/burnt-river-4.jpg", caption: "Clubhouse & camp digs" },
-    { src: "/images/burnt-river-5.jpg", caption: "Wildlife & wilderness" },
-    { src: "/images/burnt-river-6.jpg", caption: "50 years of LDMA history" },
+    { src: "/images/campgrounds/burnt-river-oregon/burnt-river-1.jpg", caption: "Burnt River clubhouse" },
+    { src: "/images/campgrounds/burnt-river-oregon/burnt-river-2.jpg", caption: "Trommel & recirculator" },
+    { src: "/images/campgrounds/burnt-river-oregon/burnt-river-3.jpg", caption: "Family prospecting" },
+    { src: "/images/campgrounds/burnt-river-oregon/burnt-river-4.jpg", caption: "Clash of the Trommels — we got gold!" },
+    { src: "/images/campgrounds/burnt-river-oregon/burnt-river-5.jpg", caption: "Camp gathering" },
+    { src: "/images/campgrounds/burnt-river-oregon/burnt-river-6.jpg", caption: "Campsite prospecting" },
   ],
   ctaTitle: "Ready to Visit Burnt River?",
+  facebookGroupUrl: "https://www.facebook.com/groups/1586051941480504",
 };
 
 export const oconeeData: CampPageData = {
   name: "Oconee",
   state: "South Carolina",
   slug: "oconee-south-carolina",
-  heroImage: "/images/camp-oconee.jpg",
-  heroImageFallback: "/images/camp-oconee.jpg",
+  heroImage: "/images/campgrounds/oconee-south-carolina/camp-oconee.jpg",
+  heroImageFallback: "/images/campgrounds/oconee-south-carolina/camp-oconee.jpg",
   tagline: "Rustic Blue Ridge Gem & Gold • Panning & Gem Hunting",
   overview:
     "120 acres in the Blue Ridge foothills near Tamassee. A rustic retreat with gold panning and gem hunting — quartz, garnets, and rubies. Panning station, equipment rentals, and fire pit. Partial hookup and dry camping. Owned by LDMA (Lost Dutchman's Mining Association).",
@@ -299,22 +305,23 @@ export const oconeeData: CampPageData = {
   ],
   galleryTitle: "Oconee Through the Years",
   galleryImages: [
-    { src: "/images/oconee-1.jpg", caption: "Blue Ridge foothills" },
-    { src: "/images/oconee-2.jpg", caption: "Panning station" },
-    { src: "/images/oconee-3.jpg", caption: "Gem hunting" },
-    { src: "/images/oconee-4.jpg", caption: "Campground" },
-    { src: "/images/oconee-5.jpg", caption: "Gold & garnets" },
-    { src: "/images/oconee-6.jpg", caption: "50 years of LDMA history" },
+    { src: "/images/campgrounds/oconee-south-carolina/oconee-1.jpg", caption: "LDMA Oconee Camp — welcome home" },
+    { src: "/images/campgrounds/oconee-south-carolina/oconee-2.jpg", caption: "Riverbank prospecting" },
+    { src: "/images/campgrounds/oconee-south-carolina/oconee-3.jpg", caption: "Gold Hog sluice in action" },
+    { src: "/images/campgrounds/oconee-south-carolina/oconee-4.jpg", caption: "Gold pan find" },
+    { src: "/images/campgrounds/oconee-south-carolina/oconee-5.jpg", caption: "Digger's Dirt Party finds" },
+    { src: "/images/campgrounds/oconee-south-carolina/oconee-6.jpg", caption: "Camp dig — trommel & sluice" },
   ],
   ctaTitle: "Ready to Visit Oconee?",
+  facebookGroupUrl: "https://www.facebook.com/groups/1303356383142385",
 };
 
 export const loudMineData: CampPageData = {
   name: "Loud Mine",
   state: "Georgia",
   slug: "loud-mine-georgia",
-  heroImage: "/images/camp-loud-mine.jpg",
-  heroImageFallback: "/images/camp-loud-mine.jpg",
+  heroImage: "/images/campgrounds/loud-mine-georgia/camp-loud-mine.jpg",
+  heroImageFallback: "/images/campgrounds/loud-mine-georgia/camp-loud-mine.jpg",
   tagline: "Dahlonega Gold Belt • Stream Gold & Family Activities",
   overview:
     "37 acres in the Southern gold country, just 5 miles from Cleveland Town Square. Rich stream gold and bench deposits. Tranquil wooded hills with swimming, fishing, kayaking, and hiking. RV hookups, pavilion, laundry, craft room, and game room. Owned by LDMA (Lost Dutchman's Mining Association).",
@@ -350,22 +357,23 @@ export const loudMineData: CampPageData = {
   ],
   galleryTitle: "Loud Mine Through the Years",
   galleryImages: [
-    { src: "/images/loud-mine-1.jpg", caption: "Wooded hills" },
-    { src: "/images/loud-mine-2.jpg", caption: "Stream gold" },
-    { src: "/images/loud-mine-3.jpg", caption: "RV hookups" },
-    { src: "/images/loud-mine-4.jpg", caption: "Pavilion & clubhouse" },
-    { src: "/images/loud-mine-5.jpg", caption: "Family activities" },
-    { src: "/images/loud-mine-6.jpg", caption: "50 years of LDMA history" },
+    { src: "/images/campgrounds/loud-mine-georgia/loud-mine-1.jpg", caption: "Loud Mine clubhouse — holiday season" },
+    { src: "/images/campgrounds/loud-mine-georgia/loud-mine-2.jpg", caption: "Pond-side prospecting" },
+    { src: "/images/campgrounds/loud-mine-georgia/loud-mine-3.jpg", caption: "Loud Mine Camp — family gathering" },
+    { src: "/images/campgrounds/loud-mine-georgia/loud-mine-4.jpg", caption: "Campfire gathering" },
+    { src: "/images/campgrounds/loud-mine-georgia/loud-mine-5.jpg", caption: "Sluice box prospecting" },
+    { src: "/images/campgrounds/loud-mine-georgia/loud-mine-6.jpg", caption: "Welcome to Loud Mine" },
   ],
   ctaTitle: "Ready to Visit Loud Mine?",
+  facebookGroupUrl: "https://www.facebook.com/groups/2055448148072142",
 };
 
 export const veinMountainData: CampPageData = {
   name: "Vein Mountain",
   state: "North Carolina",
   slug: "vein-mountain-north-carolina",
-  heroImage: "/images/camp-vein-mountain.jpg",
-  heroImageFallback: "/images/camp-vein-mountain.jpg",
+  heroImage: "/images/campgrounds/vein-mountain-north-carolina/camp-vein-mountain.jpg",
+  heroImageFallback: "/images/campgrounds/vein-mountain-north-carolina/camp-vein-mountain.jpg",
   tagline: "Mother Lode in the Blue Ridge • Quartz Veins & Alluvial Gold",
   overview:
     "130 acres in a tranquil wooded setting near Nebo. Gold-bearing quartz veins, alluvial gravels, and soft bedrock. Ideal for family weekend getaways. RV hookups (30 amp, water), clubhouse, game room, and laundry. Owned by LDMA (Lost Dutchman's Mining Association).",
@@ -401,12 +409,13 @@ export const veinMountainData: CampPageData = {
   ],
   galleryTitle: "Vein Mountain Through the Years",
   galleryImages: [
-    { src: "/images/vein-mountain-1.jpg", caption: "Wooded setting" },
-    { src: "/images/vein-mountain-2.jpg", caption: "Quartz veins" },
-    { src: "/images/vein-mountain-3.jpg", caption: "Campground" },
-    { src: "/images/vein-mountain-4.jpg", caption: "Clubhouse" },
-    { src: "/images/vein-mountain-5.jpg", caption: "Family weekends" },
-    { src: "/images/vein-mountain-6.jpg", caption: "50 years of LDMA history" },
+    { src: "/images/campgrounds/vein-mountain-north-carolina/vein-mountain-1.jpg", caption: "Vein Mountain Gold Camp sign" },
+    { src: "/images/campgrounds/vein-mountain-north-carolina/vein-mountain-2.jpg", caption: "Camp gathering" },
+    { src: "/images/campgrounds/vein-mountain-north-carolina/vein-mountain-3.jpg", caption: "Gold dredging on the creek" },
+    { src: "/images/campgrounds/vein-mountain-north-carolina/vein-mountain-4.jpg", caption: "Gold find celebration" },
+    { src: "/images/campgrounds/vein-mountain-north-carolina/vein-mountain-5.jpg", caption: "Metal detecting event" },
+    { src: "/images/campgrounds/vein-mountain-north-carolina/vein-mountain-6.jpg", caption: "Digger's Dirt Party finds" },
   ],
   ctaTitle: "Ready to Visit Vein Mountain?",
+  facebookGroupUrl: "https://www.facebook.com/groups/254481531751690",
 };

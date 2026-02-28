@@ -29,7 +29,7 @@ export function Footer() {
               className="inline-block hover:opacity-90 transition-opacity"
             >
               <Image
-                src="/images/LDMA_50_Badge_2-02.png"
+                src="/images/global/LDMA_50_Badge_2-02.png"
                 alt="LDMA 50th Anniversary"
                 width={120}
                 height={60}

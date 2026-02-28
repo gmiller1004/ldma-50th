@@ -11,28 +11,28 @@ const memberStories = [
     since: "Member since 1984",
     quote:
       "My wife and I love spending time at our LDMA camps, seeing familiar faces and making new friends. It feels like family every time we pull in.",
-    photo: "/images/member-john-m.jpg",
+    photo: "/images/home/member-john-m.jpg",
   },
   {
     name: "Brandi B.",
     since: "Member since 2006",
     quote:
       "If you haven't experienced an LDMA mining event, you're missing out. The gold, the fun, and the camaraderie is unmatched. We've made memories that will last a lifetime.",
-    photo: "/images/member-brandi-b.jpg",
+    photo: "/images/home/member-brandi-b.jpg",
   },
   {
     name: "John Shannon",
     since: "LDMA Member",
     quote:
       "When I joined Lost Dutchman's, I went to a few outings, had fun, met a lot of great people, and started planning my stays. Like a little kid, I can't wait to go back every time.",
-    photo: "/images/member-john-shannon.jpg",
+    photo: "/images/home/member-john-shannon.jpg",
   },
   {
     name: "Paul & Cathy McGillis",
     since: "Long-time Members",
     quote:
       "We laugh when we make our plans to stay at any of our ten 'second' homes. The camps are that special — we've been coming back for years and it never gets old.",
-    photo: "/images/member-mcgillis.jpg",
+    photo: "/images/home/member-mcgillis.jpg",
   },
 ];
 

@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { FacebookGroupCTA } from "@/components/FacebookGroupCTA";
 import type { CampPageData, AmenityIcon } from "@/lib/camp-page-data";
 
 const ICON_MAP: Record<AmenityIcon, LucideIcon> = {
@@ -456,6 +457,12 @@ export function CampPageTemplate({ camp }: { camp: CampPageData }) {
               />
             ))}
           </motion.div>
+          {camp.facebookGroupUrl && (
+            <>
+              <SectionDivider />
+              <FacebookGroupCTA url={camp.facebookGroupUrl} campName={camp.name} />
+            </>
+          )}
         </div>
       </section>
 
@@ -499,6 +506,7 @@ export function CampPageTemplate({ camp }: { camp: CampPageData }) {
                   fill
                   className="object-contain"
                   sizes="90vw"
+                  unoptimized
                 />
               </motion.div>
               {camp.galleryImages[lightboxIndex]?.caption && (
@@ -615,6 +623,7 @@ function GalleryImage({
           className="object-cover group-hover:scale-105 transition-transform duration-500"
           sizes="(max-width: 768px) 50vw, 33vw"
           onError={() => setError(true)}
+          unoptimized
         />
       ) : (
         <Image
@@ -623,6 +632,7 @@ function GalleryImage({
           fill
           className="object-cover group-hover:scale-105 transition-transform duration-500"
           sizes="(max-width: 768px) 50vw, 33vw"
+          unoptimized
         />
       )}
       <div

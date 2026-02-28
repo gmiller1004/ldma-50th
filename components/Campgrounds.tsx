@@ -27,7 +27,7 @@ const featuredCamps = [
       "Trash & Dump Station",
     ],
     address: "24997 Italian Bar Rd, Columbia, CA 95310",
-    image: "/images/camp-italian-bar.jpg",
+    image: "/images/home/campgrounds/italian-bar.jpg",
     link: "https://myldma.com/collections/italian-bar-california",
   },
   {
@@ -42,7 +42,7 @@ const featuredCamps = [
       "Community Events",
     ],
     address: "15650 Stanton Rd, Congress, AZ 85332",
-    image: "/images/camp-stanton.jpg",
+    image: "/images/home/campgrounds/stanton.jpg",
     link: "https://myldma.com/collections/stanton-arizona",
   },
   {
@@ -57,7 +57,7 @@ const featuredCamps = [
       "Dump Station",
     ],
     address: "28089 Burnt River Canyon Ln, Durkee, OR 97905",
-    image: "/images/camp-burnt-river.jpg",
+    image: "/images/home/campgrounds/burnt-river.jpg",
     link: "https://myldma.com/collections/burnt-river-oregon",
   },
   {
@@ -72,7 +72,7 @@ const featuredCamps = [
       "Family Activities",
     ],
     address: "575 Abb Helton Rd, Cleveland, GA 30528",
-    image: "/images/camp-loud-mine.jpg",
+    image: "/images/home/campgrounds/loud-mine.jpg",
     link: "https://myldma.com/collections/loud-mine-georgia",
   },
 ];

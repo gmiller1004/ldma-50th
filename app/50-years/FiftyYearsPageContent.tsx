@@ -67,23 +67,76 @@ const stats = [
 
 const thenNowItems = [
   {
-    camp: "Italian Bar",
-    thenTitle: "1976 — First Outing",
-    thenText: "The Buzzard and early LDMA members at the very first Thanksgiving outing on the South Fork Stanislaus.",
-    thenMedia: "video" as const,
+    camp: "Vein Mountain",
+    thenTitle: "1990s–2000s",
+    thenText: "Early days at the North Carolina camp — quartz veins and alluvial gold in the Blue Ridge.",
+    thenVideoId: "4zx-ZobLxh0",
     nowTitle: "Today",
-    nowText: "160 acres of river access, RV hookups, clubhouse, and gold panning. The first LDMA camp, still going strong.",
-    nowImage: "/images/camp-italian-bar.jpg",
+    nowText: "130 acres with RV hookups, clubhouse, and gold-bearing quartz veins. Family weekend getaways in a tranquil wooded setting.",
+    nowImage: "/images/50-years/now-vein-mountain.jpg",
+  },
+  {
+    camp: "Finley Camp",
+    thenTitle: "1990s–2000s",
+    thenText: "Vintage footage from the Northern California camp — North Fork Salmon River and Russian Creek.",
+    thenVideoId: "6LieKbr1vO4",
+    nowTitle: "Today",
+    nowText: "140 acres at 2,600 ft with North Fork Salmon River & Russian Creek. Primitive, shaded, self-contained camping.",
+    nowImage: "/images/50-years/now-finley.jpg",
+  },
+  {
+    camp: "Burnt River",
+    thenTitle: "1990s–2000s",
+    thenText: "Early outings along Burnt River and Deer Creek in Eastern Oregon — where the rose gold runs.",
+    thenVideoId: "B2CYXuFrZXg",
+    nowTitle: "Today",
+    nowText: "136 acres with showers, clubhouse, and dump station. Camp digs, potlucks, and famed rose gold finds.",
+    nowImage: "/images/50-years/now-burnt-river.jpg",
+  },
+  {
+    camp: "Loud Mine",
+    thenTitle: "1990s–2000s",
+    thenText: "Footage from the Dahlonega gold belt — stream gold and family prospecting in Georgia.",
+    thenVideoId: "u090tsHfIVI",
+    nowTitle: "Today",
+    nowText: "37 acres with RV hookups, pavilion, clubhouse, and rich stream gold. Swim, fish, kayak, and hunt for gold.",
+    nowImage: "/images/50-years/now-loud-mine.jpg",
   },
   {
     camp: "Stanton",
-    thenTitle: "1980s — Ghost Town",
-    thenText: "A nearly abandoned mining town in the Arizona desert, awaiting restoration by LDMA members.",
-    thenMedia: "image" as const,
-    thenImage: "/images/stanton-1.jpg",
+    thenTitle: "1990s–2000s",
+    thenText: "The Arizona ghost town in early LDMA days — before and during member restoration.",
+    thenVideoId: "VkhLiYOADJA",
     nowTitle: "Today",
-    nowText: "One of America's best-preserved gold camps — historic Hotel Stanton, clubhouse, and year-round prospecting.",
-    nowImage: "/images/camp-stanton.jpg",
+    nowText: "One of America's best-preserved gold camps — historic Hotel Stanton, museum, clubhouse, and 197 RV sites.",
+    nowImage: "/images/50-years/now-stanton.jpg",
+  },
+  {
+    camp: "Duisenburg",
+    thenTitle: "1990s–2000s",
+    thenText: "High desert prospecting in the Mojave — metal detecting and dry washing near Randsburg.",
+    thenVideoId: "jZxiqJWkuyo",
+    nowTitle: "Today",
+    nowText: "160 acres of Mojave gold country. Primitive RV and tent camping, clubhouse, and 40+ years of desert prospecting.",
+    nowImage: "/images/50-years/now-duisenburg.jpg",
+  },
+  {
+    camp: "Italian Bar",
+    thenTitle: "1990s–2000s",
+    thenText: "The Buzzard and early members at the first LDMA camp — the South Fork Stanislaus.",
+    thenVideoId: "fA9_x6Wlng8",
+    nowTitle: "Today",
+    nowText: "160 acres of river access, RV hookups, clubhouse, and gold panning. The first LDMA camp, still going strong.",
+    nowImage: "/images/50-years/now-italian-bar.jpg",
+  },
+  {
+    camp: "Oconee",
+    thenTitle: "1990s–2000s",
+    thenText: "Early days in the Blue Ridge foothills — gold panning and gem hunting in South Carolina.",
+    thenVideoId: "3zw1CoD2904",
+    nowTitle: "Today",
+    nowText: "120 acres with panning station, equipment rentals, and gem hunting — quartz, garnets, and rubies.",
+    nowImage: "/images/50-years/now-oconee.jpg",
   },
 ];
 
@@ -312,30 +365,15 @@ export function FiftyYearsPageContent() {
                       {item.thenText}
                     </p>
                   </div>
-                  {item.thenMedia === "video" ? (
-                    <div className="relative aspect-video rounded-lg overflow-hidden border border-[#d4af37]/20">
-                      <iframe
-                        src={`https://www.youtube.com/embed/${BUZZARD_VIDEO_ID}?rel=0`}
-                        title={`${item.camp} - Then`}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        className="absolute inset-0 w-full h-full"
-                      />
-                    </div>
-                  ) : (
-                    item.thenImage && (
-                      <div className="relative aspect-[4/3] rounded-lg overflow-hidden border border-[#d4af37]/20">
-                        <Image
-                          src={item.thenImage}
-                          alt={`${item.camp} - Then`}
-                          fill
-                          className="object-cover opacity-80"
-                          sizes="(max-width: 768px) 100vw, 50vw"
-                        />
-                        <div className="absolute inset-0 bg-[#1a120b]/40" />
-                      </div>
-                    )
-                  )}
+                  <div className="relative aspect-video rounded-lg overflow-hidden border border-[#d4af37]/20">
+                    <iframe
+                      src={`https://www.youtube.com/embed/${item.thenVideoId}?rel=0`}
+                      title={`${item.camp} - Then`}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="absolute inset-0 w-full h-full"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-4">
                   <div className="h-8" />

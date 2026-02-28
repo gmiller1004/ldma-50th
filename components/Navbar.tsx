@@ -24,7 +24,7 @@ function NavbarLogo() {
   return (
     <div className="relative h-8 w-auto md:h-10 drop-shadow-[0_0_8px_rgba(212,175,55,0.25)] group-hover:drop-shadow-[0_0_12px_rgba(212,175,55,0.4)] transition-all">
       <Image
-        src="/images/50th-logo.png"
+        src="/images/global/50th-logo.png"
         alt="LDMA 50th Anniversary"
         width={120}
         height={48}

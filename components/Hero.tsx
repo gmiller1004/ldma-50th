@@ -19,7 +19,7 @@ export function Hero() {
       >
         {!bgError ? (
           <Image
-            src="/images/hero-george-italian-bar.jpg"
+            src="/images/home/hero-george-italian-bar.jpg"
             alt="George Buzzard Massie with OG LDMA members at Italian Bar, 1976"
             fill
             priority

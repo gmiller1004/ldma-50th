@@ -21,6 +21,7 @@ import {
   Navigation,
 } from "lucide-react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { FacebookGroupCTA } from "@/components/FacebookGroupCTA";
 
 const amenities = [
   {
@@ -43,12 +44,12 @@ const amenities = [
 ];
 
 const galleryImages: { src: string; caption?: string }[] = [
-  { src: "/images/stanton-1.jpg", caption: "Historic Hotel Stanton" },
-  { src: "/images/stanton-2.jpg", caption: "Member restoration project" },
-  { src: "/images/stanton-3.jpg", caption: "Gold-bearing claims" },
-  { src: "/images/stanton-4.jpg", caption: "Campground views" },
-  { src: "/images/stanton-5.jpg", caption: "Clubhouse & gathering space" },
-  { src: "/images/stanton-6.jpg", caption: "50 years of LDMA history" },
+  { src: "/images/campgrounds/stanton-arizona/stanton-1.jpg", caption: "Holiday gathering at Stanton" },
+  { src: "/images/campgrounds/stanton-arizona/stanton-2.jpg", caption: "Mining headframe demonstration" },
+  { src: "/images/campgrounds/stanton-arizona/stanton-3.jpg", caption: "Member work day — utility upgrades" },
+  { src: "/images/campgrounds/stanton-arizona/stanton-4.jpg", caption: "Gold finds at Hotel Stanton" },
+  { src: "/images/campgrounds/stanton-arizona/stanton-5.jpg", caption: "RV campground & historic buildings" },
+  { src: "/images/campgrounds/stanton-arizona/stanton-6.jpg", caption: "Gold from Stanton claims" },
 ];
 
 const nearbyAttractions = [
@@ -132,7 +133,7 @@ export function StantonCampContent() {
         <motion.div className="absolute inset-0" style={{ y: heroY }}>
           {!heroError ? (
             <Image
-              src="/images/camp-stanton-hero.jpg"
+              src="/images/campgrounds/stanton-arizona/camp-stanton-hero.jpg"
               alt="Stanton Camp"
               fill
               className="object-cover scale-105"
@@ -142,7 +143,7 @@ export function StantonCampContent() {
             />
           ) : (
             <Image
-              src="/images/camp-stanton.jpg"
+              src="/images/campgrounds/stanton-arizona/camp-stanton.jpg"
               alt="Stanton Camp"
               fill
               className="object-cover scale-105"
@@ -497,12 +498,17 @@ export function StantonCampContent() {
                 key={src}
                 src={src}
                 index={i}
-                fallback="/images/camp-stanton.jpg"
+                fallback="/images/campgrounds/stanton-arizona/camp-stanton.jpg"
                 caption={caption}
                 onClick={() => setLightboxIndex(i)}
               />
             ))}
           </motion.div>
+          <SectionDivider />
+          <FacebookGroupCTA
+            url="https://www.facebook.com/groups/521036414939133"
+            campName="Stanton"
+          />
         </div>
       </section>
 
@@ -536,7 +542,7 @@ export function StantonCampContent() {
               >
                 <Image
                   src={
-                    galleryImages[lightboxIndex]?.src || "/images/camp-stanton.jpg"
+                    galleryImages[lightboxIndex]?.src || "/images/campgrounds/stanton-arizona/camp-stanton.jpg"
                   }
                   alt={galleryImages[lightboxIndex]?.caption || "Stanton camp"}
                   fill

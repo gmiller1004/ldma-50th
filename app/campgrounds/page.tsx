@@ -16,7 +16,7 @@ const mainCamps = [
     tagline: "Flagship Camp • Historic Ghost Town",
     desc: "120 patented acres with full hookups, museum, clubhouse, laundry, and exclusive claims.",
     address: "15650 Stanton Rd, Congress, AZ 85332",
-    image: "/images/camp-stanton.jpg",
+    image: "/images/campgrounds/stanton-arizona/camp-stanton.jpg",
     slug: "stanton-arizona",
   },
   {
@@ -25,7 +25,7 @@ const mainCamps = [
     tagline: "First LDMA Camp • River Gold",
     desc: "160 acres on the South Fork Stanislaus River where many members found their first gold.",
     address: "24997 Italian Bar Rd, Columbia, CA 95310",
-    image: "/images/camp-italian-bar.jpg",
+    image: "/images/campgrounds/italian-bar-california/camp-italian-bar.jpg",
     slug: "italian-bar-california",
   },
   {
@@ -34,7 +34,7 @@ const mainCamps = [
     tagline: "High Desert Oasis",
     desc: "160 acres Mojave Desert near Randsburg. Showers, clubhouse, primitive RV/tent camping.",
     address: "L.D.M.A. Clubhouse, Ridgecrest, CA 93555",
-    image: "/images/camp-duisenburg.jpg",
+    image: "/images/campgrounds/duisenburg-california/camp-duisenburg.jpg",
     slug: "duisenburg-california",
   },
   {
@@ -43,7 +43,7 @@ const mainCamps = [
     tagline: "Scenic Gold & Wildlife",
     desc: "118 acres with hookups, showers, laundry, and gold in stream/bench gravel. Elk, deer & chukar abound.",
     address: "31097 Valentine Lane, Huntington, OR 97907",
-    image: "/images/camp-blue-bucket.jpg",
+    image: "/images/campgrounds/blue-bucket-oregon/camp-blue-bucket.jpg",
     slug: "blue-bucket-oregon",
   },
   {
@@ -52,7 +52,7 @@ const mainCamps = [
     tagline: "Wilderness River Camp",
     desc: "136 acres along Burnt River & Deer Creek. Dry camping with showers, clubhouse, dump station.",
     address: "28089 Burnt River Canyon Ln, Durkee, OR 97905",
-    image: "/images/camp-burnt-river.jpg",
+    image: "/images/campgrounds/burnt-river-oregon/camp-burnt-river.jpg",
     slug: "burnt-river-oregon",
   },
   {
@@ -61,7 +61,7 @@ const mainCamps = [
     tagline: "Rustic Blue Ridge Gem & Gold",
     desc: "120 acres with panning station, equipment rentals, fire pit, and gem hunting (quartz, garnets, rubies).",
     address: "475 LDMA Dr, Tamassee, SC 29686",
-    image: "/images/camp-oconee.jpg",
+    image: "/images/campgrounds/oconee-south-carolina/camp-oconee.jpg",
     slug: "oconee-south-carolina",
   },
   {
@@ -70,7 +70,7 @@ const mainCamps = [
     tagline: "Dahlonega Gold Belt",
     desc: "37 acres with hookups, pavilion, and rich stream gold near swimming & kayaking.",
     address: "575 Abb Helton Rd, Cleveland, GA 30528",
-    image: "/images/camp-loud-mine.jpg",
+    image: "/images/campgrounds/loud-mine-georgia/camp-loud-mine.jpg",
     slug: "loud-mine-georgia",
   },
   {
@@ -79,7 +79,7 @@ const mainCamps = [
     tagline: "Mother Lode in the Blue Ridge",
     desc: "130 acres with quartz veins, alluvial gravel, hookups, clubhouse, and family weekend vibes.",
     address: "3216 Vein Mt. Rd, Nebo, NC 28761",
-    image: "/images/camp-vein-mountain.jpg",
+    image: "/images/campgrounds/vein-mountain-north-carolina/camp-vein-mountain.jpg",
     slug: "vein-mountain-north-carolina",
   },
 ];
