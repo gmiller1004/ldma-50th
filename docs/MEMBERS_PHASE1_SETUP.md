@@ -86,8 +86,12 @@ SENDGRID_FROM_EMAIL=noreply@yourdomain.com
 SENDGRID_FROM_NAME=LDMA
 
 # Upstash Redis (auth codes)
+# Upstash Redis - either set of names works:
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
+# Or (Vercel KV / Upstash integration):
+# KV_REST_API_URL=
+# KV_REST_API_TOKEN=
 
 # Session secret (generate a random string, e.g. openssl rand -hex 32)
 MEMBER_SESSION_SECRET=

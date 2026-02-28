@@ -39,6 +39,7 @@ export async function POST(req: Request) {
     });
 
     if (!stored) {
+      console.error("[send-code] Redis failed to store auth code");
       return NextResponse.json(
         {
           error: "Unable to send code. Please try again later.",
@@ -51,10 +52,10 @@ export async function POST(req: Request) {
     const sent = await sendLoginCode(result.email, code);
 
     if (!sent) {
-      // Code was stored but email failed - in prod you might want to delete the code
+      console.error("[send-code] SendGrid failed to send email");
       return NextResponse.json(
         {
-          error: "Code was generated but we could not send the email. Please check your email configuration or try again.",
+          error: "Code was generated but we could not send the email. Please try again later.",
           action: "retry",
         },
         { status: 503 }
