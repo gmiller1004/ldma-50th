@@ -52,6 +52,9 @@ const MERCH_COLLECTION_HANDLES = [
   "all",
 ];
 
+/** Primary collection handle for full shop page */
+export const SHOP_COLLECTION_HANDLE = "merch";
+
 export type ProductOption = {
   name: string;
   optionValues: Array<{ name: string }>;
@@ -150,6 +153,74 @@ const PRODUCT_FRAGMENT = `
             name
             value
           }
+        }
+      }
+    }
+  }
+`;
+
+/** Product fragment for shop collection page. Full details for product cards and modal. */
+export type ShopProductVariant = {
+  id: string;
+  availableForSale: boolean;
+  price: { amount: string; currencyCode: string };
+  compareAtPrice: { amount: string; currencyCode: string } | null;
+  selectedOptions: Array<{ name: string; value: string }>;
+};
+
+export type ShopProduct = {
+  id: string;
+  title: string;
+  handle: string;
+  productType?: string;
+  publishedAt?: string;
+  descriptionHtml?: string;
+  featuredImage: EventProductImage | null;
+  images?: {
+    edges: Array<{ node: EventProductImage }>;
+  };
+  options?: EventProductOption[];
+  variants: {
+    edges: Array<{ node: ShopProductVariant }>;
+  };
+};
+
+const SHOP_PRODUCT_FRAGMENT = `
+  fragment ShopProductFields on Product {
+    id
+    title
+    handle
+    productType
+    publishedAt
+    descriptionHtml
+    featuredImage {
+      url
+      altText
+      width
+      height
+    }
+    images(first: 10) {
+      edges {
+        node {
+          url
+          altText
+          width
+          height
+        }
+      }
+    }
+    options(first: 10) {
+      name
+      optionValues { name }
+    }
+    variants(first: 50) {
+      edges {
+        node {
+          id
+          availableForSale
+          price { amount currencyCode }
+          compareAtPrice { amount currencyCode }
+          selectedOptions { name value }
         }
       }
     }
@@ -356,6 +427,60 @@ export async function getEventProducts(): Promise<EventProduct[]> {
   } catch (e) {
     throw e;
   }
+}
+
+export type MerchShopData = {
+  products: ShopProduct[];
+  collectionDescription?: string;
+};
+
+/** Fetch products and collection info from the merch collection for the shop page. */
+export async function getMerchProducts(): Promise<MerchShopData> {
+  for (const handle of MERCH_COLLECTION_HANDLES) {
+    try {
+      const result = await shopifyFetch<{
+        collection: {
+          description: string;
+          descriptionHtml?: string;
+          products: {
+            edges: Array<{ node: ShopProduct }>;
+          };
+        } | null;
+      }>({
+        query: `
+          ${SHOP_PRODUCT_FRAGMENT}
+          query GetMerchProducts($handle: String!) {
+            collection(handle: $handle) {
+              description
+              descriptionHtml
+              products(first: 50, sortKey: TITLE) {
+                edges {
+                  node {
+                    ...ShopProductFields
+                  }
+                }
+              }
+            }
+          }
+        `,
+        variables: { handle },
+      });
+
+      const collection = result?.collection;
+      const products = collection?.products?.edges ?? [];
+      if (products.length > 0) {
+        const desc =
+          (collection?.descriptionHtml || collection?.description || "").trim();
+        return {
+          products: products.map(({ node }) => node),
+          collectionDescription: desc || undefined,
+        };
+      }
+    } catch {
+      continue;
+    }
+  }
+  return { products: [] };
 }
 
 export async function createCartAndAddLine(variantId: string) {

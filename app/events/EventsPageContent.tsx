@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -567,6 +567,7 @@ function EventDetailModal({
     return imgs;
   }, [event]);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const touchStartX = useRef(0);
   const variants = getVariants(event);
   const defaultVariant =
     variants.find((v) => v.availableForSale !== false) ?? variants[0];
@@ -618,7 +619,28 @@ function EventDetailModal({
         <div className="max-h-[90vh] overflow-y-auto">
           {/* Gallery */}
           {galleryImages.length > 0 && (
-            <div className="relative aspect-[16/10] bg-[#0f3d1e]/30">
+            <div
+              className="relative aspect-[16/10] bg-[#0f3d1e]/30 touch-pan-y"
+              onTouchStart={(e) => {
+                touchStartX.current = e.touches[0]!.clientX;
+              }}
+              onTouchEnd={(e) => {
+                if (galleryImages.length <= 1) return;
+                const diff = touchStartX.current - e.changedTouches[0]!.clientX;
+                const threshold = 50;
+                if (Math.abs(diff) > threshold) {
+                  if (diff > 0) {
+                    setGalleryIndex((i) =>
+                      i === galleryImages.length - 1 ? 0 : i + 1
+                    );
+                  } else {
+                    setGalleryIndex((i) =>
+                      i === 0 ? galleryImages.length - 1 : i - 1
+                    );
+                  }
+                }
+              }}
+            >
               <Image
                 src={galleryImages[galleryIndex]?.url ?? galleryImages[0]!.url}
                 alt={galleryImages[galleryIndex]?.altText ?? event.title}
@@ -785,9 +807,9 @@ function EventCard({
             <Calendar className="w-16 h-16" />
           </div>
         )}
-        {/* Gradient overlay for text readability — hidden on hover when details panel shows (sm+) */}
+        {/* Gradient overlay with date/title — hidden on mobile (panel always expanded); on sm+ shown until hover */}
         <div
-          className="absolute inset-x-0 bottom-0 pt-20 pb-4 px-4 transition-opacity duration-200 sm:group-hover:opacity-0"
+          className="absolute inset-x-0 bottom-0 pt-20 pb-4 px-4 transition-opacity duration-200 hidden sm:block sm:group-hover:opacity-0"
           style={{
             background:
               "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 45%, transparent 100%)",

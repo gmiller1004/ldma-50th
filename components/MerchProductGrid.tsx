@@ -66,7 +66,7 @@ function ProductCard({
       viewport={{ once: true }}
       transition={{ delay: index * 0.1 }}
     >
-      <Link href={`/shop/${product.handle}`} className="block">
+      <Link href={`/shop?product=${encodeURIComponent(product.handle)}`} className="block">
         <div className="relative aspect-square bg-[#1a120b]">
           {product.featuredImage ? (
             <Image
