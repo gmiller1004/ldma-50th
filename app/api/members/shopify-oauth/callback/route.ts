@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { verifySessionToken } from "@/lib/session";
 import { exchangeCodeForTokens } from "@/lib/customer-account-api";
 import { setShopifyOAuthToken } from "@/lib/shopify-tokens";
+import { consumeOAuthState } from "@/lib/oauth-state";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -25,31 +24,14 @@ export async function GET(req: Request) {
     );
   }
 
-  const parts = state.split("_");
-  const memberNumber = parts.length >= 2 ? parts.slice(1).join("_") : null;
-
+  const memberNumber = await consumeOAuthState(state);
   if (!memberNumber) {
     return NextResponse.redirect(
-      `${doneUrl}?error=${encodeURIComponent("Invalid state")}`
+      `${doneUrl}?error=${encodeURIComponent("Invalid or expired state. Please try again.")}`
     );
   }
 
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("member_session")?.value;
-    if (!token) {
-      return NextResponse.redirect(
-        `${doneUrl}?error=${encodeURIComponent("Session expired")}`
-      );
-    }
-
-    const session = await verifySessionToken(token);
-    if (!session || session.memberNumber !== memberNumber) {
-      return NextResponse.redirect(
-        `${doneUrl}?error=${encodeURIComponent("Session mismatch")}`
-      );
-    }
-
     const redirectUri = `${baseUrl}/api/members/shopify-oauth/callback`;
     const tokens = await exchangeCodeForTokens(code, redirectUri);
 

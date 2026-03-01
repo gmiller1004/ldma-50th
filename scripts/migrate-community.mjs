@@ -24,6 +24,7 @@ const migrations = [
   "migrate-member-notifications.sql",
   "migrate-member-shopify-tokens.sql",
   "migrate-member-shopify-oauth.sql",
+  "migrate-oauth-state.sql",
   "migrate-claims.sql",
   "seed-stanton-claims.sql",
 ];

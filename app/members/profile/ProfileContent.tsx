@@ -48,7 +48,12 @@ export function ProfileContent() {
   const [companionProduct, setCompanionProduct] = useState<MembershipProductInfo | null>(null);
   const [bannerExpanded, setBannerExpanded] = useState(true);
   const [avatarHelpOpen, setAvatarHelpOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"profile" | "purchase-history">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "purchase-history">(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#purchase-history") {
+      return "purchase-history";
+    }
+    return "profile";
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     phone: "",
@@ -564,6 +569,7 @@ function PurchaseHistoryTab() {
   const [orders, setOrders] = useState<CustomerOrder[] | null>(null);
   const [needsLogin, setNeedsLogin] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const popupRef = useRef<Window | null>(null);
 
   function loadPurchaseHistory() {
@@ -573,8 +579,12 @@ function PurchaseHistoryTab() {
       .then((data) => {
         setNeedsLogin(!!data.needsLogin);
         setOrders(data.orders ?? []);
+        setError(data.error ?? null);
       })
-      .catch(() => setNeedsLogin(true))
+      .catch(() => {
+        setNeedsLogin(true);
+        setError(null);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -596,7 +606,12 @@ function PurchaseHistoryTab() {
       if (e.data?.type !== SHOPIFY_OAUTH_MESSAGE) return;
       popupRef.current?.close();
       popupRef.current = null;
-      loadPurchaseHistory();
+      if (e.data?.success) {
+        window.location.hash = "purchase-history";
+        window.location.reload();
+      } else {
+        loadPurchaseHistory();
+      }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
@@ -612,6 +627,12 @@ function PurchaseHistoryTab() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="p-4 rounded-lg bg-amber-950/30 border border-amber-700/30">
+          <p className="text-sm text-amber-200">{error}</p>
+        </div>
+      )}
+
       {!needsLogin && (
         <div className="p-4 rounded-lg bg-[#0f3d1e]/30 border border-[#d4af37]/20">
           <p className="text-sm text-[#e8e0d5]/90">

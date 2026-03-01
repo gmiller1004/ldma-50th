@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifySessionToken } from "@/lib/session";
 import { getAuthorizationUrl } from "@/lib/customer-account-api";
+import { setOAuthState } from "@/lib/oauth-state";
 import { randomBytes } from "crypto";
 
 export async function GET() {
@@ -19,7 +20,10 @@ export async function GET() {
 
     const baseUrl = getBaseUrl();
     const redirectUri = `${baseUrl}/api/members/shopify-oauth/callback`;
-    const state = `${randomBytes(16).toString("hex")}_${session.memberNumber}`;
+    const state = randomBytes(32).toString("hex");
+
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await setOAuthState(state, session.memberNumber, expiresAt);
 
     const authUrl = await getAuthorizationUrl(redirectUri, state);
     return NextResponse.redirect(authUrl);

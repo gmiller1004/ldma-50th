@@ -59,9 +59,19 @@ export async function GET() {
     try {
       const orders = await getCustomerOrders(accessToken, 50);
       return NextResponse.json({ needsLogin: false, orders });
-    } catch {
-      await clearShopifyToken(session.memberNumber);
-      return NextResponse.json({ needsLogin: true }, { status: 200 });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      const isAuthError = msg.includes("401") || msg.includes("unauthorized") || msg.includes("token");
+      if (isAuthError) {
+        await clearShopifyToken(session.memberNumber);
+        return NextResponse.json({ needsLogin: true }, { status: 200 });
+      }
+      console.error("[purchase-history] getCustomerOrders failed:", e);
+      return NextResponse.json({
+        needsLogin: false,
+        orders: [],
+        error: "Unable to load orders. Please try again.",
+      }, { status: 200 });
     }
   } catch (e) {
     console.error("[purchase-history]", e);
