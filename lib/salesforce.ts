@@ -22,6 +22,12 @@ export type MemberLookupResult = {
   shippingSameAsBilling?: boolean;
   duesOwed?: number;
   maintenancePaidThru?: string;
+  /** Show maintenance dues (LDMA type, not exempt). When false, hide dues line. */
+  showMaintenance?: boolean;
+  /** Hide entire maintenance block (type not LDMA + is new member). */
+  hideMaintenance?: boolean;
+  maintenanceExempt?: boolean;
+  isOnAutoPay?: boolean;
   error?: string;
 };
 
@@ -40,7 +46,7 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
 
   try {
     const escaped = String(memberNumber).replace(/'/g, "\\'");
-    const query = `SELECT Id, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c FROM Contact WHERE Customer_Number__c = '${escaped}' LIMIT 1`;
+    const query = `SELECT Id, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c FROM Contact WHERE Customer_Number__c = '${escaped}' LIMIT 1`;
     const queryRes = await fetch(
       `${client.instanceUrl}/services/data/v59.0/query?q=${encodeURIComponent(query)}`,
       {
@@ -89,6 +95,19 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
       membershipTypeText === "LDMA" ||
       isNewMember;
 
+    const maintenanceExempt =
+      String((c.Maintenance_Exempt__c as string) || "").toUpperCase() === "YES";
+    const isOnAutoPay =
+      c.Is_On_Auto_Pay__c === true || c.LDMA_Auto_Pay_Shopify__c === true;
+
+    // Hide maintenance section: type not LDMA AND is new member
+    const hideMaintenance =
+      membershipType !== "LDMA" && membershipTypeText !== "LDMA" && isNewMember;
+    const showMaintenance =
+      !hideMaintenance &&
+      (membershipType === "LDMA" || membershipTypeText === "LDMA") &&
+      !maintenanceExempt;
+
     const duesRaw = c.Maintenance_Min_0_Email__c;
     let duesOwed: number | undefined;
     if (typeof duesRaw === "number" && !Number.isNaN(duesRaw)) {
@@ -124,6 +143,9 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
       shippingSameAsBilling: c.Shipping_Same_As_Billing__c === true,
       duesOwed,
       maintenancePaidThru,
+      showMaintenance,
+      maintenanceExempt,
+      isOnAutoPay,
     };
   } catch (e) {
     console.error("Salesforce lookup error:", e);
@@ -292,7 +314,10 @@ function mockLookup(memberNumber: string): MemberLookupResult {
     otherCity: "Phoenix",
     otherState: "AZ",
     otherPostalCode: "85001",
-    duesOwed: 0,
+    duesOwed: 75,
     maintenancePaidThru: "2025-12-31",
+    showMaintenance: true,
+    hideMaintenance: false,
+    isOnAutoPay: false,
   };
 }

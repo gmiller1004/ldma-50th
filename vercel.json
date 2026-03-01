@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/comment-digest",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}

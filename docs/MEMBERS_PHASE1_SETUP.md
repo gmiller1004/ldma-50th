@@ -42,6 +42,8 @@ The **Run As** user runs all API calls on behalf of the app. Create a dedicated 
 | Maintenance paid thru | `Maintenance_Paid_Thru_Date__c` | Shown on profile |
 | Shipping address | `OtherStreet`, `OtherCity`, `OtherState`, `OtherPostalCode` | Editable; updates set `Shipping_Same_As_Billing__c` = false |
 | Phone | `Phone` | Editable |
+| Maintenance exempt | `Maintenance_Exempt__c` | When 'Yes', hide dues |
+| AutoPay | `Is_On_Auto_Pay__c`, `LDMA_Auto_Pay_Shopify__c` | Either true → show AutoPay note |
 
 ---
 
@@ -95,6 +97,10 @@ UPSTASH_REDIS_REST_TOKEN=
 
 # Session secret (generate a random string, e.g. openssl rand -hex 32)
 MEMBER_SESSION_SECRET=
+
+# Optional: URL for "make a payment" link. Append ?amount=X when member has dues.
+# See docs/MEMBERS_MAINTENANCE_PAYMENT.md for setup.
+# MEMBER_MAINTENANCE_PAYMENT_URL=
 ```
 
 ---

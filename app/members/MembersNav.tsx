@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { User, LogOut } from "lucide-react";
+import { User, LogOut, Map } from "lucide-react";
 
 export function MembersNav() {
   const router = useRouter();
@@ -14,7 +14,7 @@ export function MembersNav() {
   }
 
   return (
-    <nav className="flex items-center gap-4 mb-8 text-sm">
+    <nav className="flex items-center gap-4 mb-8 text-sm flex-wrap">
       <Link
         href="/members"
         className="flex items-center gap-2 text-[#e8e0d5]/80 hover:text-[#d4af37] transition-colors"
@@ -27,6 +27,13 @@ export function MembersNav() {
         className="flex items-center gap-2 text-[#e8e0d5]/80 hover:text-[#d4af37] transition-colors"
       >
         Profile
+      </Link>
+      <Link
+        href="/directory"
+        className="flex items-center gap-2 text-[#e8e0d5]/80 hover:text-[#d4af37] transition-colors"
+      >
+        <Map className="w-4 h-4" />
+        Directory
       </Link>
       <button
         type="button"

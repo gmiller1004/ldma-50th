@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifySessionToken } from "@/lib/session";
 import { lookupMember, updateContact } from "@/lib/salesforce";
+import { getAvatarUrl } from "@/lib/avatars";
+import { getCommentDigestEnabled, setCommentDigestEnabled } from "@/lib/notification-preferences";
 
 export async function GET() {
   try {
@@ -22,10 +24,23 @@ export async function GET() {
       return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 
+    const [avatarUrl, commentDigestEnabled] = await Promise.all([
+      getAvatarUrl(member.contactId ?? null),
+      getCommentDigestEnabled(session.memberNumber),
+    ]);
+
+    const paymentBase = process.env.MEMBER_MAINTENANCE_PAYMENT_URL;
+    const maintenancePaymentUrl =
+      paymentBase && member.duesOwed != null && member.duesOwed > 0
+        ? `${paymentBase}${paymentBase.includes("?") ? "&" : "?"}amount=${member.duesOwed.toFixed(2)}`
+        : paymentBase || null;
+
     return NextResponse.json({
       authenticated: true,
       memberNumber: session.memberNumber,
       contactId: member.contactId,
+      avatarUrl: avatarUrl ?? null,
+      commentDigestEnabled,
       email: member.email,
       firstName: member.firstName,
       lastName: member.lastName,
@@ -36,6 +51,10 @@ export async function GET() {
       otherPostalCode: member.otherPostalCode,
       duesOwed: member.duesOwed,
       maintenancePaidThru: member.maintenancePaidThru,
+      showMaintenance: member.showMaintenance,
+      hideMaintenance: member.hideMaintenance,
+      isOnAutoPay: member.isOnAutoPay,
+      maintenancePaymentUrl,
     });
   } catch (e) {
     console.error("Me route error:", e);
@@ -72,12 +91,18 @@ export async function PATCH(req: Request) {
       otherState?: string;
       otherPostalCode?: string;
     } = {};
+    let notificationUpdate: Promise<void> | null = null;
 
     if (typeof body.phone === "string") input.phone = body.phone.trim();
     if (typeof body.otherStreet === "string") input.otherStreet = body.otherStreet.trim();
     if (typeof body.otherCity === "string") input.otherCity = body.otherCity.trim();
     if (typeof body.otherState === "string") input.otherState = body.otherState.trim();
     if (typeof body.otherPostalCode === "string") input.otherPostalCode = body.otherPostalCode.trim();
+    if (typeof body.commentDigestEnabled === "boolean") {
+      notificationUpdate = setCommentDigestEnabled(session.memberNumber, body.commentDigestEnabled);
+    }
+
+    if (notificationUpdate) await notificationUpdate;
 
     if (Object.keys(input).length === 0) {
       return NextResponse.json({ ok: true });

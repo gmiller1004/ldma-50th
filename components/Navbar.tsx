@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Pickaxe, Menu, X, ShoppingBag } from "lucide-react";
+import { Pickaxe, Menu, X, ShoppingBag, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 
@@ -41,7 +41,6 @@ const navLinks = [
   { href: "/campgrounds", label: "Campgrounds" },
   { href: "/events", label: "Events 2026" },
   { href: "/memberships", label: "Memberships" },
-  { href: "/members", label: "Members" },
   { href: "/shop", label: "Shop" },
   { href: "/50-years", label: "50 Years" },
 ];
@@ -61,6 +60,30 @@ function CartButton() {
         </span>
       )}
     </button>
+  );
+}
+
+function MemberIconButton() {
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/members/me")
+      .then((res) => res.json())
+      .then((data) => setAuthenticated(data.authenticated === true))
+      .catch(() => setAuthenticated(false));
+  }, []);
+
+  const href = authenticated ? "/members" : "/members/login";
+  const label = authenticated ? "Member dashboard" : "Sign in";
+
+  return (
+    <Link
+      href={href}
+      className="p-2 text-[#e8e0d5]/90 hover:text-[#d4af37] transition-colors"
+      aria-label={label}
+    >
+      <User className="w-5 h-5" />
+    </Link>
   );
 }
 
@@ -89,6 +112,7 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
+            <MemberIconButton />
             <CartButton />
             <Link
               href="/memberships"
@@ -100,6 +124,7 @@ export function Navbar() {
 
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center gap-3">
+            <MemberIconButton />
             <CartButton />
             <button
               onClick={() => setMobileOpen(!mobileOpen)}

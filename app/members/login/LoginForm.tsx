@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 
 type Step = "number" | "code";
 
 export function LoginForm() {
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") ?? undefined;
   const [step, setStep] = useState<Step>("number");
   const [memberNumber, setMemberNumber] = useState("");
   const [code, setCode] = useState("");
@@ -51,7 +54,10 @@ export function LoginForm() {
       const res = await fetch("/api/members/verify-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: code.trim() }),
+        body: JSON.stringify({
+          code: code.trim(),
+          ...(redirectTo && { redirect: redirectTo }),
+        }),
       });
       const data = await res.json();
 

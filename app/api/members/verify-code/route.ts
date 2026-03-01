@@ -6,6 +6,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const code = body.code?.trim();
+    const requestedRedirect = typeof body.redirect === "string" ? body.redirect.trim() : null;
+    const allowedRedirect =
+      requestedRedirect &&
+      requestedRedirect.startsWith("/") &&
+      !requestedRedirect.startsWith("//")
+        ? requestedRedirect
+        : "/members";
     if (!code || !/^\d{6}$/.test(code)) {
       return NextResponse.json(
         { error: "Please enter a valid 6-digit code" },
@@ -31,7 +38,7 @@ export async function POST(req: Request) {
     const options = sessionCookieOptions(token);
     const response = NextResponse.json({
       ok: true,
-      redirect: "/members",
+      redirect: allowedRedirect,
     });
 
     response.cookies.set(options.name, options.value, {
