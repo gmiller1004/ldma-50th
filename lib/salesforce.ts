@@ -28,6 +28,10 @@ export type MemberLookupResult = {
   hideMaintenance?: boolean;
   maintenanceExempt?: boolean;
   isOnAutoPay?: boolean;
+  /** Companion add-on: true = member has it. When true, Companion__c may hold the name. */
+  companionTransferable?: boolean;
+  /** Companion name (when companionTransferable is true and set). */
+  companion?: string;
   error?: string;
 };
 
@@ -100,6 +104,12 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
     const isOnAutoPay =
       c.Is_On_Auto_Pay__c === true || c.LDMA_Auto_Pay_Shopify__c === true;
 
+    const companionTransferable = c.Companion_Transferable__c === true;
+    const companion =
+      typeof c.Companion__c === "string" && c.Companion__c.trim()
+        ? (c.Companion__c as string).trim()
+        : undefined;
+
     // Hide maintenance section: type not LDMA AND is new member
     const hideMaintenance =
       membershipType !== "LDMA" && membershipTypeText !== "LDMA" && isNewMember;
@@ -146,6 +156,8 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
       showMaintenance,
       maintenanceExempt,
       isOnAutoPay,
+      companionTransferable,
+      companion,
     };
   } catch (e) {
     console.error("Salesforce lookup error:", e);
@@ -319,5 +331,7 @@ function mockLookup(memberNumber: string): MemberLookupResult {
     showMaintenance: true,
     hideMaintenance: false,
     isOnAutoPay: false,
+    companionTransferable: false,
+    companion: undefined,
   };
 }

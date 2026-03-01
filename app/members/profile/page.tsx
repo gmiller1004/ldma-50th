@@ -24,12 +24,9 @@ export default async function MembersProfilePage() {
       />
       <MembersNav />
 
-      <h1 className="font-serif text-3xl font-semibold text-[#f0d48f] mb-2">
+      <h1 className="font-serif text-3xl font-semibold text-[#f0d48f] mb-8">
         Profile
       </h1>
-      <p className="text-[#e8e0d5]/70 mb-8">
-        Your contact information from LDMA records.
-      </p>
 
       <ProfileContent />
     </>

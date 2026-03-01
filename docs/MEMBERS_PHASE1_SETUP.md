@@ -44,6 +44,8 @@ The **Run As** user runs all API calls on behalf of the app. Create a dedicated 
 | Phone | `Phone` | Editable |
 | Maintenance exempt | `Maintenance_Exempt__c` | When 'Yes', hide dues |
 | AutoPay | `Is_On_Auto_Pay__c`, `LDMA_Auto_Pay_Shopify__c` | Either true → show AutoPay note |
+| Companion add-on | `Companion_Transferable__c` | true = has add-on; shows companion section on profile |
+| Companion name | `Companion__c` | Name of companion (when `Companion_Transferable__c` is true) |
 
 ---
 

@@ -22,6 +22,8 @@ const migrations = [
   "migrate-community-edit-reactions.sql",
   "migrate-member-avatars.sql",
   "migrate-member-notifications.sql",
+  "migrate-member-shopify-tokens.sql",
+  "migrate-member-shopify-oauth.sql",
   "migrate-claims.sql",
   "seed-stanton-claims.sql",
 ];

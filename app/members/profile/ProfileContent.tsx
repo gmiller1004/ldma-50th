@@ -2,7 +2,15 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { Pickaxe, Camera, Loader2, Bell } from "lucide-react";
+import { Pickaxe, Camera, Loader2, Bell, Users, HelpCircle, X, Plus, Info, ShoppingBag } from "lucide-react";
+import { AddToCartButton } from "@/components/AddToCartButton";
+import { getCompanionAddOnProduct } from "@/app/actions/membership";
+import type { MembershipProductInfo } from "@/app/actions/membership";
+
+const COMPANION_HELP_TEXT =
+  "The Companion & Transferability add-on lets a spouse, child over 18, parent, or grandparent prospect on LDMA claims and visit camps independently. You can also transfer your membership to an heir.";
+
+const COMPANION_BANNER_STORAGE_KEY = "ldma-companion-banner-expanded";
 
 type Profile = {
   authenticated: boolean;
@@ -24,6 +32,8 @@ type Profile = {
   isOnAutoPay?: boolean;
   maintenancePaymentUrl?: string | null;
   commentDigestEnabled?: boolean;
+  companionTransferable?: boolean;
+  companion?: string;
 };
 
 export function ProfileContent() {
@@ -35,6 +45,10 @@ export function ProfileContent() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingNotify, setSavingNotify] = useState(false);
+  const [companionProduct, setCompanionProduct] = useState<MembershipProductInfo | null>(null);
+  const [bannerExpanded, setBannerExpanded] = useState(true);
+  const [avatarHelpOpen, setAvatarHelpOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"profile" | "purchase-history">("profile");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     phone: "",
@@ -68,6 +82,27 @@ export function ProfileContent() {
       .catch(() => setError("Failed to load profile"))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (profile?.authenticated && profile.companionTransferable === false) {
+      getCompanionAddOnProduct().then(setCompanionProduct);
+    }
+  }, [profile?.authenticated, profile?.companionTransferable]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem(COMPANION_BANNER_STORAGE_KEY);
+    if (stored !== null) {
+      setBannerExpanded(stored === "true");
+    }
+  }, []);
+
+  function setBannerExpandedWithStorage(expanded: boolean) {
+    setBannerExpanded(expanded);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(COMPANION_BANNER_STORAGE_KEY, String(expanded));
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -167,6 +202,9 @@ export function ProfileContent() {
   }
 
   const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(" ") || "—";
+  const showCompanionBanner = profile.companionTransferable === false;
+  const showCompanionSection = profile.companionTransferable === true;
+
   const address = [
     profile.otherStreet,
     [profile.otherCity, profile.otherState].filter(Boolean).join(", "),
@@ -177,6 +215,103 @@ export function ProfileContent() {
 
   return (
     <div className="space-y-6">
+      <div className="flex gap-1 border-b border-[#d4af37]/20 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("profile")}
+          className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
+            activeTab === "profile"
+              ? "bg-[#d4af37]/20 text-[#f0d48f] border border-[#d4af37]/30 border-b-transparent -mb-[2px]"
+              : "text-[#e8e0d5]/60 hover:text-[#e8e0d5] hover:bg-[#0f3d1e]/20"
+          }`}
+        >
+          Profile
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("purchase-history")}
+          className={`px-4 py-2 rounded-t-lg font-medium transition-colors flex items-center gap-2 ${
+            activeTab === "purchase-history"
+              ? "bg-[#d4af37]/20 text-[#f0d48f] border border-[#d4af37]/30 border-b-transparent -mb-[2px]"
+              : "text-[#e8e0d5]/60 hover:text-[#e8e0d5] hover:bg-[#0f3d1e]/20"
+          }`}
+        >
+          <ShoppingBag className="w-4 h-4" />
+          Purchase History
+        </button>
+      </div>
+
+      {activeTab === "purchase-history" ? (
+        <PurchaseHistoryTab />
+      ) : (
+      <>
+      {showCompanionBanner && (
+        <div className="rounded-xl bg-[#0f3d1e]/40 border border-[#d4af37]/30 overflow-hidden">
+          <div className="relative">
+            {bannerExpanded ? (
+              <div className="p-6">
+                <button
+                  type="button"
+                  onClick={() => setBannerExpandedWithStorage(false)}
+                  className="absolute top-4 right-4 p-1 rounded text-[#e8e0d5]/60 hover:text-[#e8e0d5] hover:bg-[#d4af37]/10 transition-colors"
+                  aria-label="Minimize"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pr-8">
+                  <div className="flex-1">
+                    <h3 className="font-serif text-lg font-semibold text-[#f0d48f] flex items-center gap-2 mb-1">
+                      <Users className="w-5 h-5 text-[#d4af37]" />
+                      Add Companion & Transferability
+                    </h3>
+                    <p className="text-[#e8e0d5]/90 text-sm mb-2">
+                      Let a spouse, child over 18, parent, or grandparent prospect on LDMA claims and visit camps independently. Transfer your membership to an heir — build a family legacy.
+                    </p>
+                    <p className="text-sm text-[#d4af37] font-medium">
+                      $600 for a limited time <span className="text-[#e8e0d5]/70 line-through">(regularly $2,500)</span>
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex flex-col items-end gap-2">
+                    {companionProduct ? (
+                      <>
+                        <AddToCartButton
+                          variantId={companionProduct.variantId}
+                          label="Add to Cart"
+                          addingLabel="Adding…"
+                          className="!w-auto"
+                        />
+                        <p className="text-xs text-[#e8e0d5]/60">or call (888) 465-3717</p>
+                      </>
+                    ) : (
+                      <a
+                        href="tel:888-465-3717"
+                        className="inline-flex items-center gap-2 px-5 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+                      >
+                        Call to Purchase
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setBannerExpandedWithStorage(true)}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[#0f3d1e]/60 transition-colors"
+              >
+                <h3 className="font-serif text-base font-semibold text-[#f0d48f] flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#d4af37]" />
+                  Add Companion & Transferability
+                </h3>
+                <span className="shrink-0 p-1 rounded text-[#d4af37] hover:bg-[#d4af37]/10 transition-colors">
+                  <Plus className="w-5 h-5" />
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row gap-6 items-start">
         <div className="relative group">
           <div className="w-24 h-24 rounded-full overflow-hidden bg-[#0f3d1e]/50 border-2 border-[#d4af37]/30 flex items-center justify-center shrink-0">
@@ -209,10 +344,22 @@ export function ProfileContent() {
             )}
           </label>
         </div>
-        <div className="flex-1">
-          <p className="text-sm text-[#e8e0d5]/70">
+        <div className="flex-1 relative flex items-center group/help">
+          <button
+            type="button"
+            onClick={() => setAvatarHelpOpen((o) => !o)}
+            onBlur={() => setTimeout(() => setAvatarHelpOpen(false), 150)}
+            className="p-1.5 rounded text-[#e8e0d5]/50 hover:text-[#d4af37] hover:bg-[#d4af37]/10 transition-colors"
+            aria-label="Profile photo help"
+          >
+            <Info className="w-5 h-5" />
+          </button>
+          <div
+            className={`absolute left-0 top-full mt-2 z-10 px-3 py-2 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-sm text-[#e8e0d5]/90 shadow-xl min-w-[200px] max-w-[280px] ${avatarHelpOpen ? "block" : "hidden group-hover/help:block"}`}
+            role="tooltip"
+          >
             Hover over your photo to change it. Shown on your community posts. Max 2MB, JPEG/PNG/WebP/GIF.
-          </p>
+          </div>
         </div>
       </div>
 
@@ -251,6 +398,26 @@ export function ProfileContent() {
                 <p className="mt-1 text-sm text-[#e8e0d5]/60">
                   Call (888) 465-3717 to set up autopay or make a payment.
                 </p>
+              )}
+            </div>
+          )}
+          {showCompanionSection && (
+            <div className="mt-4 pt-4 border-t border-[#d4af37]/20 sm:col-span-2">
+              <dt className="text-sm text-[#e8e0d5]/60 flex items-center gap-1.5 mb-1">
+                Companion
+                <span
+                  className="inline-flex text-[#d4af37]/70 cursor-help"
+                  title={COMPANION_HELP_TEXT}
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </span>
+              </dt>
+              {profile.companion ? (
+                <dd className="font-medium text-[#e8e0d5]">{profile.companion}</dd>
+              ) : (
+                <dd className="text-[#e8e0d5]/90">
+                  <span className="text-amber-400/90">Please call (888) 465-3717 to confirm your companion.</span>
+                </dd>
               )}
             </div>
           )}
@@ -371,6 +538,143 @@ export function ProfileContent() {
       <p className="text-sm text-[#e8e0d5]/50">
         To update your name or email, please call the LDMA office.
       </p>
+      </>
+      )}
+    </div>
+  );
+}
+
+type CustomerOrder = {
+  id: string;
+  name: string;
+  orderNumber: number;
+  processedAt: string;
+  totalPrice: { amount: string; currencyCode: string };
+  lineItems: Array<{
+    title: string;
+    quantity: number;
+    originalTotalPrice: { amount: string };
+  }>;
+};
+
+const SHOPIFY_OAUTH_MESSAGE = "shopify-oauth-complete";
+const OAUTH_POPUP_NAME = "shopify-oauth";
+
+function PurchaseHistoryTab() {
+  const [orders, setOrders] = useState<CustomerOrder[] | null>(null);
+  const [needsLogin, setNeedsLogin] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const popupRef = useRef<Window | null>(null);
+
+  function loadPurchaseHistory() {
+    setLoading(true);
+    fetch("/api/members/purchase-history")
+      .then((res) => res.json())
+      .then((data) => {
+        setNeedsLogin(!!data.needsLogin);
+        setOrders(data.orders ?? []);
+      })
+      .catch(() => setNeedsLogin(true))
+      .finally(() => setLoading(false));
+  }
+
+  function openShopifySignIn() {
+    const popup = window.open(
+      "/api/members/shopify-oauth/start",
+      OAUTH_POPUP_NAME,
+      "width=500,height=700,scrollbars=yes,resizable=yes"
+    );
+    popupRef.current = popup ?? null;
+  }
+
+  useEffect(() => {
+    loadPurchaseHistory();
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type !== SHOPIFY_OAUTH_MESSAGE) return;
+      popupRef.current?.close();
+      popupRef.current = null;
+      loadPurchaseHistory();
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="py-12 text-center text-[#e8e0d5]/60">
+        Loading purchase history…
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {!needsLogin && (
+        <div className="p-4 rounded-lg bg-[#0f3d1e]/30 border border-[#d4af37]/20">
+          <p className="text-sm text-[#e8e0d5]/90">
+            These details only include purchases made from the MyLDMA online store.
+            If you have questions about purchases that don&apos;t appear here, call{" "}
+            <a href="tel:888-465-3717" className="text-[#d4af37] hover:underline">(888) 465-3717</a>.
+          </p>
+        </div>
+      )}
+
+      {needsLogin ? (
+        <div className="p-8 rounded-xl bg-[#0f0a06]/60 border border-[#d4af37]/20 text-center">
+          <ShoppingBag className="w-12 h-12 text-[#d4af37]/50 mx-auto mb-4" />
+          <p className="text-[#e8e0d5]/90 mb-4">
+            Sign in with your MyLDMA store account to view your purchase history. You may receive a one-time code by email.
+          </p>
+          <button
+            type="button"
+            onClick={openShopifySignIn}
+            className="px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+          >
+            Sign in to Store
+          </button>
+          <p className="text-xs text-[#e8e0d5]/50 mt-3">
+            If a window didn&apos;t open, your browser may have blocked the popup. Allow popups and try again.
+          </p>
+        </div>
+      ) : orders && orders.length > 0 ? (
+        <div className="space-y-4">
+          {orders.map((order) => (
+            <div
+              key={order.id}
+              className="p-5 rounded-xl bg-[#0f0a06]/60 border border-[#d4af37]/20"
+            >
+              <div className="flex flex-wrap justify-between gap-2 mb-3">
+                <span className="font-semibold text-[#f0d48f]">{order.name}</span>
+                <span className="text-sm text-[#e8e0d5]/70">
+                  {new Date(order.processedAt).toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
+              </div>
+              <ul className="space-y-1 text-sm text-[#e8e0d5]/90 mb-3">
+                {order.lineItems.map((item, i) => (
+                  <li key={i}>
+                    {item.quantity}× {item.title} — ${parseFloat(item.originalTotalPrice.amount).toFixed(2)}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[#d4af37] font-semibold">
+                Total: ${parseFloat(order.totalPrice.amount).toFixed(2)} {order.totalPrice.currencyCode}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="p-8 rounded-xl bg-[#0f0a06]/60 border border-[#d4af37]/20 text-center text-[#e8e0d5]/70">
+          No orders found.
+        </div>
+      )}
+
     </div>
   );
 }

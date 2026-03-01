@@ -50,3 +50,25 @@ export async function getMembershipProductsForFlow(): Promise<
 
   return result;
 }
+
+/** Get Companion add-on product for profile upsell (members without it). */
+export async function getCompanionAddOnProduct(): Promise<MembershipProductInfo | null> {
+  const map = await getMembershipCollectionProducts();
+  const product = map.companion;
+  if (!product) return null;
+  const variant = product.variants?.edges?.[0]?.node;
+  if (!variant) return null;
+  const compareAtPrice =
+    variant.compareAtPrice?.amount && parseFloat(variant.compareAtPrice.amount) > 0
+      ? variant.compareAtPrice.amount
+      : null;
+
+  return {
+    key: "companion",
+    product,
+    variantId: variant.id,
+    price: variant.price.amount,
+    compareAtPrice,
+    title: product.title,
+  };
+}

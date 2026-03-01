@@ -55,6 +55,8 @@ export async function GET() {
       hideMaintenance: member.hideMaintenance,
       isOnAutoPay: member.isOnAutoPay,
       maintenancePaymentUrl,
+      companionTransferable: member.companionTransferable,
+      companion: member.companion,
     });
   } catch (e) {
     console.error("Me route error:", e);
