@@ -1,31 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Script from "next/script";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Sparkles } from "lucide-react";
-
-const KLAVIYO_SCRIPT_URL = "https://static.klaviyo.com/onsite/js/WvfeJF/klaviyo.js";
+import { Check, Sparkles, Loader2 } from "lucide-react";
 
 export function NewsletterSignup() {
-  const [success, setSuccess] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || status === "loading") return;
 
-  useEffect(() => {
-    const handleKlaviyoSubmit = (e: Event) => {
-      const event = e as CustomEvent<{ type: string }>;
-      if (event.detail?.type === "submit") {
-        setSuccess(true);
+    setStatus("loading");
+    setErrorMessage("");
+
+    try {
+      const res = await fetch("/api/newsletter/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        success?: boolean;
+      };
+
+      if (res.ok && data.success) {
+        setStatus("success");
+      } else {
+        setStatus("error");
+        setErrorMessage(data.error || "Something went wrong. Please try again.");
       }
-    };
-
-    window.addEventListener("klaviyoForms", handleKlaviyoSubmit);
-    return () => window.removeEventListener("klaviyoForms", handleKlaviyoSubmit);
-  }, []);
+    } catch {
+      setStatus("error");
+      setErrorMessage("Something went wrong. Please try again.");
+    }
+  }
 
   return (
     <motion.section
@@ -37,7 +50,7 @@ export function NewsletterSignup() {
     >
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         <AnimatePresence mode="wait">
-          {success ? (
+          {status === "success" ? (
             <motion.div
               key="success"
               initial={{ opacity: 0, scale: 0.9 }}
@@ -95,18 +108,39 @@ export function NewsletterSignup() {
                 continues with you.
               </p>
 
-              <div className="newsletter-klaviyo-wrapper rounded-xl border border-[#d4af37]/30 bg-[#0f3d1e]/20 p-6 sm:p-8 shadow-[0_0_25px_rgba(212,175,55,0.1)]">
-                <div
-                  className="klaviyo-form-VwfrBY min-h-[120px]"
-                  suppressHydrationWarning
-                />
-                {mounted && (
-                  <Script
-                    src={KLAVIYO_SCRIPT_URL}
-                    strategy="afterInteractive"
+              <form
+                onSubmit={handleSubmit}
+                className="rounded-xl border border-[#d4af37]/30 bg-[#0f3d1e]/20 p-6 sm:p-8 shadow-[0_0_25px_rgba(212,175,55,0.1)]"
+              >
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    required
+                    disabled={status === "loading"}
+                    className="flex-1 min-w-0 px-4 py-3 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] placeholder-[#e8e0d5]/50 focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50 focus:border-[#d4af37]/50 disabled:opacity-60"
                   />
+                  <button
+                    type="submit"
+                    disabled={status === "loading"}
+                    className="px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shrink-0"
+                  >
+                    {status === "loading" ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Joining…
+                      </>
+                    ) : (
+                      "Join the List"
+                    )}
+                  </button>
+                </div>
+                {status === "error" && errorMessage && (
+                  <p className="mt-3 text-sm text-amber-400/90">{errorMessage}</p>
                 )}
-              </div>
+              </form>
 
               <p className="text-center text-[#d4af37]/60 text-sm mt-6">
                 We respect your inbox. Unsubscribe anytime. Only gold — no spam.
