@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
+import Script from "next/script";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Sparkles } from "lucide-react";
 
+const KLAVIYO_SCRIPT_URL = "https://static.klaviyo.com/onsite/js/WvfeJF/klaviyo.js";
+
 export function NewsletterSignup() {
   const [success, setSuccess] = useState(false);
-  const formRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleKlaviyoSubmit = (e: Event) => {
@@ -88,14 +95,17 @@ export function NewsletterSignup() {
                 continues with you.
               </p>
 
-              <div
-                ref={formRef}
-                className="newsletter-klaviyo-wrapper rounded-xl border border-[#d4af37]/30 bg-[#0f3d1e]/20 p-6 sm:p-8 shadow-[0_0_25px_rgba(212,175,55,0.1)]"
-              >
+              <div className="newsletter-klaviyo-wrapper rounded-xl border border-[#d4af37]/30 bg-[#0f3d1e]/20 p-6 sm:p-8 shadow-[0_0_25px_rgba(212,175,55,0.1)]">
                 <div
                   className="klaviyo-form-VwfrBY min-h-[120px]"
                   suppressHydrationWarning
                 />
+                {mounted && (
+                  <Script
+                    src={KLAVIYO_SCRIPT_URL}
+                    strategy="afterInteractive"
+                  />
+                )}
               </div>
 
               <p className="text-center text-[#d4af37]/60 text-sm mt-6">

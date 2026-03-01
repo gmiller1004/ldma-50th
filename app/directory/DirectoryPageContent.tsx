@@ -120,20 +120,20 @@ function CampCard({
           <span className="line-clamp-2">{camp.address}</span>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-row flex-wrap gap-3 lg:flex-col">
           <Link
             href={`/directory/${camp.slug}`}
-            className="inline-flex items-center justify-center gap-2 flex-1 px-5 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-all"
+            className="inline-flex items-center justify-center gap-2 flex-1 lg:flex-none lg:w-full min-w-0 px-5 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-all whitespace-nowrap"
           >
             Community
-            <MessageCircle className="w-4 h-4" strokeWidth={2} />
+            <MessageCircle className="w-4 h-4 shrink-0" strokeWidth={2} />
           </Link>
           <Link
             href={`/campgrounds/${camp.slug}`}
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 border border-[#d4af37]/50 text-[#d4af37] font-semibold rounded-lg hover:bg-[#d4af37]/10 transition-all"
+            className="inline-flex items-center justify-center gap-2 flex-1 lg:flex-none lg:w-full min-w-0 px-5 py-3 border border-[#d4af37]/50 text-[#d4af37] font-semibold rounded-lg hover:bg-[#d4af37]/10 transition-all whitespace-nowrap"
           >
             Details
-            <ArrowRight className="w-4 h-4" strokeWidth={2} />
+            <ArrowRight className="w-4 h-4 shrink-0" strokeWidth={2} />
           </Link>
         </div>
       </div>

@@ -129,10 +129,10 @@ function CampCard({
   return (
     <motion.article
       className="group bg-[#1a120b] rounded-2xl overflow-hidden border border-[#d4af37]/25 hover:border-[#d4af37]/50 transition-all duration-300"
-      initial={{ opacity: 0, y: 30 }}
+      initial={false}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay: index * 0.1 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.4, delay: index * 0.05 }}
       whileHover={{ y: -6, scale: 1.02, transition: { duration: 0.2 } }}
       style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}
     >

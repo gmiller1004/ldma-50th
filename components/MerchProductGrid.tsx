@@ -61,10 +61,10 @@ function ProductCard({
   return (
     <motion.article
       className="group bg-[#0f3d1e]/20 rounded-xl overflow-hidden border border-[#d4af37]/20 hover:border-[#d4af37]/40 transition-all"
-      initial={{ opacity: 0, y: 30 }}
+      initial={false}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay: index * 0.1 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.4, delay: index * 0.05 }}
     >
       <Link href={`/shop?product=${encodeURIComponent(product.handle)}`} className="block">
         <div className="relative aspect-square bg-[#1a120b]">

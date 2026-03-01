@@ -368,9 +368,10 @@ function ProductCard({
   return (
     <motion.article
       className="group flex flex-col rounded-2xl bg-[#1a120b]/80 border border-[#d4af37]/20 overflow-hidden hover:border-[#d4af37]/40 transition-colors duration-300"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      initial={false}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.4, delay: index * 0.05 }}
     >
       <div className="relative aspect-square bg-[#0f3d1e]/30 overflow-hidden">
         {selectedVariant?.compareAtPrice &&
