@@ -12,6 +12,9 @@ const COMPANION_HELP_TEXT =
 
 const COMPANION_BANNER_STORAGE_KEY = "ldma-companion-banner-expanded";
 
+/** Hidden until Admin API is available for purchase history. Set to true when ready. */
+const SHOW_PURCHASE_HISTORY_TAB = false;
+
 type Profile = {
   authenticated: boolean;
   memberNumber?: string;
@@ -49,7 +52,7 @@ export function ProfileContent() {
   const [bannerExpanded, setBannerExpanded] = useState(true);
   const [avatarHelpOpen, setAvatarHelpOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"profile" | "purchase-history">(() => {
-    if (typeof window !== "undefined" && window.location.hash === "#purchase-history") {
+    if (SHOW_PURCHASE_HISTORY_TAB && typeof window !== "undefined" && window.location.hash === "#purchase-history") {
       return "purchase-history";
     }
     return "profile";
@@ -232,21 +235,23 @@ export function ProfileContent() {
         >
           Profile
         </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("purchase-history")}
-          className={`px-4 py-2 rounded-t-lg font-medium transition-colors flex items-center gap-2 ${
-            activeTab === "purchase-history"
-              ? "bg-[#d4af37]/20 text-[#f0d48f] border border-[#d4af37]/30 border-b-transparent -mb-[2px]"
-              : "text-[#e8e0d5]/60 hover:text-[#e8e0d5] hover:bg-[#0f3d1e]/20"
-          }`}
-        >
-          <ShoppingBag className="w-4 h-4" />
-          Purchase History
-        </button>
+        {SHOW_PURCHASE_HISTORY_TAB && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("purchase-history")}
+            className={`px-4 py-2 rounded-t-lg font-medium transition-colors flex items-center gap-2 ${
+              activeTab === "purchase-history"
+                ? "bg-[#d4af37]/20 text-[#f0d48f] border border-[#d4af37]/30 border-b-transparent -mb-[2px]"
+                : "text-[#e8e0d5]/60 hover:text-[#e8e0d5] hover:bg-[#0f3d1e]/20"
+            }`}
+          >
+            <ShoppingBag className="w-4 h-4" />
+            Purchase History
+          </button>
+        )}
       </div>
 
-      {activeTab === "purchase-history" ? (
+      {SHOW_PURCHASE_HISTORY_TAB && activeTab === "purchase-history" ? (
         <PurchaseHistoryTab />
       ) : (
       <>
