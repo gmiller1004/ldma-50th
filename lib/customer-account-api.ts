@@ -170,6 +170,9 @@ export async function getCustomerOrders(
 ): Promise<CustomerOrder[]> {
   const endpoint = await getGraphqlEndpoint();
 
+  // Experimental: Customer Account API may expect shcat_ prefix (OAuth token might omit it)
+  const tokenForRequest = accessToken.startsWith("shcat_") ? accessToken : `shcat_${accessToken}`;
+
   const query = `
     query getCustomerOrders($first: Int!) {
       customer {
@@ -202,7 +205,7 @@ export async function getCustomerOrders(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${tokenForRequest}`,
     },
     body: JSON.stringify({ query, variables: { first } }),
   });
