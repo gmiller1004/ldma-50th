@@ -62,7 +62,7 @@ const stats = [
   { value: "50", label: "Years" },
   { value: "12", label: "Camps" },
   { value: "8+", label: "States" },
-  { value: "1,000s", label: "Members" },
+  { value: "6,500+", label: "Members" },
 ];
 
 const thenNowItems = [

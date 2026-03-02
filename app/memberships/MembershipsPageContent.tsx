@@ -29,12 +29,12 @@ const benefits = [
   },
   {
     icon: Tent,
-    title: "Camping from $6/Day",
+    title: "Camping from $6/Night",
     desc: "Stay up to 6 months per visit. RV hookups, showers, clubhouses, dump stations. Bring up to 4 guests. Family-friendly settings built for adventure.",
   },
   {
     icon: Users,
-    title: "Community of 5,000+",
+    title: "Community of 6,500+",
     desc: "Hands-on demos, co-hosted outings with Minelab and Garrett, campfire camaraderie. Beginners welcome — learn from experienced members.",
   },
   {
@@ -81,7 +81,7 @@ const testimonials = [
 
 const TRUST_STATS = [
   { label: "50 years", sub: "of adventure" },
-  { label: "5,000+", sub: "members" },
+  { label: "6,500+", sub: "members" },
   { label: "12", sub: "private campgrounds" },
   { label: "30-day", sub: "refund guarantee" },
 ];
