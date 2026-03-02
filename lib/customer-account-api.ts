@@ -186,14 +186,17 @@ export async function getCustomerOrders(
     body: JSON.stringify({ query, variables: { first } }),
   });
 
-  if (!res.ok) {
-    throw new Error(`Customer Account API error: ${res.status}`);
-  }
-
-  const json = await res.json() as Record<string, unknown>;
+  const json = (await res.json()) as Record<string, unknown>;
   const errs = json.errors as Array<{ message: string }> | undefined;
   if (errs && errs.length > 0) {
-    throw new Error(errs[0].message || "Failed to fetch orders");
+    const msg = errs[0].message || "Failed to fetch orders";
+    console.error("[customer-account-api] GraphQL errors:", JSON.stringify(errs));
+    throw new Error(msg);
+  }
+
+  if (!res.ok) {
+    const body = typeof json === "object" ? JSON.stringify(json) : String(json);
+    throw new Error(`Customer Account API error: ${res.status} - ${body}`);
   }
 
   const data = json.data as Record<string, unknown> | undefined;

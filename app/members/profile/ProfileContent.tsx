@@ -575,18 +575,45 @@ function PurchaseHistoryTab() {
 
   function loadPurchaseHistory(includeDebug = false) {
     setLoading(true);
+    setDebug(null);
     fetch(`/api/members/purchase-history${includeDebug ? "?debug=1" : ""}`)
       .then((res) => res.json())
       .then((data) => {
         setNeedsLogin(!!data.needsLogin);
         setOrders(data.orders ?? []);
         setError(data.error ?? null);
+        if (includeDebug && (data._debug || data.errorMsg)) {
+          setDebug({
+            _debug: data._debug,
+            errorMsg: data.errorMsg,
+            memberNumber: data.memberNumber,
+          });
+        }
       })
       .catch(() => {
         setNeedsLogin(true);
         setError(null);
       })
       .finally(() => setLoading(false));
+  }
+
+  async function runTroubleshoot() {
+    setDebug(null);
+    const [statusRes, historyRes] = await Promise.all([
+      fetch("/api/members/shopify-status"),
+      fetch("/api/members/purchase-history?debug=1"),
+    ]);
+    const status = await statusRes.json();
+    const history = await historyRes.json();
+    setDebug({
+      status,
+      purchaseHistory: {
+        _debug: history._debug,
+        errorMsg: history.errorMsg,
+        needsLogin: history.needsLogin,
+        memberNumber: history.memberNumber,
+      },
+    });
   }
 
   function openShopifySignIn() {
@@ -664,16 +691,7 @@ function PurchaseHistoryTab() {
           </p>
           <button
             type="button"
-            onClick={async () => {
-              setDebug(null);
-              const [statusRes, historyRes] = await Promise.all([
-                fetch("/api/members/shopify-status"),
-                fetch("/api/members/purchase-history?debug=1"),
-              ]);
-              const status = await statusRes.json();
-              const history = await historyRes.json();
-              setDebug({ status, purchaseHistory: history._debug ?? history.needsLogin ? "needsLogin" : "ok", memberNumber: history.memberNumber });
-            }}
+            onClick={runTroubleshoot}
             className="mt-4 text-xs text-[#e8e0d5]/40 hover:text-[#d4af37]/70 underline"
           >
             Troubleshoot connection
@@ -717,6 +735,22 @@ function PurchaseHistoryTab() {
       ) : (
         <div className="p-8 rounded-xl bg-[#0f0a06]/60 border border-[#d4af37]/20 text-center text-[#e8e0d5]/70">
           No orders found.
+          {error && (
+            <>
+              <button
+                type="button"
+                onClick={runTroubleshoot}
+                className="mt-4 block mx-auto text-xs text-[#e8e0d5]/40 hover:text-[#d4af37]/70 underline"
+              >
+                Troubleshoot connection
+              </button>
+              {debug && (
+                <pre className="mt-3 p-3 text-left text-xs bg-black/30 rounded overflow-auto max-h-40 text-[#e8e0d5]/80">
+                  {JSON.stringify(debug, null, 2)}
+                </pre>
+              )}
+            </>
+          )}
         </div>
       )}
 
