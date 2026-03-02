@@ -737,6 +737,22 @@ function PurchaseHistoryTab() {
           No orders found.
           {error && (
             <>
+              <p className="mt-3 text-sm text-[#e8e0d5]/60">
+                If you previously connected your store, try disconnecting and signing in again.
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await fetch("/api/members/shopify-disconnect", { method: "POST" });
+                  if (res.ok) {
+                    setDebug(null);
+                    loadPurchaseHistory();
+                  }
+                }}
+                className="mt-3 px-4 py-2 text-sm bg-[#d4af37]/20 text-[#d4af37] rounded-lg hover:bg-[#d4af37]/30 transition-colors"
+              >
+                Disconnect store & sign in again
+              </button>
               <button
                 type="button"
                 onClick={runTroubleshoot}
