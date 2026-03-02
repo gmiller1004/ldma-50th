@@ -6,7 +6,9 @@ export async function setOAuthState(
   memberNumber: string,
   expiresAt: Date
 ): Promise<void> {
-  if (!hasDb() || !sql) return;
+  if (!hasDb() || !sql) {
+    throw new Error("Database not configured. Cannot store OAuth state.");
+  }
   await sql`
     INSERT INTO oauth_state (state, member_number, expires_at)
     VALUES (${state}, ${memberNumber}, ${expiresAt.toISOString()}::timestamptz)
@@ -20,7 +22,10 @@ export async function setOAuthState(
 export async function consumeOAuthState(
   state: string
 ): Promise<string | null> {
-  if (!hasDb() || !sql) return null;
+  if (!hasDb() || !sql) {
+    console.error("[oauth-state] Database not configured");
+    return null;
+  }
   const rows = await sql`
     DELETE FROM oauth_state
     WHERE state = ${state} AND expires_at > NOW()

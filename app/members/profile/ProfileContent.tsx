@@ -570,11 +570,12 @@ function PurchaseHistoryTab() {
   const [needsLogin, setNeedsLogin] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<Record<string, unknown> | null>(null);
   const popupRef = useRef<Window | null>(null);
 
-  function loadPurchaseHistory() {
+  function loadPurchaseHistory(includeDebug = false) {
     setLoading(true);
-    fetch("/api/members/purchase-history")
+    fetch(`/api/members/purchase-history${includeDebug ? "?debug=1" : ""}`)
       .then((res) => res.json())
       .then((data) => {
         setNeedsLogin(!!data.needsLogin);
@@ -604,12 +605,14 @@ function PurchaseHistoryTab() {
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (e.data?.type !== SHOPIFY_OAUTH_MESSAGE) return;
-      popupRef.current?.close();
-      popupRef.current = null;
       if (e.data?.success) {
+        popupRef.current?.close();
+        popupRef.current = null;
         window.location.hash = "purchase-history";
         window.location.reload();
       } else {
+        popupRef.current?.close();
+        popupRef.current = null;
         loadPurchaseHistory();
       }
     };
@@ -659,6 +662,27 @@ function PurchaseHistoryTab() {
           <p className="text-xs text-[#e8e0d5]/50 mt-3">
             If a window didn&apos;t open, your browser may have blocked the popup. Allow popups and try again.
           </p>
+          <button
+            type="button"
+            onClick={async () => {
+              setDebug(null);
+              const [statusRes, historyRes] = await Promise.all([
+                fetch("/api/members/shopify-status"),
+                fetch("/api/members/purchase-history?debug=1"),
+              ]);
+              const status = await statusRes.json();
+              const history = await historyRes.json();
+              setDebug({ status, purchaseHistory: history._debug ?? history.needsLogin ? "needsLogin" : "ok", memberNumber: history.memberNumber });
+            }}
+            className="mt-4 text-xs text-[#e8e0d5]/40 hover:text-[#d4af37]/70 underline"
+          >
+            Troubleshoot connection
+          </button>
+          {debug && (
+            <pre className="mt-2 p-3 text-xs bg-black/30 rounded overflow-auto max-h-32 text-[#e8e0d5]/80">
+              {JSON.stringify(debug, null, 2)}
+            </pre>
+          )}
         </div>
       ) : orders && orders.length > 0 ? (
         <div className="space-y-4">
