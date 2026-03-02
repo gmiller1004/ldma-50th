@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Info, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { ShareButton } from "@/components/ShareButton";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import type { ShopProduct, ShopProductVariant } from "@/lib/shopify";
 
@@ -292,9 +293,15 @@ function ProductDetailModal({
           )}
 
           <div className="p-6 md:p-8">
-            <h2 className="font-serif text-2xl md:text-3xl font-bold text-[#f0d48f] mb-6">
-              {product.title}
-            </h2>
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <h2 className="font-serif text-2xl md:text-3xl font-bold text-[#f0d48f]">
+                {product.title}
+              </h2>
+              <ShareButton
+                url={`/shop?product=${encodeURIComponent(product.handle)}`}
+                title={product.title}
+              />
+            </div>
 
             {product.descriptionHtml && (
               <div

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { SocialLinks } from "./SocialLinks";
 
 const footerLinks = {
   Explore: [
@@ -75,6 +76,10 @@ export function Footer() {
                 </li>
               ))}
             </ul>
+            <div className="mt-4">
+              <p className="text-[#e8e0d5]/60 text-xs mb-2">Follow us</p>
+              <SocialLinks variant="footer" />
+            </div>
           </div>
           <div>
             <h4 className="font-serif font-semibold text-[#f0d48f] mb-4">

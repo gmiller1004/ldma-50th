@@ -21,6 +21,7 @@ import {
   Navigation,
   type LucideIcon,
 } from "lucide-react";
+import { ShareButton } from "@/components/ShareButton";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FacebookGroupCTA } from "@/components/FacebookGroupCTA";
 import type { CampPageData, AmenityIcon } from "@/lib/camp-page-data";
@@ -123,11 +124,16 @@ export function CampPageTemplate({ camp }: { camp: CampPageData }) {
         </motion.div>
 
         <motion.div
-          className="absolute top-6 right-4 sm:right-8 z-20"
+          className="absolute top-6 right-4 sm:right-8 z-20 flex items-center gap-3"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
         >
+          <ShareButton
+            url={`/campgrounds/${camp.slug}`}
+            title={`${camp.name}, ${camp.state}`}
+            text={camp.tagline}
+          />
           <span className="inline-block px-4 py-2 rounded-lg bg-[#d4af37]/90 text-[#1a120b] text-xs font-bold uppercase tracking-wider border border-[#f0d48f]/50 shadow-lg">
             50th Anniversary
           </span>

@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Calendar, Info, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShareButton } from "@/components/ShareButton";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { EVENT_TYPES, CAMP_FILTERS } from "@/lib/events-config";
@@ -696,19 +697,26 @@ function EventDetailModal({
             <h2 className="font-serif text-2xl md:text-3xl font-bold text-[#f0d48f] mb-2">
               {event.title}
             </h2>
-            <div className="flex flex-wrap items-center gap-4 text-[#e8e0d5]/80 text-sm mb-6">
-              {dates.formatted && (
-                <span className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-[#d4af37]/70" />
-                  {dates.formatted}
-                </span>
-              )}
-              {campLabel && (
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-[#d4af37]/70" />
-                  {campLabel}
-                </span>
-              )}
+            <div className="flex flex-wrap items-center justify-between gap-4 text-[#e8e0d5]/80 text-sm mb-6">
+              <div className="flex flex-wrap items-center gap-4">
+                {dates.formatted && (
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-[#d4af37]/70" />
+                    {dates.formatted}
+                  </span>
+                )}
+                {campLabel && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-[#d4af37]/70" />
+                    {campLabel}
+                  </span>
+                )}
+              </div>
+              <ShareButton
+                url={`/events?product=${encodeURIComponent(event.handle)}`}
+                title={event.title}
+                text={[dates.formatted, campLabel].filter(Boolean).join(" • ")}
+              />
             </div>
 
             {event.descriptionHtml && (

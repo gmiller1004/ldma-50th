@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Pickaxe, Menu, X, ShoppingBag, User } from "lucide-react";
+import { Pickaxe, Menu, X, ShoppingBag, User, Share2 } from "lucide-react";
+import { SocialLinks } from "./SocialLinks";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 
@@ -112,6 +113,22 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
+            <div className="relative group">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-[#e8e0d5]/90 hover:text-[#d4af37] text-sm font-medium transition-colors"
+                aria-haspopup="true"
+                aria-expanded={false}
+              >
+                <Share2 className="w-4 h-4" />
+                Follow
+              </button>
+              <div className="absolute top-full left-0 pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50">
+                <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-lg shadow-xl overflow-hidden">
+                  <SocialLinks variant="nav-dropdown" />
+                </div>
+              </div>
+            </div>
             <MemberIconButton />
             <CartButton />
             <Link
@@ -157,6 +174,7 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              <SocialLinks variant="mobile-menu" onLinkClick={() => setMobileOpen(false)} />
               <Link
                 href="/memberships"
                 onClick={() => setMobileOpen(false)}
