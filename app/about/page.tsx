@@ -107,7 +107,7 @@ export default function AboutPage() {
                 detecting, dry washing, high-banking, or simply enjoying the
                 outdoors with family and friends, our campgrounds offer something
                 for everyone. Members keep 100% of the gold they find. Camping
-                rates are member-friendly — from $5/night for dry camping to
+                rates are member-friendly — from $6/night for dry camping to
                 $12/night for full RV hookups — and you can stay up to six
                 months at a time at any property.
               </p>

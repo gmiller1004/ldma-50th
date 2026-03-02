@@ -45,7 +45,7 @@ const faqs = [
   },
   {
     q: "How much does camping cost?",
-    a: "Member rates are very affordable: dry camping starts at around $5/night, and full RV hookups run about $12/night. Exact rates vary by campground.",
+    a: "Member rates are very affordable: dry camping starts at around $6/night, and full RV hookups run about $12/night. Exact rates vary by campground.",
   },
   {
     q: "Do I keep the gold I find?",
