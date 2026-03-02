@@ -34,10 +34,18 @@ async function getOpenIdConfig(): Promise<OpenIdConfig> {
 async function getGraphqlEndpoint(): Promise<string> {
   if (cachedGraphqlApi) return cachedGraphqlApi;
   if (!SHOP_DOMAIN) throw new Error("NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN not set");
-  const res = await fetch(`https://${SHOP_DOMAIN}/.well-known/customer-account-api`);
-  if (!res.ok) throw new Error("Failed to fetch Customer Account API config");
-  const config = (await res.json()) as CustomerAccountApiConfig;
-  cachedGraphqlApi = config.graphql_api;
+  // Custom account domain (e.g. account.myldma.com) from discovery can reject OAuth tokens with "Invalid token, missing prefix shcat_."
+  // Use store domain by default; set SHOPIFY_USE_DISCOVERY_GRAPHQL=1 to use discovered URL instead.
+  const useDiscovery = process.env.SHOPIFY_USE_DISCOVERY_GRAPHQL === "1";
+  if (useDiscovery) {
+    const res = await fetch(`https://${SHOP_DOMAIN}/.well-known/customer-account-api`);
+    if (!res.ok) throw new Error("Failed to fetch Customer Account API config");
+    const config = (await res.json()) as CustomerAccountApiConfig;
+    cachedGraphqlApi = config.graphql_api;
+  } else {
+    const storeDomain = SHOP_DOMAIN.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    cachedGraphqlApi = `https://${storeDomain}/customer/api/2026-01/graphql`;
+  }
   return cachedGraphqlApi!;
 }
 
