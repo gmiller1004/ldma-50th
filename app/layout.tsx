@@ -3,7 +3,10 @@ import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import { CartDrawer } from "@/components/CartDrawer";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "LDMA | 50 Years of Gold, Grit & Brotherhood • 1976–2026",
   description:
     "The Lost Dutchman's Mining Association celebrates 50 years of gold prospecting, camaraderie, and the great outdoors. Join us for DirtFest 2026, memberships, and more.",
@@ -12,6 +15,27 @@ export const metadata: Metadata = {
     description:
       "The Lost Dutchman's Mining Association — 50 years of adventure, discovery, and fellowship.",
     type: "website",
+    url: "/",
+    siteName: "LDMA",
+    images: [
+      {
+        url: "/images/home/hero-george-italian-bar.jpg",
+        width: 1200,
+        height: 630,
+        alt: "George Buzzard Massie with OG LDMA members at Italian Bar, 1976",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LDMA | 50 Years of Gold, Grit & Brotherhood",
+    description:
+      "The Lost Dutchman's Mining Association — 50 years of adventure, discovery, and fellowship.",
+    images: ["/images/home/hero-george-italian-bar.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 
