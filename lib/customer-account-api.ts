@@ -34,18 +34,10 @@ async function getOpenIdConfig(): Promise<OpenIdConfig> {
 async function getGraphqlEndpoint(): Promise<string> {
   if (cachedGraphqlApi) return cachedGraphqlApi;
   if (!SHOP_DOMAIN) throw new Error("NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN not set");
-  // Custom account domain (e.g. account.myldma.com) from discovery can reject OAuth tokens with "Invalid token, missing prefix shcat_."
-  // Use store domain by default; set SHOPIFY_USE_DISCOVERY_GRAPHQL=1 to use discovered URL instead.
-  const useDiscovery = process.env.SHOPIFY_USE_DISCOVERY_GRAPHQL === "1";
-  if (useDiscovery) {
-    const res = await fetch(`https://${SHOP_DOMAIN}/.well-known/customer-account-api`);
-    if (!res.ok) throw new Error("Failed to fetch Customer Account API config");
-    const config = (await res.json()) as CustomerAccountApiConfig;
-    cachedGraphqlApi = config.graphql_api;
-  } else {
-    const storeDomain = SHOP_DOMAIN.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    cachedGraphqlApi = `https://${storeDomain}/customer/api/2026-01/graphql`;
-  }
+  const res = await fetch(`https://${SHOP_DOMAIN}/.well-known/customer-account-api`);
+  if (!res.ok) throw new Error("Failed to fetch Customer Account API config");
+  const config = (await res.json()) as CustomerAccountApiConfig;
+  cachedGraphqlApi = config.graphql_api;
   return cachedGraphqlApi!;
 }
 
@@ -215,7 +207,18 @@ export async function getCustomerOrders(
     body: JSON.stringify({ query, variables: { first } }),
   });
 
-  const json = (await res.json()) as Record<string, unknown>;
+  const text = await res.text();
+  let json: Record<string, unknown>;
+  try {
+    json = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    if (text.trimStart().startsWith("<")) {
+      throw new Error(
+        `Customer Account API returned HTML instead of JSON (status ${res.status}). The endpoint may be incorrect or unavailable.`
+      );
+    }
+    throw new Error(`Customer Account API returned invalid JSON: ${text.slice(0, 100)}`);
+  }
   const errs = json.errors as Array<{ message: string }> | undefined;
   if (errs && errs.length > 0) {
     const msg = errs[0].message || "Failed to fetch orders";
