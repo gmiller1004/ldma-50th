@@ -2,10 +2,79 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { Pickaxe, Camera, Loader2, Bell, Users, HelpCircle, X, Plus, Info, ShoppingBag } from "lucide-react";
+import { Pickaxe, Camera, Loader2, Bell, Users, HelpCircle, X, Plus, Info, ShoppingBag, Sparkles } from "lucide-react";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { getCompanionAddOnProduct } from "@/app/actions/membership";
 import type { MembershipProductInfo } from "@/app/actions/membership";
+
+function LegacyOfferModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="relative max-w-lg w-full max-h-[90vh] overflow-y-auto rounded-xl bg-[#1a120b] border border-[#d4af37]/30 shadow-xl"
+        role="dialog"
+        aria-labelledby="legacy-modal-title"
+        aria-modal="true"
+      >
+        <div className="sticky top-0 flex items-center justify-between p-4 border-b border-[#d4af37]/20 bg-[#1a120b] z-10">
+          <h2 id="legacy-modal-title" className="font-serif text-lg font-semibold text-[#f0d48f]">
+            Build Your Family Legacy — Add-Ons Explained
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 text-[#e8e0d5]/60 hover:text-[#e8e0d5] hover:bg-[#d4af37]/10 rounded-lg transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6 space-y-6">
+          <p className="text-[#e8e0d5]/90 text-sm">
+            Three add-ons help you pass your LDMA membership on to family and keep the tradition going.
+          </p>
+
+          <section>
+            <h3 className="font-semibold text-[#f0d48f] mb-2">Companion Add-On</h3>
+            <p className="text-[#e8e0d5]/90 text-sm leading-relaxed">
+              Lets a spouse, child over 18, parent, or grandparent prospect on LDMA claims and visit camps on their own—without you being there. They get their own membership privileges and can camp, prospect, and participate in events independently. Perfect for family members who want full access even when you&apos;re not around.
+            </p>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-[#f0d48f] mb-2">Transferability Add-On</h3>
+            <p className="text-[#e8e0d5]/90 text-sm leading-relaxed">
+              Lets you transfer your membership to a chosen heir when the time comes. Without transferability, your membership ends with you. With it, you designate who receives your membership—spouse, child, grandchild, or another family member—so they can continue prospecting and camping with LDMA. Transferability protects your investment and keeps the tradition alive in your family.
+            </p>
+          </section>
+
+          <section>
+            <h3 className="font-semibold text-[#f0d48f] mb-2">Pre-Paid Transfer Fee</h3>
+            <p className="text-[#e8e0d5]/90 text-sm leading-relaxed">
+              When a membership is transferred, the person receiving it typically pays a transfer fee. Pre-paying this fee means you cover it now, so your heir receives the membership with no fee when the time comes. It reduces the burden on them and makes it easier for the next generation to step into LDMA.
+            </p>
+          </section>
+
+          <p className="text-[#e8e0d5]/70 text-sm pt-2 border-t border-[#d4af37]/20">
+            To see which offers apply to your membership, close this and click <strong className="text-[#d4af37]">Request My Personalized Offer</strong>. We&apos;ll review your account and email you within 72 hours.
+          </p>
+        </div>
+        <div className="sticky bottom-0 p-4 border-t border-[#d4af37]/20 bg-[#1a120b]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full px-4 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const COMPANION_HELP_TEXT =
   "The Companion & Transferability add-on lets a spouse, child over 18, parent, or grandparent prospect on LDMA claims and visit camps independently. You can also transfer your membership to an heir.";
@@ -14,6 +83,9 @@ const COMPANION_BANNER_STORAGE_KEY = "ldma-companion-banner-expanded";
 
 /** Hidden until Admin API is available for purchase history. Set to true when ready. */
 const SHOW_PURCHASE_HISTORY_TAB = false;
+
+/** Hidden for now. Set to true to show the Add Companion & Transferability card. */
+const SHOW_COMPANION_ADD_ON_CARD = false;
 
 type Profile = {
   authenticated: boolean;
@@ -37,6 +109,8 @@ type Profile = {
   commentDigestEnabled?: boolean;
   companionTransferable?: boolean;
   companion?: string;
+  legacyOfferRequestDate?: string | null;
+  legacyOfferStatus?: string | null;
 };
 
 export function ProfileContent() {
@@ -51,6 +125,8 @@ export function ProfileContent() {
   const [companionProduct, setCompanionProduct] = useState<MembershipProductInfo | null>(null);
   const [bannerExpanded, setBannerExpanded] = useState(true);
   const [avatarHelpOpen, setAvatarHelpOpen] = useState(false);
+  const [legacyModalOpen, setLegacyModalOpen] = useState(false);
+  const [legacyRequesting, setLegacyRequesting] = useState(false);
   const [activeTab, setActiveTab] = useState<"profile" | "purchase-history">(() => {
     if (SHOW_PURCHASE_HISTORY_TAB && typeof window !== "undefined" && window.location.hash === "#purchase-history") {
       return "purchase-history";
@@ -104,6 +180,15 @@ export function ProfileContent() {
       setBannerExpanded(stored === "true");
     }
   }, []);
+
+  useEffect(() => {
+    if (!legacyModalOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLegacyModalOpen(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [legacyModalOpen]);
 
   function setBannerExpandedWithStorage(expanded: boolean) {
     setBannerExpanded(expanded);
@@ -167,6 +252,24 @@ export function ProfileContent() {
     }
   }
 
+  async function handleLegacyOfferRequest() {
+    setLegacyRequesting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/members/legacy-offer-request", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Request failed");
+        return;
+      }
+      await loadProfile();
+    } catch {
+      setError("Request failed");
+    } finally {
+      setLegacyRequesting(false);
+    }
+  }
+
   async function handleNotifyToggle(enabled: boolean) {
     setSavingNotify(true);
     setError(null);
@@ -210,8 +313,9 @@ export function ProfileContent() {
   }
 
   const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(" ") || "—";
-  const showCompanionBanner = profile.companionTransferable === false;
+  const showCompanionBanner = SHOW_COMPANION_ADD_ON_CARD && profile.companionTransferable === false;
   const showCompanionSection = profile.companionTransferable === true;
+  const legacyOfferRequested = Boolean(profile.legacyOfferRequestDate);
 
   const address = [
     profile.otherStreet,
@@ -255,6 +359,48 @@ export function ProfileContent() {
         <PurchaseHistoryTab />
       ) : (
       <>
+      <div className="rounded-xl bg-[#0f3d1e]/40 border border-[#d4af37]/30 overflow-hidden">
+        <div className="p-6">
+          <h3 className="font-serif text-lg font-semibold text-[#f0d48f] flex items-center gap-2 mb-2">
+            <Sparkles className="w-5 h-5 text-[#d4af37]" />
+            Build Your Family Legacy
+          </h3>
+          <p className="text-[#e8e0d5]/90 text-sm mb-3">
+            Pass your LDMA membership on to a spouse, child, parent, or grandparent so they can prospect and visit camps on their own. With transferability, your membership outlives you—and the legacy keeps going for the next generation.
+          </p>
+          <p className="text-[#e8e0d5]/90 text-sm mb-4">
+            We can also prepay the transfer fee so your heir receives the membership without paying it. You cover it now; they get the benefit later.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setLegacyModalOpen(true)}
+              className="px-4 py-2 text-sm font-medium text-[#d4af37] border border-[#d4af37]/40 rounded-lg hover:bg-[#d4af37]/10 transition-colors"
+            >
+              More Info
+            </button>
+            {legacyOfferRequested ? (
+              <p className="px-4 py-2 text-sm text-[#e8e0d5]/80">
+                We&apos;ve received your request. You&apos;ll hear from us within 72 hours.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLegacyOfferRequest}
+                disabled={legacyRequesting}
+                className="px-5 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {legacyRequesting ? "Requesting…" : "Request My Personalized Offer"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {legacyModalOpen && (
+        <LegacyOfferModal onClose={() => setLegacyModalOpen(false)} />
+      )}
+
       {showCompanionBanner && (
         <div className="rounded-xl bg-[#0f3d1e]/40 border border-[#d4af37]/30 overflow-hidden">
           <div className="relative">

@@ -57,6 +57,8 @@ export async function GET() {
       maintenancePaymentUrl,
       companionTransferable: member.companionTransferable,
       companion: member.companion,
+      legacyOfferRequestDate: member.legacyOfferRequestDate ?? null,
+      legacyOfferStatus: member.legacyOfferStatus ?? null,
     });
   } catch (e) {
     console.error("Me route error:", e);

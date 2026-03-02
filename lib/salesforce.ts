@@ -32,6 +32,10 @@ export type MemberLookupResult = {
   companionTransferable?: boolean;
   /** Companion name (when companionTransferable is true and set). */
   companion?: string;
+  /** When member requested legacy offer; used to show "already requested" state. */
+  legacyOfferRequestDate?: string | null;
+  /** Legacy offer status (e.g. Pending Review, Reviewed - Email Sent). */
+  legacyOfferStatus?: string | null;
   error?: string;
 };
 
@@ -50,7 +54,7 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
 
   try {
     const escaped = String(memberNumber).replace(/'/g, "\\'");
-    const query = `SELECT Id, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c FROM Contact WHERE Customer_Number__c = '${escaped}' LIMIT 1`;
+    const query = `SELECT Id, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c, Legacy_Offer_Request_Date__c, Legacy_Offer_Status__c FROM Contact WHERE Customer_Number__c = '${escaped}' LIMIT 1`;
     const queryRes = await fetch(
       `${client.instanceUrl}/services/data/v59.0/query?q=${encodeURIComponent(query)}`,
       {
@@ -138,6 +142,18 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
             : String(paidThru);
     }
 
+    const legacyRequestDate = c.Legacy_Offer_Request_Date__c;
+    const legacyOfferRequestDate =
+      legacyRequestDate != null
+        ? typeof legacyRequestDate === "string"
+          ? legacyRequestDate
+          : legacyRequestDate instanceof Date
+            ? legacyRequestDate.toISOString()
+            : String(legacyRequestDate)
+        : null;
+    const legacyOfferStatus =
+      typeof c.Legacy_Offer_Status__c === "string" ? c.Legacy_Offer_Status__c : null;
+
     return {
       valid: true,
       active,
@@ -158,6 +174,8 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
       isOnAutoPay,
       companionTransferable,
       companion,
+      legacyOfferRequestDate: legacyOfferRequestDate ?? undefined,
+      legacyOfferStatus: legacyOfferStatus ?? undefined,
     };
   } catch (e) {
     console.error("Salesforce lookup error:", e);
@@ -301,6 +319,50 @@ export async function updateContact(
     return { success: true };
   } catch (e) {
     console.error("Salesforce update error:", e);
+    return { success: false, error: "Update failed" };
+  }
+}
+
+/** Record that the member requested their legacy offer. Sets Legacy_Offer_Request_Date__c and Legacy_Offer_Status__c. */
+export async function recordLegacyOfferRequest(
+  contactId: string
+): Promise<UpdateContactResult> {
+  if (process.env.NODE_ENV === "development" && contactId === "mock-contact-id") {
+    return { success: true };
+  }
+
+  const client = await getSalesforceClient();
+  if (!client) {
+    return { success: false, error: "Salesforce not configured" };
+  }
+
+  const now = new Date().toISOString();
+  const body = {
+    Legacy_Offer_Request_Date__c: now,
+    Legacy_Offer_Status__c: "Pending Review",
+  };
+
+  try {
+    const res = await fetch(
+      `${client.instanceUrl}/services/data/v59.0/sobjects/Contact/${contactId}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${client.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Salesforce legacy offer request error:", err);
+      return { success: false, error: "Update failed" };
+    }
+    return { success: true };
+  } catch (e) {
+    console.error("Salesforce legacy offer request error:", e);
     return { success: false, error: "Update failed" };
   }
 }
