@@ -74,19 +74,11 @@ export async function GET(req: Request) {
     } catch (e) {
       console.error("[purchase-history] getCustomerOrders failed:", e);
       const msg = e instanceof Error ? e.message : "";
-      const isAuthError = msg.includes("401") || /unauthorized|invalid.*token/i.test(msg);
-      if (isAuthError) {
-        await clearShopifyToken(session.memberNumber);
-        return NextResponse.json(
-          debug ? { needsLogin: true, _debug: "orders-failed-auth", errorMsg: msg } : { needsLogin: true },
-          { status: 200 }
-        );
-      }
       return NextResponse.json({
         needsLogin: false,
         orders: [],
         error: "Unable to load orders. Please try again.",
-        ...(debug && { _debug: "orders-failed-other", errorMsg: msg }),
+        ...(debug && { _debug: "orders-failed", errorMsg: msg }),
       }, { status: 200 });
     }
   } catch (e) {

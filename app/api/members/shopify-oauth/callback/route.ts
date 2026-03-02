@@ -26,8 +26,9 @@ export async function GET(req: Request) {
 
   const memberNumber = await consumeOAuthState(state);
   if (!memberNumber) {
+    console.error("[shopify-oauth/callback] consumeOAuthState returned null for state:", state?.slice(0, 8) + "...");
     return NextResponse.redirect(
-      `${doneUrl}?error=${encodeURIComponent("Invalid or expired state. Please try again.")}`
+      `${doneUrl}?error=${encodeURIComponent("state_invalid: State not found or expired. Try again.")}`
     );
   }
 
@@ -42,13 +43,15 @@ export async function GET(req: Request) {
       expiresAt,
       tokens.refresh_token
     );
+    console.log("[shopify-oauth/callback] Stored token for member", memberNumber.slice(0, 2) + "***");
 
     return NextResponse.redirect(`${doneUrl}?success=1`);
   } catch (e) {
     console.error("[shopify-oauth/callback]", e);
     const msg = e instanceof Error ? e.message : "Token exchange failed";
+    const code = msg.toLowerCase().includes("redirect") ? "redirect_uri_mismatch" : "token_exchange_failed";
     return NextResponse.redirect(
-      `${doneUrl}?error=${encodeURIComponent(msg)}`
+      `${doneUrl}?error=${encodeURIComponent(code + ": " + msg)}`
     );
   }
 }

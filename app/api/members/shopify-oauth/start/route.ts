@@ -24,6 +24,7 @@ export async function GET() {
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await setOAuthState(state, session.memberNumber, expiresAt);
+    console.log("[shopify-oauth/start] Stored state for member", session.memberNumber.slice(0, 2) + "***");
 
     const authUrl = await getAuthorizationUrl(redirectUri, state);
     return NextResponse.redirect(authUrl);
