@@ -1,7 +1,10 @@
 /**
  * Shopify Customer Account API
  * OAuth 2.0 + GraphQL for customer orders (supports OTP login).
+ * Uses PKCE (public client) for Headless channel - produces shcat_ tokens.
  */
+
+import { randomBytes, createHash } from "crypto";
 
 const SHOP_DOMAIN = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN;
 const CLIENT_ID = process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID;
@@ -38,10 +41,18 @@ async function getGraphqlEndpoint(): Promise<string> {
   return cachedGraphqlApi!;
 }
 
-/** Build the OAuth authorization URL for redirect. */
+/** Generate PKCE code_verifier and code_challenge (S256). */
+export function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
+  const verifier = randomBytes(32).toString("base64url");
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  return { codeVerifier: verifier, codeChallenge: challenge };
+}
+
+/** Build the OAuth authorization URL for redirect. Uses PKCE for public client (produces shcat_ tokens). */
 export async function getAuthorizationUrl(
   redirectUri: string,
-  state: string
+  state: string,
+  pkce?: { codeVerifier: string; codeChallenge: string }
 ): Promise<string> {
   const config = await getOpenIdConfig();
   if (!CLIENT_ID) throw new Error("SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID not set");
@@ -53,6 +64,11 @@ export async function getAuthorizationUrl(
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("state", state);
 
+  if (pkce) {
+    url.searchParams.set("code_challenge", pkce.codeChallenge);
+    url.searchParams.set("code_challenge_method", "S256");
+  }
+
   return url.toString();
 }
 
@@ -63,30 +79,35 @@ type TokenResponse = {
   id_token?: string;
 };
 
-/** Exchange authorization code for tokens (confidential client). */
+/** Exchange authorization code for tokens. Prefers PKCE (public client) when codeVerifier is provided; falls back to confidential client. */
 export async function exchangeCodeForTokens(
   code: string,
-  redirectUri: string
+  redirectUri: string,
+  codeVerifier?: string
 ): Promise<TokenResponse> {
   const config = await getOpenIdConfig();
-  if (!CLIENT_ID || !CLIENT_SECRET) {
-    throw new Error("SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID or _SECRET not set");
-  }
+  if (!CLIENT_ID) throw new Error("SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID not set");
 
   const body = new URLSearchParams();
   body.set("grant_type", "authorization_code");
   body.set("client_id", CLIENT_ID);
   body.set("redirect_uri", redirectUri);
   body.set("code", code);
+  if (codeVerifier) {
+    body.set("code_verifier", codeVerifier);
+  }
 
-  const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+  if (CLIENT_SECRET && !codeVerifier) {
+    const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
+    headers.Authorization = `Basic ${credentials}`;
+  }
 
   const res = await fetch(config.token_endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${credentials}`,
-    },
+    headers,
     body: body.toString(),
   });
 
@@ -98,26 +119,26 @@ export async function exchangeCodeForTokens(
   return data;
 }
 
-/** Refresh access token using refresh_token. */
+/** Refresh access token using refresh_token. Supports both confidential (with secret) and public clients. */
 export async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> {
   const config = await getOpenIdConfig();
-  if (!CLIENT_ID || !CLIENT_SECRET) {
-    throw new Error("SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID or _SECRET not set");
-  }
+  if (!CLIENT_ID) throw new Error("SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID not set");
 
   const body = new URLSearchParams();
   body.set("grant_type", "refresh_token");
   body.set("client_id", CLIENT_ID);
   body.set("refresh_token", refreshToken);
 
-  const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+  if (CLIENT_SECRET) {
+    headers.Authorization = `Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64")}`;
+  }
 
   const res = await fetch(config.token_endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${credentials}`,
-    },
+    headers,
     body: body.toString(),
   });
 

@@ -24,17 +24,19 @@ export async function GET(req: Request) {
     );
   }
 
-  const memberNumber = await consumeOAuthState(state);
-  if (!memberNumber) {
+  const oauthState = await consumeOAuthState(state);
+  if (!oauthState) {
     console.error("[shopify-oauth/callback] consumeOAuthState returned null for state:", state?.slice(0, 8) + "...");
     return NextResponse.redirect(
       `${doneUrl}?error=${encodeURIComponent("state_invalid: State not found or expired. Try again.")}`
     );
   }
 
+  const { memberNumber, codeVerifier } = oauthState;
+
   try {
     const redirectUri = `${baseUrl}/api/members/shopify-oauth/callback`;
-    const tokens = await exchangeCodeForTokens(code, redirectUri);
+    const tokens = await exchangeCodeForTokens(code, redirectUri, codeVerifier ?? undefined);
 
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
     await setShopifyOAuthToken(

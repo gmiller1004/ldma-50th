@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifySessionToken } from "@/lib/session";
-import { getAuthorizationUrl } from "@/lib/customer-account-api";
+import { getAuthorizationUrl, generatePKCE } from "@/lib/customer-account-api";
 import { setOAuthState } from "@/lib/oauth-state";
 import { randomBytes } from "crypto";
 
@@ -21,12 +21,13 @@ export async function GET() {
     const baseUrl = getBaseUrl();
     const redirectUri = `${baseUrl}/api/members/shopify-oauth/callback`;
     const state = randomBytes(32).toString("hex");
+    const pkce = generatePKCE();
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await setOAuthState(state, session.memberNumber, expiresAt);
-    console.log("[shopify-oauth/start] Stored state for member", session.memberNumber.slice(0, 2) + "***");
+    await setOAuthState(state, session.memberNumber, expiresAt, pkce.codeVerifier);
+    console.log("[shopify-oauth/start] Stored state+PKCE for member", session.memberNumber.slice(0, 2) + "***");
 
-    const authUrl = await getAuthorizationUrl(redirectUri, state);
+    const authUrl = await getAuthorizationUrl(redirectUri, state, pkce);
     return NextResponse.redirect(authUrl);
   } catch (e) {
     console.error("[shopify-oauth/start]", e);
