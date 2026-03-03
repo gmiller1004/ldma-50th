@@ -513,7 +513,7 @@ export function ProfileContent() {
                       </>
                     ) : (
                       <a
-                        href="tel:888-465-3717"
+                        href="tel:8884653717"
                         className="inline-flex items-center gap-2 px-5 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
                       >
                         Call to Purchase
@@ -906,7 +906,7 @@ function PurchaseHistoryTab() {
           <p className="text-sm text-[#e8e0d5]/90">
             These details only include purchases made from the MyLDMA online store.
             If you have questions about purchases that don&apos;t appear here, call{" "}
-            <a href="tel:888-465-3717" className="text-[#d4af37] hover:underline">(888) 465-3717</a>.
+            <a href="tel:8884653717" className="text-[#d4af37] hover:underline">(888) 465-3717</a>.
           </p>
         </div>
       )}

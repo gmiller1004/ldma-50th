@@ -26,7 +26,7 @@ export default function ContactPage() {
 
           <div className="space-y-8">
             <a
-              href="tel:888-465-3717"
+              href="tel:8884653717"
               className="flex items-start gap-4 p-6 rounded-xl bg-[#0f3d1e]/30 border border-[#d4af37]/20 hover:border-[#d4af37]/40 transition-colors group"
             >
               <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#d4af37]/15 flex items-center justify-center group-hover:bg-[#d4af37]/25 transition-colors">

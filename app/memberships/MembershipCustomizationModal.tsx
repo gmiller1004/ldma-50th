@@ -194,7 +194,7 @@ export function MembershipCustomizationModal({
               <div className="py-8 text-center">
                 <p className="text-red-400 mb-4">{error}</p>
                 <p className="text-[#e8e0d5]/60 text-sm">
-                  Visit our shop or contact info@myldma.com or (800) 551-9707
+                  Visit our shop or contact info@myldma.com or (888) 465-3717
                 </p>
               </div>
             ) : !current && !isSummaryStep ? (

@@ -350,10 +350,10 @@ export function MembershipsPageContent() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
               <CustomizeMembershipButton />
               <a
-                href="tel:8005519707"
+                href="tel:8884653717"
                 className="text-[#e8e0d5]/70 hover:text-[#d4af37] text-sm transition-colors"
               >
-                Questions? Call (800) 551-9707
+                Questions? Call (888) 465-3717
               </a>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-[#e8e0d5]/60">
