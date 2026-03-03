@@ -15,6 +15,8 @@ import { verifySessionToken } from "@/lib/session";
 import { ShopPageContent } from "@/app/shop/ShopPageContent";
 
 export const revalidate = 300;
+/** Members-only check uses cookies(); must be dynamic. */
+export const dynamic = "force-dynamic";
 
 /** Ensure collection payload is RSC-serializable (no undefined, BigInt, or non-plain values). */
 function serializableCollection(collection: {
