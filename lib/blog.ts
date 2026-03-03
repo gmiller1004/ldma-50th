@@ -53,19 +53,39 @@ export async function getCategories(): Promise<BlogCategory[]> {
   return rows as BlogCategory[];
 }
 
+/** Slug for URL: lowercase, spaces to hyphens, strip non-alphanumeric/hyphen */
+export function slugifyTag(tag: string): string {
+  return tag
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "tag";
+}
+
 export async function getPosts(options: {
   categoryId?: string;
+  tagSlug?: string;
   publishedOnly?: boolean;
   limit?: number;
   offset?: number;
 }): Promise<BlogPost[]> {
-  const { categoryId, publishedOnly = true, limit = 50, offset = 0 } = options;
+  const { categoryId, tagSlug, publishedOnly = true, limit = 50, offset = 0 } = options;
   if (!hasDb() || !sql) return [];
 
   const categoryFilter = categoryId ? sql`AND p.category_id = ${categoryId}` : sql``;
   const publishedFilter = publishedOnly
     ? sql`AND p.published_at IS NOT NULL`
     : sql``;
+  const normalizedTagSlug = tagSlug?.trim().toLowerCase().replace(/-+/g, "-").replace(/^-|-$/g, "") || "";
+  const tagFilter =
+    normalizedTagSlug
+      ? sql`AND EXISTS (
+          SELECT 1 FROM unnest(COALESCE(p.tags, ARRAY[]::TEXT[])) AS t
+          WHERE trim(both '-' from regexp_replace(regexp_replace(regexp_replace(lower(trim(t)), '\s+', '-', 'g'), '[^a-z0-9-]', '', 'gi'), '-+', '-', 'g')) = ${normalizedTagSlug}
+        )`
+      : sql``;
 
   const rows = await sql`
     SELECT
@@ -80,7 +100,7 @@ export async function getPosts(options: {
       p.updated_at AS "updatedAt"
     FROM blog_posts p
     JOIN blog_categories c ON c.id = p.category_id
-    WHERE 1=1 ${categoryFilter} ${publishedFilter}
+    WHERE 1=1 ${categoryFilter} ${publishedFilter} ${tagFilter}
     ORDER BY COALESCE(p.published_at, p.updated_at) DESC
     LIMIT ${limit}
     OFFSET ${offset}

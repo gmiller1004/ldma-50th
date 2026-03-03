@@ -8,6 +8,7 @@ const footerLinks = {
     { href: "/events", label: "Events 2026" },
     { href: "/memberships", label: "Memberships" },
     { href: "/shop", label: "Shop" },
+    { href: "/blog", label: "Blog" },
     { href: "/50-years", label: "50 Years" },
   ],
   Connect: [

@@ -39,3 +39,16 @@ CREATE INDEX IF NOT EXISTS idx_blog_posts_slug ON blog_posts(slug);
 CREATE INDEX IF NOT EXISTS idx_blog_posts_published ON blog_posts(published_at) WHERE published_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_blog_posts_category ON blog_posts(category_id);
 CREATE INDEX IF NOT EXISTS idx_blog_posts_updated ON blog_posts(updated_at DESC);
+
+-- Blog post comments (member or anonymous; profanity-hidden not shown)
+CREATE TABLE IF NOT EXISTS blog_comments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  blog_post_id UUID NOT NULL REFERENCES blog_posts(id) ON DELETE CASCADE,
+  author_contact_id TEXT,
+  author_display_name TEXT,
+  body TEXT NOT NULL,
+  is_hidden BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_blog_comments_post_id ON blog_comments(blog_post_id);
+CREATE INDEX IF NOT EXISTS idx_blog_comments_created ON blog_comments(created_at ASC);
