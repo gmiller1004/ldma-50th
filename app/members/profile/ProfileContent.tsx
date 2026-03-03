@@ -611,12 +611,14 @@ export function ProfileContent() {
             <div className="mt-4 pt-4 border-t border-[#d4af37]/20 sm:col-span-2">
               <dt className="text-sm text-[#e8e0d5]/60 flex items-center gap-1.5 mb-1">
                 Companion
-                <span
-                  className="inline-flex text-[#d4af37]/70 cursor-help"
-                  title={COMPANION_HELP_TEXT}
-                >
-                  <HelpCircle className="w-4 h-4" />
-                </span>
+                {!profile.companion && (
+                  <span
+                    className="inline-flex text-[#d4af37]/70 cursor-help"
+                    title={COMPANION_HELP_TEXT}
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                  </span>
+                )}
               </dt>
               {profile.companion ? (
                 <dd className="font-medium text-[#e8e0d5]">{profile.companion}</dd>
