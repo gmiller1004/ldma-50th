@@ -320,6 +320,9 @@ export function ProfileContent() {
   const showCompanionBanner = SHOW_COMPANION_ADD_ON_CARD && profile.companionTransferable === false;
   const showCompanionSection = profile.companionTransferable === true;
   const legacyOfferRequested = Boolean(profile.legacyOfferRequestDate);
+  const legacyOfferCompleted =
+    typeof profile.legacyOfferStatus === "string" &&
+    profile.legacyOfferStatus.toLowerCase().includes("completed");
   const legacyOfferReviewed =
     typeof profile.legacyOfferStatus === "string" &&
     profile.legacyOfferStatus.toLowerCase().includes("reviewed");
@@ -374,6 +377,7 @@ export function ProfileContent() {
         <PurchaseHistoryTab />
       ) : (
       <>
+      {!legacyOfferCompleted && (
       <div className="rounded-xl bg-[#0f3d1e]/40 border border-[#d4af37]/30 overflow-hidden">
         <div className="p-6">
           <h3 className="font-serif text-lg font-semibold text-[#f0d48f] flex items-center gap-2 mb-2">
@@ -441,6 +445,7 @@ export function ProfileContent() {
           )}
         </div>
       </div>
+      )}
 
       {legacyModalOpen && (
         <LegacyOfferModal onClose={() => setLegacyModalOpen(false)} />
