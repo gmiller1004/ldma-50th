@@ -12,9 +12,13 @@ const { Client } = pg;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+// Prefer new Neon (STORAGE_*); fall back to old free Neon
+const connectionString =
+  process.env.STORAGE_DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.DATABASE_URL;
 if (!connectionString) {
-  console.error("Error: POSTGRES_URL or DATABASE_URL not set.");
+  console.error("Error: STORAGE_DATABASE_URL, POSTGRES_URL, or DATABASE_URL not set.");
   process.exit(1);
 }
 

@@ -1,9 +1,13 @@
 import { neon } from "@neondatabase/serverless";
 
-const connectionString = process.env.POSTGRES_URL ?? process.env.DATABASE_URL;
+// Prefer new Neon (STORAGE_*); fall back to old free Neon (POSTGRES_URL / DATABASE_URL)
+const connectionString =
+  process.env.STORAGE_DATABASE_URL ??
+  process.env.POSTGRES_URL ??
+  process.env.DATABASE_URL;
 if (!connectionString) {
   console.warn(
-    "[db] POSTGRES_URL or DATABASE_URL not set. Community features will not work."
+    "[db] STORAGE_DATABASE_URL, POSTGRES_URL, or DATABASE_URL not set. Community features will not work."
   );
 }
 

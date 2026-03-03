@@ -10,11 +10,16 @@ const devStore = new Map<
 >();
 
 function getRedis(): Redis | null {
-  // Support both Upstash Redis and Vercel KV / Upstash integration env var names
+  // Support multiple env naming conventions (Upstash Redis, Vercel KV, LDMAStorage)
   const url =
-    process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+    process.env.UPSTASH_REDIS_REST_URL ||
+    process.env.KV_REST_API_URL ||
+    process.env.LDMAStorage_KV_REST_API_URL ||
+    process.env.LDMAStorage_KV_URL;
   const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+    process.env.UPSTASH_REDIS_REST_TOKEN ||
+    process.env.KV_REST_API_TOKEN ||
+    process.env.LDMAStorage_KV_REST_API_TOKEN;
   if (!url || !token) return null;
   return new Redis({ url, token });
 }
@@ -78,8 +83,13 @@ export async function verifyAuthCode(
 
 export function isRedisConfigured(): boolean {
   const url =
-    process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+    process.env.UPSTASH_REDIS_REST_URL ||
+    process.env.KV_REST_API_URL ||
+    process.env.LDMAStorage_KV_REST_API_URL ||
+    process.env.LDMAStorage_KV_URL;
   const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+    process.env.UPSTASH_REDIS_REST_TOKEN ||
+    process.env.KV_REST_API_TOKEN ||
+    process.env.LDMAStorage_KV_REST_API_TOKEN;
   return !!(url && token);
 }
