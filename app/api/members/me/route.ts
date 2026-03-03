@@ -62,6 +62,7 @@ export async function GET() {
       legacyOfferIsTransferable: member.isTransferable ?? false,
       legacyOfferIsCompanion: member.isCompanion ?? false,
       legacyOfferIsPrePay: member.isPrePayTransfer ?? false,
+      isLdmaAdmin: member.isLdmaAdmin ?? false,
     });
   } catch (e) {
     console.error("Me route error:", e);

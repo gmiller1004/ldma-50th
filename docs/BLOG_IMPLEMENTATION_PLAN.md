@@ -28,7 +28,7 @@ Add a blog to the LDMA site with:
 
 ## 3. Database Schema
 
-**Migration:** `scripts/init-blog-db.sql` (run once)
+**Migration:** `scripts/init-blog-db.sql` (run once). Use: `npm run db:blog:init` (or `node --env-file=.env.local scripts/init-blog-db.mjs`).
 
 ```sql
 -- Blog categories (fixed list, seeded)

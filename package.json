@@ -9,6 +9,9 @@
     "preview": "next build && next start -p 3000",
     "lint": "eslint",
     "db:init": "node --env-file=.env.local scripts/init-community-db.mjs",
+    "db:blog:init": "node --env-file=.env.local scripts/init-blog-db.mjs",
+    "db:blog:seed-myldma": "node --env-file=.env.local scripts/seed-blog-from-myldma-sitemap.mjs",
+    "generate:blog-redirects": "node scripts/generate-blog-redirects.mjs",
     "db:migrate": "node --env-file=.env.local scripts/migrate-community.mjs"
   },
   "dependencies": {

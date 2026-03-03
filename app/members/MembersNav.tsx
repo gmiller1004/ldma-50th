@@ -1,11 +1,20 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { User, LogOut, Map } from "lucide-react";
+import { User, LogOut, Map, FileEdit } from "lucide-react";
 
 export function MembersNav() {
   const router = useRouter();
+  const [isLdmaAdmin, setIsLdmaAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/members/me")
+      .then((res) => res.json())
+      .then((data) => setIsLdmaAdmin(data.isLdmaAdmin === true))
+      .catch(() => setIsLdmaAdmin(false));
+  }, []);
 
   async function handleLogout() {
     await fetch("/api/members/logout", { method: "POST" });
@@ -35,6 +44,15 @@ export function MembersNav() {
         <Map className="w-4 h-4" />
         Directory
       </Link>
+      {isLdmaAdmin && (
+        <Link
+          href="/admin/blog"
+          className="flex items-center gap-2 text-[#e8e0d5]/80 hover:text-[#d4af37] transition-colors"
+        >
+          <FileEdit className="w-4 h-4" />
+          Blog Admin
+        </Link>
+      )}
       <button
         type="button"
         onClick={handleLogout}

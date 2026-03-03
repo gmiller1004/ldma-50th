@@ -40,6 +40,8 @@ export type MemberLookupResult = {
   isTransferable?: boolean;
   isCompanion?: boolean;
   isPrePayTransfer?: boolean;
+  /** When true, member can access blog admin at /admin/blog. */
+  isLdmaAdmin?: boolean;
   error?: string;
 };
 
@@ -58,7 +60,7 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
 
   try {
     const escaped = String(memberNumber).replace(/'/g, "\\'");
-    const query = `SELECT Id, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c, Legacy_Offer_Request_Date__c, Legacy_Offer_Status__c, Is_Transferable__c, Is_Companion__c, Is_PrePay_Transfer__c, Companion_Transferable__c, Companion__c, Companion__r.Name FROM Contact WHERE Customer_Number__c = '${escaped}' LIMIT 1`;
+    const query = `SELECT Id, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c, Legacy_Offer_Request_Date__c, Legacy_Offer_Status__c, Is_Transferable__c, Is_Companion__c, Is_PrePay_Transfer__c, Companion_Transferable__c, Companion__c, Companion__r.Name, Is_LDMA_Admin__c FROM Contact WHERE Customer_Number__c = '${escaped}' LIMIT 1`;
     const queryRes = await fetch(
       `${client.instanceUrl}/services/data/v59.0/query?q=${encodeURIComponent(query)}`,
       {
@@ -189,6 +191,7 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
       isTransferable: c.Is_Transferable__c === true,
       isCompanion: c.Is_Companion__c === true,
       isPrePayTransfer: c.Is_PrePay_Transfer__c === true,
+      isLdmaAdmin: c.Is_LDMA_Admin__c === true,
     };
   } catch (e) {
     console.error("Salesforce lookup error:", e);
@@ -408,5 +411,6 @@ function mockLookup(memberNumber: string): MemberLookupResult {
     isOnAutoPay: false,
     companionTransferable: false,
     companion: undefined,
+    isLdmaAdmin: true,
   };
 }

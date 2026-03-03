@@ -5,12 +5,14 @@ import {
   isMembersOnlyCollection,
 } from "@/lib/collections-config";
 import { getValidCampSlugs } from "@/lib/directory-camps";
+import { getPosts } from "@/lib/blog";
 
 const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
 
 const STATIC_PATHS = [
   "",
   "/about",
+  "/blog",
   "/campgrounds",
   "/contact",
   "/events",
@@ -75,8 +77,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.6,
       });
     }
+
+    const blogPosts = await getPosts({ publishedOnly: true, limit: 500 });
+    for (const post of blogPosts) {
+      entries.push({
+        url: `${BASE}/blog/${post.slug}`,
+        lastModified: post.updatedAt,
+        changeFrequency: "weekly" as const,
+        priority: 0.5,
+      });
+    }
   } catch {
-    // Shopify env may be missing at build; static + campgrounds still included
+    // Shopify/env may be missing at build; static + campgrounds still included
   }
 
   return entries;

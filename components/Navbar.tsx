@@ -64,16 +64,13 @@ function CartButton() {
   );
 }
 
-function MemberIconButton() {
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    fetch("/api/members/me")
-      .then((res) => res.json())
-      .then((data) => setAuthenticated(data.authenticated === true))
-      .catch(() => setAuthenticated(false));
-  }, []);
-
+function MemberIconButton({
+  authenticated,
+  isLdmaAdmin,
+}: {
+  authenticated: boolean;
+  isLdmaAdmin: boolean;
+}) {
   const href = authenticated ? "/members" : "/members/login";
   const label = authenticated ? "Member dashboard" : "Sign in";
 
@@ -90,6 +87,22 @@ function MemberIconButton() {
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [auth, setAuth] = useState<{ authenticated: boolean; isLdmaAdmin: boolean }>({
+    authenticated: false,
+    isLdmaAdmin: false,
+  });
+
+  useEffect(() => {
+    fetch("/api/members/me")
+      .then((res) => res.json())
+      .then((data) =>
+        setAuth({
+          authenticated: data.authenticated === true,
+          isLdmaAdmin: data.isLdmaAdmin === true,
+        })
+      )
+      .catch(() => setAuth({ authenticated: false, isLdmaAdmin: false }));
+  }, []);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/95 backdrop-blur-md border-b border-[#d4af37]/20">
@@ -129,7 +142,7 @@ export function Navbar() {
                 </div>
               </div>
             </div>
-            <MemberIconButton />
+            <MemberIconButton authenticated={auth.authenticated} isLdmaAdmin={auth.isLdmaAdmin} />
             <CartButton />
             <Link
               href="/memberships"
@@ -141,7 +154,7 @@ export function Navbar() {
 
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center gap-3">
-            <MemberIconButton />
+            <MemberIconButton authenticated={auth.authenticated} isLdmaAdmin={auth.isLdmaAdmin} />
             <CartButton />
             <button
               onClick={() => setMobileOpen(!mobileOpen)}

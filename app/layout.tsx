@@ -3,7 +3,12 @@ import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import { CartDrawer } from "@/components/CartDrawer";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
+// Never use Shopify store URL for site base (canonical, og:url, etc.)
+const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
+const siteUrl =
+  typeof rawSiteUrl === "string" && rawSiteUrl.includes("myshopify.com")
+    ? "https://ldma-50th.vercel.app"
+    : rawSiteUrl;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

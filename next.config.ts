@@ -34,7 +34,10 @@ const LEGACY_REDIRECTS: Array<{ source: string; destination: string }> = [
 
 const nextConfig: NextConfig = {
   async redirects() {
-    return LEGACY_REDIRECTS.map(({ source, destination }) => ({
+    // Load blog redirects from .js so compiled config can resolve it (Node does not load .ts)
+    const { BLOG_REDIRECTS } = require("./lib/blog-redirects.generated.js");
+    const all = [...BLOG_REDIRECTS, ...LEGACY_REDIRECTS];
+    return all.map(({ source, destination }) => ({
       source,
       destination,
       permanent: true,
@@ -50,6 +53,11 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "cdn.shopify.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.blob.vercel-storage.com",
         pathname: "/**",
       },
     ],
