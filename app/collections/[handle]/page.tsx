@@ -6,7 +6,7 @@ import { notFound, redirect } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { getCollectionByHandle } from "@/lib/shopify";
+import { getCollectionByHandle, type ShopProduct } from "@/lib/shopify";
 import {
   isCampgroundCollection,
   isMembersOnlyCollection,
@@ -20,12 +20,12 @@ export const revalidate = 300;
 function serializableCollection(collection: {
   handle: string;
   title: string;
-  products: unknown[];
+  products: ShopProduct[];
   collectionDescription?: string;
-}) {
-  let products: unknown[] = [];
+}): { handle: string; title: string; collectionDescription?: string; products: ShopProduct[] } {
+  let products: ShopProduct[] = [];
   try {
-    products = JSON.parse(JSON.stringify(collection.products ?? []));
+    products = JSON.parse(JSON.stringify(collection.products ?? [])) as ShopProduct[];
   } catch (e) {
     console.error("[collections] serializableCollection:", e);
   }
