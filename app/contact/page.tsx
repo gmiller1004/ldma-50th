@@ -69,14 +69,12 @@ export default function ContactPage() {
                 <h2 className="font-serif text-xl font-semibold text-[#f0d48f] mb-1">
                   Main Website
                 </h2>
-                <a
-                  href="https://myldma.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href="/"
                   className="text-[#d4af37] hover:text-[#f0d48f] underline transition-colors"
                 >
-                  myldma.com
-                </a>
+                  Home
+                </Link>
                 <p className="text-[#e8e0d5]/60 text-sm mt-1">
                   Membership, campground bookings, shop, and event info
                 </p>

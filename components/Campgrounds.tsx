@@ -28,7 +28,7 @@ const featuredCamps = [
     ],
     address: "24997 Italian Bar Rd, Columbia, CA 95310",
     image: "/images/home/campgrounds/italian-bar.jpg",
-    link: "https://myldma.com/collections/italian-bar-california",
+    link: "/campgrounds/italian-bar-california",
   },
   {
     name: "Stanton, Arizona",
@@ -43,7 +43,7 @@ const featuredCamps = [
     ],
     address: "15650 Stanton Rd, Congress, AZ 85332",
     image: "/images/home/campgrounds/stanton.jpg",
-    link: "https://myldma.com/collections/stanton-arizona",
+    link: "/campgrounds/stanton-arizona",
   },
   {
     name: "Burnt River, Oregon",
@@ -58,7 +58,7 @@ const featuredCamps = [
     ],
     address: "28089 Burnt River Canyon Ln, Durkee, OR 97905",
     image: "/images/home/campgrounds/burnt-river.jpg",
-    link: "https://myldma.com/collections/burnt-river-oregon",
+    link: "/campgrounds/burnt-river-oregon",
   },
   {
     name: "Loud Mine, Georgia",
@@ -73,7 +73,7 @@ const featuredCamps = [
     ],
     address: "575 Abb Helton Rd, Cleveland, GA 30528",
     image: "/images/home/campgrounds/loud-mine.jpg",
-    link: "https://myldma.com/collections/loud-mine-georgia",
+    link: "/campgrounds/loud-mine-georgia",
   },
 ];
 
@@ -192,8 +192,6 @@ function CampCard({
         {/* CTA */}
         <Link
           href={camp.link}
-          target="_blank"
-          rel="noopener noreferrer"
           className="inline-flex items-center gap-2 w-full justify-center sm:w-auto px-6 py-3.5 bg-[#d4af37] text-[#1a120b] font-bold rounded-lg hover:bg-[#f0d48f] transition-all shadow-[0_0_15px_rgba(212,175,55,0.2)] group-hover:shadow-[0_0_25px_rgba(212,175,55,0.35)]"
         >
           Explore Camp

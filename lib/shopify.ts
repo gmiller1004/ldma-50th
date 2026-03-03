@@ -525,6 +525,30 @@ export async function getAllCollectionHandles(): Promise<string[]> {
   }
 }
 
+/** Fetch all active (published) product handles for sitemap. */
+export async function getAllProductHandles(): Promise<string[]> {
+  try {
+    const result = await shopifyFetch<{
+      products: { edges: Array<{ node: { handle: string } }> };
+    }>({
+      query: `
+        query GetAllProductHandles($first: Int!) {
+          products(first: $first, sortKey: TITLE) {
+            edges {
+              node { handle }
+            }
+          }
+        }
+      `,
+      variables: { first: 250 },
+    });
+    return (result?.products?.edges ?? []).map((e) => e.node.handle);
+  } catch (e) {
+    console.error("getAllProductHandles error:", e);
+    return [];
+  }
+}
+
 export type CollectionPageData = {
   handle: string;
   title: string;
