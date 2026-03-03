@@ -16,6 +16,27 @@ import { ShopPageContent } from "@/app/shop/ShopPageContent";
 
 export const revalidate = 300;
 
+/** Ensure collection payload is RSC-serializable (no undefined, BigInt, or non-plain values). */
+function serializableCollection(collection: {
+  handle: string;
+  title: string;
+  products: unknown[];
+  collectionDescription?: string;
+}) {
+  let products: unknown[] = [];
+  try {
+    products = JSON.parse(JSON.stringify(collection.products ?? []));
+  } catch (e) {
+    console.error("[collections] serializableCollection:", e);
+  }
+  return {
+    handle: collection.handle,
+    title: collection.title,
+    collectionDescription: collection.collectionDescription ?? undefined,
+    products,
+  };
+}
+
 type Props = {
   params: Promise<{ handle: string }>;
 };
@@ -111,16 +132,17 @@ export default async function CollectionPage({ params }: Props) {
       }
     }
 
+    const payload = serializableCollection(collection);
     return (
       <>
         <Navbar />
         <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
           <Suspense fallback={<div className="py-24 text-center text-[#e8e0d5]/60">Loading…</div>}>
             <ShopPageContent
-              products={collection.products}
-              collectionDescription={collection.collectionDescription}
-              collectionHandle={collection.handle}
-              collectionTitle={collection.title}
+              products={payload.products}
+              collectionDescription={payload.collectionDescription}
+              collectionHandle={payload.handle}
+              collectionTitle={payload.title}
             />
           </Suspense>
         </main>
