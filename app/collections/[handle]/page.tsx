@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -108,12 +109,14 @@ export default async function CollectionPage({ params }: Props) {
     <>
       <Navbar />
       <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
-        <ShopPageContent
-          products={collection.products}
-          collectionDescription={collection.collectionDescription}
-          collectionHandle={collection.handle}
-          collectionTitle={collection.title}
-        />
+        <Suspense fallback={<div className="py-24 text-center text-[#e8e0d5]/60">Loading…</div>}>
+          <ShopPageContent
+            products={collection.products}
+            collectionDescription={collection.collectionDescription}
+            collectionHandle={collection.handle}
+            collectionTitle={collection.title}
+          />
+        </Suspense>
       </main>
       <Footer />
     </>
