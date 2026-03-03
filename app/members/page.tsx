@@ -4,7 +4,7 @@ import { verifySessionToken } from "@/lib/session";
 import { MembersNav } from "./MembersNav";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import Link from "next/link";
-import { User, ChevronRight, MessageCircle } from "lucide-react";
+import { User, ChevronRight, MessageCircle, Gift } from "lucide-react";
 
 export default async function MembersDashboardPage() {
   const cookieStore = await cookies();
@@ -62,6 +62,24 @@ export default async function MembersDashboardPage() {
               <h2 className="font-semibold text-[#e8e0d5]">Camp Directory & Community</h2>
               <p className="text-sm text-[#e8e0d5]/60">
                 Browse camps, share trip reports, and join discussions
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-[#e8e0d5]/40 group-hover:text-[#d4af37] transition-colors" />
+        </Link>
+
+        <Link
+          href="/collections/exclusive-offers-for-ldma-members"
+          className="flex items-center justify-between p-4 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg hover:border-[#d4af37]/40 hover:bg-[#0f0a06]/80 transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#d4af37]/20 rounded-lg">
+              <Gift className="w-5 h-5 text-[#d4af37]" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-[#e8e0d5]">Exclusive Offers for LDMA Members</h2>
+              <p className="text-sm text-[#e8e0d5]/60">
+                Limited-time member-only deals — check back often for new offers
               </p>
             </div>
           </div>

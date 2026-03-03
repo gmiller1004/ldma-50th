@@ -3,7 +3,12 @@ import { cookies } from "next/headers";
 import { verifySessionToken } from "@/lib/session";
 import { lookupMember, updateContact } from "@/lib/salesforce";
 import { getAvatarUrl } from "@/lib/avatars";
-import { getCommentDigestEnabled, setCommentDigestEnabled } from "@/lib/notification-preferences";
+import {
+  getCommentDigestEnabled,
+  setCommentDigestEnabled,
+  getExclusiveOffersNotify,
+  setExclusiveOffersNotify,
+} from "@/lib/notification-preferences";
 
 export async function GET() {
   try {
@@ -24,9 +29,10 @@ export async function GET() {
       return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 
-    const [avatarUrl, commentDigestEnabled] = await Promise.all([
+    const [avatarUrl, commentDigestEnabled, exclusiveOffersNotify] = await Promise.all([
       getAvatarUrl(member.contactId ?? null),
       getCommentDigestEnabled(session.memberNumber),
+      getExclusiveOffersNotify(session.memberNumber),
     ]);
 
     const paymentBase = process.env.MEMBER_MAINTENANCE_PAYMENT_URL;
@@ -41,6 +47,7 @@ export async function GET() {
       contactId: member.contactId,
       avatarUrl: avatarUrl ?? null,
       commentDigestEnabled,
+      exclusiveOffersNotify,
       email: member.email,
       firstName: member.firstName,
       lastName: member.lastName,
@@ -99,7 +106,6 @@ export async function PATCH(req: Request) {
       otherState?: string;
       otherPostalCode?: string;
     } = {};
-    let notificationUpdate: Promise<void> | null = null;
 
     if (typeof body.phone === "string") input.phone = body.phone.trim();
     if (typeof body.otherStreet === "string") input.otherStreet = body.otherStreet.trim();
@@ -107,10 +113,11 @@ export async function PATCH(req: Request) {
     if (typeof body.otherState === "string") input.otherState = body.otherState.trim();
     if (typeof body.otherPostalCode === "string") input.otherPostalCode = body.otherPostalCode.trim();
     if (typeof body.commentDigestEnabled === "boolean") {
-      notificationUpdate = setCommentDigestEnabled(session.memberNumber, body.commentDigestEnabled);
+      await setCommentDigestEnabled(session.memberNumber, body.commentDigestEnabled);
     }
-
-    if (notificationUpdate) await notificationUpdate;
+    if (typeof body.exclusiveOffersNotify === "boolean") {
+      await setExclusiveOffersNotify(session.memberNumber, body.exclusiveOffersNotify);
+    }
 
     if (Object.keys(input).length === 0) {
       return NextResponse.json({ ok: true });

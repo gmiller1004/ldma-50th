@@ -11,6 +11,126 @@ import { ShareButton } from "@/components/ShareButton";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import type { ShopProduct, ShopProductVariant } from "@/lib/shopify";
 
+/** Modal: explain exclusive-offers email notifications, then Confirm or Cancel */
+function ExclusiveOffersNotifyModal({
+  open,
+  onClose,
+  onConfirm,
+  saving,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  saving: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="relative max-w-md w-full rounded-xl bg-[#1a120b] border border-[#d4af37]/30 shadow-xl"
+        role="dialog"
+        aria-labelledby="exclusive-offers-modal-title"
+        aria-modal="true"
+      >
+        <div className="p-6 space-y-4">
+          <h2 id="exclusive-offers-modal-title" className="font-serif text-lg font-semibold text-[#f0d48f]">
+            Email me when new offers become available
+          </h2>
+          <p className="text-[#e8e0d5]/90 text-sm leading-relaxed">
+            We&apos;ll send you one email when new products are added to Exclusive Offers for LDMA Members. Emails go out at most once per day and only when there are new offers. You can turn this off anytime in Profile → Notifications.
+          </p>
+        </div>
+        <div className="flex gap-3 p-4 border-t border-[#d4af37]/20">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 border border-[#d4af37]/40 text-[#e8e0d5] rounded-lg hover:bg-[#d4af37]/10 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={saving}
+            className="flex-1 px-4 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Confirm"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Banner + button that opens modal to opt in to exclusive-offers email notifications */
+function ExclusiveOffersBanner() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [optedIn, setOptedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/members/me")
+      .then((res) => res.json())
+      .then((data) => setOptedIn(data.exclusiveOffersNotify === true))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleConfirm() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/members/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exclusiveOffersNotify: true }),
+      });
+      if (res.ok) {
+        setOptedIn(true);
+        setModalOpen(false);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="py-6 border-b border-[#d4af37]/10 bg-[#0f3d1e]/20">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-4">
+        <p className="text-[#e8e0d5]/90 text-center">
+          These offers are available for a limited time. Check back often for new offers.
+        </p>
+        {!loading && !optedIn && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#d4af37]/20 text-[#d4af37] font-medium rounded-lg border border-[#d4af37]/40 hover:bg-[#d4af37]/30 hover:border-[#d4af37]/60 transition-colors"
+            >
+              <Info className="w-4 h-4" />
+              Email me when new offers become available
+            </button>
+          </div>
+        )}
+        {!loading && optedIn && (
+          <p className="text-[#e8e0d5]/70 text-center text-sm">
+            You&apos;re signed up for new offer emails. Manage in Profile → Notifications.
+          </p>
+        )}
+      </div>
+      <ExclusiveOffersNotifyModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onConfirm={handleConfirm}
+        saving={saving}
+      />
+    </section>
+  );
+}
+
 /** Get flat array of variants */
 function getVariants(p: ShopProduct): ShopProductVariant[] {
   return (p.variants?.edges ?? []).map((e) => e.node).filter(Boolean);
@@ -580,7 +700,7 @@ export function ShopPageContent({
           >
             {isCollectionPage ? collectionTitle : "Shop"}
           </motion.h1>
-          {isCollectionPage ? (
+          {isCollectionPage && collectionHandle !== "exclusive-offers-for-ldma-members" ? (
             <motion.p
               className="text-[#e8e0d5]/90 text-lg md:text-xl max-w-2xl mx-auto"
               initial={{ opacity: 0, y: 16 }}
@@ -589,7 +709,7 @@ export function ShopPageContent({
             >
               Products in this collection.
             </motion.p>
-          ) : (
+          ) : !isCollectionPage ? (
             <>
               <motion.p
                 className="text-[#e8e0d5]/90 text-lg md:text-xl max-w-2xl mx-auto"
@@ -617,9 +737,14 @@ export function ShopPageContent({
                 </Link>
               </motion.div>
             </>
-          )}
+          ) : null}
         </div>
       </section>
+
+      {/* Exclusive offers: limited-time notice + email signup button */}
+      {collectionHandle === "exclusive-offers-for-ldma-members" && (
+        <ExclusiveOffersBanner />
+      )}
 
       {/* Collection description */}
       {collectionDescription && (

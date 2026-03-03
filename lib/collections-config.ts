@@ -5,6 +5,7 @@
 export const MEMBERS_ONLY_COLLECTION_HANDLES = [
   "exclusive-mining-gear",
   "members-only-savings",
+  "exclusive-offers-for-ldma-members",
 ] as const;
 
 export function isMembersOnlyCollection(handle: string): boolean {

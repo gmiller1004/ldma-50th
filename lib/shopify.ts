@@ -672,7 +672,7 @@ export async function getProductByHandle(
         query GetProductByHandle($handle: String!) {
           product(handle: $handle) {
             ...ShopProductFields
-            collections(first: 1) {
+            collections(first: 20) {
               edges {
                 node { handle }
               }

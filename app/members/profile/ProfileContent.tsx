@@ -108,6 +108,7 @@ type Profile = {
   isOnAutoPay?: boolean;
   maintenancePaymentUrl?: string | null;
   commentDigestEnabled?: boolean;
+  exclusiveOffersNotify?: boolean;
   companionTransferable?: boolean;
   companion?: string;
   legacyOfferRequestDate?: string | null;
@@ -282,6 +283,28 @@ export function ProfileContent() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ commentDigestEnabled: enabled }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Update failed");
+        return;
+      }
+      await loadProfile();
+    } catch {
+      setError("Update failed");
+    } finally {
+      setSavingNotify(false);
+    }
+  }
+
+  async function handleExclusiveOffersNotifyToggle(enabled: boolean) {
+    setSavingNotify(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/members/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exclusiveOffersNotify: enabled }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -739,6 +762,18 @@ export function ProfileContent() {
           />
           <span className="text-[#e8e0d5]">
             Email me a daily recap when someone comments on my posts (around 8pm Pacific). Only sent when there&apos;s activity.
+          </span>
+        </label>
+        <label className="flex items-start gap-3 cursor-pointer mt-3">
+          <input
+            type="checkbox"
+            checked={profile.exclusiveOffersNotify ?? false}
+            onChange={(e) => handleExclusiveOffersNotifyToggle(e.target.checked)}
+            disabled={savingNotify}
+            className="mt-1 w-4 h-4 rounded border-[#d4af37]/40 bg-[#1a120b] text-[#d4af37] focus:ring-[#d4af37]/50"
+          />
+          <span className="text-[#e8e0d5]">
+            Email me when new exclusive member offers are added (limited-time offers; at most once per day when there are new products).
           </span>
         </label>
       </div>
