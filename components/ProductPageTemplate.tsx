@@ -331,7 +331,9 @@ export function ProductPageTemplate({
             />
           )}
 
-          <ShareButton url={productUrl} title={product.title} />
+          {!product.handle.startsWith("legacy-") && (
+            <ShareButton url={productUrl} title={product.title} />
+          )}
         </div>
       </div>
 
