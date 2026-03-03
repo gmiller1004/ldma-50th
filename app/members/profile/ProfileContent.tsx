@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Pickaxe, Camera, Loader2, Bell, Users, HelpCircle, X, Plus, Info, ShoppingBag, Sparkles } from "lucide-react";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { getCompanionAddOnProduct } from "@/app/actions/membership";
+import { deriveLegacyOfferType, getLegacyOfferConfig } from "@/lib/legacy-offer";
 import type { MembershipProductInfo } from "@/app/actions/membership";
 
 function LegacyOfferModal({ onClose }: { onClose: () => void }) {
@@ -111,6 +112,9 @@ type Profile = {
   companion?: string;
   legacyOfferRequestDate?: string | null;
   legacyOfferStatus?: string | null;
+  legacyOfferIsTransferable?: boolean;
+  legacyOfferIsCompanion?: boolean;
+  legacyOfferIsPrePay?: boolean;
 };
 
 export function ProfileContent() {
@@ -316,6 +320,17 @@ export function ProfileContent() {
   const showCompanionBanner = SHOW_COMPANION_ADD_ON_CARD && profile.companionTransferable === false;
   const showCompanionSection = profile.companionTransferable === true;
   const legacyOfferRequested = Boolean(profile.legacyOfferRequestDate);
+  const legacyOfferReviewed =
+    typeof profile.legacyOfferStatus === "string" &&
+    profile.legacyOfferStatus.toLowerCase().includes("reviewed");
+  const legacyOfferType = legacyOfferReviewed
+    ? deriveLegacyOfferType(
+        profile.legacyOfferIsTransferable ?? false,
+        profile.legacyOfferIsCompanion ?? false,
+        profile.legacyOfferIsPrePay ?? false
+      )
+    : null;
+  const legacyOfferConfig = legacyOfferType ? getLegacyOfferConfig(legacyOfferType) : null;
 
   const address = [
     profile.otherStreet,
@@ -363,37 +378,66 @@ export function ProfileContent() {
         <div className="p-6">
           <h3 className="font-serif text-lg font-semibold text-[#f0d48f] flex items-center gap-2 mb-2">
             <Sparkles className="w-5 h-5 text-[#d4af37]" />
-            Build Your Family Legacy
+            {legacyOfferConfig ? legacyOfferConfig.headline : "Build Your Family Legacy"}
           </h3>
-          <p className="text-[#e8e0d5]/90 text-sm mb-3">
-            Pass your LDMA membership on to a spouse, child, parent, or grandparent so they can prospect and visit camps on their own. With transferability, your membership outlives you—and the legacy keeps going for the next generation.
-          </p>
-          <p className="text-[#e8e0d5]/90 text-sm mb-4">
-            We can also prepay the transfer fee so your heir receives the membership without paying it. You cover it now; they get the benefit later.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => setLegacyModalOpen(true)}
-              className="px-4 py-2 text-sm font-medium text-[#d4af37] border border-[#d4af37]/40 rounded-lg hover:bg-[#d4af37]/10 transition-colors"
-            >
-              More Info
-            </button>
-            {legacyOfferRequested ? (
-              <p className="px-4 py-2 text-sm text-[#e8e0d5]/80">
-                We&apos;ve received your request. You&apos;ll hear from us within 72 hours.
+          {legacyOfferConfig ? (
+            <>
+              <p className="text-[#e8e0d5]/90 text-sm mb-3">{legacyOfferConfig.body}</p>
+              <p className="text-[#d4af37] font-bold text-lg mb-4">
+                {legacyOfferConfig.price}{" "}
+                <span className="text-[#e8e0d5]/60 font-normal text-sm line-through">
+                  {legacyOfferConfig.regularPrice}
+                </span>
               </p>
-            ) : (
-              <button
-                type="button"
-                onClick={handleLegacyOfferRequest}
-                disabled={legacyRequesting}
-                className="px-5 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {legacyRequesting ? "Requesting…" : "Request My Personalized Offer"}
-              </button>
-            )}
-          </div>
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href="tel:8884653717"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+                >
+                  Call (888) 465-3717 to Purchase
+                </a>
+                <span className="px-2 py-2.5 text-[#e8e0d5]/60 text-sm">or</span>
+                <a
+                  href="/members"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#d4af37]/40 text-[#d4af37] font-medium rounded-lg hover:bg-[#d4af37]/10 transition-colors"
+                >
+                  Member Dashboard
+                </a>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-[#e8e0d5]/90 text-sm mb-3">
+                Pass your LDMA membership on to a spouse, child, parent, or grandparent so they can prospect and visit camps on their own. With transferability, your membership outlives you—and the legacy keeps going for the next generation.
+              </p>
+              <p className="text-[#e8e0d5]/90 text-sm mb-4">
+                We can also prepay the transfer fee so your heir receives the membership without paying it. You cover it now; they get the benefit later.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => setLegacyModalOpen(true)}
+                  className="px-4 py-2 text-sm font-medium text-[#d4af37] border border-[#d4af37]/40 rounded-lg hover:bg-[#d4af37]/10 transition-colors"
+                >
+                  More Info
+                </button>
+                {legacyOfferRequested ? (
+                  <p className="px-4 py-2 text-sm text-[#e8e0d5]/80">
+                    We&apos;ve received your request. You&apos;ll hear from us within 72 hours.
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleLegacyOfferRequest}
+                    disabled={legacyRequesting}
+                    className="px-5 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {legacyRequesting ? "Requesting…" : "Request My Personalized Offer"}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

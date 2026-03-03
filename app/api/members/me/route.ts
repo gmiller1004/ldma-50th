@@ -59,6 +59,9 @@ export async function GET() {
       companion: member.companion,
       legacyOfferRequestDate: member.legacyOfferRequestDate ?? null,
       legacyOfferStatus: member.legacyOfferStatus ?? null,
+      legacyOfferIsTransferable: member.isTransferable ?? false,
+      legacyOfferIsCompanion: member.isCompanion ?? false,
+      legacyOfferIsPrePay: member.isPrePayTransfer ?? false,
     });
   } catch (e) {
     console.error("Me route error:", e);

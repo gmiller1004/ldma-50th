@@ -36,6 +36,10 @@ export type MemberLookupResult = {
   legacyOfferRequestDate?: string | null;
   /** Legacy offer status (e.g. Pending Review, Reviewed - Email Sent). */
   legacyOfferStatus?: string | null;
+  /** What we're offering: Transferability, Companion, PrePay (set by rep when Reviewed). */
+  isTransferable?: boolean;
+  isCompanion?: boolean;
+  isPrePayTransfer?: boolean;
   error?: string;
 };
 
@@ -54,7 +58,7 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
 
   try {
     const escaped = String(memberNumber).replace(/'/g, "\\'");
-    const query = `SELECT Id, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c, Legacy_Offer_Request_Date__c, Legacy_Offer_Status__c FROM Contact WHERE Customer_Number__c = '${escaped}' LIMIT 1`;
+    const query = `SELECT Id, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c, Legacy_Offer_Request_Date__c, Legacy_Offer_Status__c, Is_Transferable__c, Is_Companion__c, Is_PrePay_Transfer__c FROM Contact WHERE Customer_Number__c = '${escaped}' LIMIT 1`;
     const queryRes = await fetch(
       `${client.instanceUrl}/services/data/v59.0/query?q=${encodeURIComponent(query)}`,
       {
@@ -176,6 +180,9 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
       companion,
       legacyOfferRequestDate: legacyOfferRequestDate ?? undefined,
       legacyOfferStatus: legacyOfferStatus ?? undefined,
+      isTransferable: c.Is_Transferable__c === true,
+      isCompanion: c.Is_Companion__c === true,
+      isPrePayTransfer: c.Is_PrePay_Transfer__c === true,
     };
   } catch (e) {
     console.error("Salesforce lookup error:", e);

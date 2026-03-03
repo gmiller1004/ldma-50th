@@ -157,9 +157,11 @@ function ProductVariantSelector({
 function ProductDetailModal({
   product,
   onClose,
+  productShareUrl,
 }: {
   product: ShopProduct;
   onClose: () => void;
+  productShareUrl?: string;
 }) {
   const variants = getVariants(product);
   const defaultVariant =
@@ -298,7 +300,7 @@ function ProductDetailModal({
                 {product.title}
               </h2>
               <ShareButton
-                url={`/shop?product=${encodeURIComponent(product.handle)}`}
+                url={productShareUrl ?? `/shop?product=${encodeURIComponent(product.handle)}`}
                 title={product.title}
               />
             </div>
@@ -465,13 +467,21 @@ function ProductCard({
 
 type SortOption = "default" | "price-low" | "price-high" | "newest";
 
+export type ShopPageContentProps = {
+  products: ShopProduct[];
+  collectionDescription?: string;
+  /** For collection pages: handle and title. Omit for main Shop page. */
+  collectionHandle?: string;
+  collectionTitle?: string;
+};
+
 export function ShopPageContent({
   products,
   collectionDescription,
-}: {
-  products: ShopProduct[];
-  collectionDescription?: string;
-}) {
+  collectionHandle,
+  collectionTitle,
+}: ShopPageContentProps) {
+  const isCollectionPage = Boolean(collectionHandle && collectionTitle);
   const searchParams = useSearchParams();
   const highlightHandle = searchParams.get("product");
   const productsWithVariants = useMemo(
@@ -530,15 +540,21 @@ export function ShopPageContent({
     return list;
   }, [productsWithVariants, productTypeFilter, sort]);
 
+  const breadcrumbItems = isCollectionPage
+    ? [
+        { label: "Home", href: "/" },
+        { label: "Shop", href: "/shop" },
+        { label: collectionTitle! },
+      ]
+    : [
+        { label: "Home", href: "/" },
+        { label: "Shop" },
+      ];
+
   return (
     <>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-        <Breadcrumbs
-          items={[
-            { label: "Home", href: "/" },
-            { label: "Shop" },
-          ]}
-        />
+        <Breadcrumbs items={breadcrumbItems} />
       </div>
 
       {/* Hero */}
@@ -546,47 +562,62 @@ export function ShopPageContent({
         <div className="absolute inset-0 bg-gradient-to-b from-[#0f3d1e]/40 via-transparent to-transparent" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(212,175,55,0.08)_0%,transparent_70%)]" />
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <motion.span
-            className="inline-block px-3 py-1 rounded bg-[#d4af37]/20 text-[#d4af37] text-sm font-medium mb-4"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            50th Anniversary
-          </motion.span>
+          {!isCollectionPage && (
+            <motion.span
+              className="inline-block px-3 py-1 rounded bg-[#d4af37]/20 text-[#d4af37] text-sm font-medium mb-4"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              50th Anniversary
+            </motion.span>
+          )}
           <motion.h1
             className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-[#f0d48f] tracking-tight mb-4"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
           >
-            Shop
+            {isCollectionPage ? collectionTitle : "Shop"}
           </motion.h1>
-          <motion.p
-            className="text-[#e8e0d5]/90 text-lg md:text-xl max-w-2xl mx-auto"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
-            Exclusive apparel, collectibles, and gear to celebrate five decades of
-            LDMA.
-          </motion.p>
-          <motion.div
-            className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <p className="text-[#e8e0d5]/70 text-sm">
-              Looking for LDMA Membership options?
-            </p>
-            <Link
-              href="/memberships"
-              className="inline-flex items-center px-5 py-2.5 bg-[#d4af37]/20 text-[#d4af37] font-semibold rounded-lg border border-[#d4af37]/40 hover:bg-[#d4af37]/30 hover:border-[#d4af37]/60 transition-colors"
+          {isCollectionPage ? (
+            <motion.p
+              className="text-[#e8e0d5]/90 text-lg md:text-xl max-w-2xl mx-auto"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
             >
-              View Memberships
-            </Link>
-          </motion.div>
+              Products in this collection.
+            </motion.p>
+          ) : (
+            <>
+              <motion.p
+                className="text-[#e8e0d5]/90 text-lg md:text-xl max-w-2xl mx-auto"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+              >
+                Exclusive apparel, collectibles, and gear to celebrate five decades of
+                LDMA.
+              </motion.p>
+              <motion.div
+                className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
+                <p className="text-[#e8e0d5]/70 text-sm">
+                  Looking for LDMA Membership options?
+                </p>
+                <Link
+                  href="/memberships"
+                  className="inline-flex items-center px-5 py-2.5 bg-[#d4af37]/20 text-[#d4af37] font-semibold rounded-lg border border-[#d4af37]/40 hover:bg-[#d4af37]/30 hover:border-[#d4af37]/60 transition-colors"
+                >
+                  View Memberships
+                </Link>
+              </motion.div>
+            </>
+          )}
         </div>
       </section>
 
@@ -703,6 +734,11 @@ export function ShopPageContent({
             key={detailProduct.id}
             product={detailProduct}
             onClose={() => setDetailProduct(null)}
+            productShareUrl={
+              isCollectionPage
+                ? `/collections/${collectionHandle}?product=${encodeURIComponent(detailProduct.handle)}`
+                : undefined
+            }
           />
         )}
       </AnimatePresence>

@@ -185,6 +185,24 @@ export type ShopProduct = {
   };
 };
 
+export type SellingPlanOption = {
+  id: string;
+  name: string;
+};
+
+/** Product with optional selling plans (subscription). Requires unauthenticated_read_selling_plans for sellingPlanGroups. */
+export type ProductWithSellingPlans = ShopProduct & {
+  sellingPlanGroups?: {
+    edges: Array<{
+      node: {
+        name: string;
+        appName?: string;
+        sellingPlans: { edges: Array<{ node: SellingPlanOption }> };
+      };
+    }>;
+  };
+};
+
 const SHOP_PRODUCT_FRAGMENT = `
   fragment ShopProductFields on Product {
     id
@@ -483,12 +501,214 @@ export async function getMerchProducts(): Promise<MerchShopData> {
   return { products: [] };
 }
 
-export async function createCartAndAddLine(variantId: string) {
-  return createCartAndAddLines([variantId]);
+/** Fetch all active (published) collection handles. */
+export async function getAllCollectionHandles(): Promise<string[]> {
+  try {
+    const result = await shopifyFetch<{
+      collections: { edges: Array<{ node: { handle: string } }> };
+    }>({
+      query: `
+        query GetAllCollectionHandles($first: Int!) {
+          collections(first: $first, sortKey: TITLE) {
+            edges {
+              node { handle }
+            }
+          }
+        }
+      `,
+      variables: { first: 100 },
+    });
+    return (result?.collections?.edges ?? []).map((e) => e.node.handle);
+  } catch (e) {
+    console.error("getAllCollectionHandles error:", e);
+    return [];
+  }
 }
 
-export async function createCartAndAddLines(variantIds: string[]) {
-  const lines = variantIds.map((id) => ({ merchandiseId: id, quantity: 1 }));
+export type CollectionPageData = {
+  handle: string;
+  title: string;
+  products: ShopProduct[];
+  collectionDescription?: string;
+};
+
+/** Fetch a collection by handle with products. Returns null if not found. */
+export async function getCollectionByHandle(
+  handle: string
+): Promise<CollectionPageData | null> {
+  try {
+    const result = await shopifyFetch<{
+      collection: {
+        handle: string;
+        title: string;
+        description?: string;
+        descriptionHtml?: string;
+        products: { edges: Array<{ node: ShopProduct }> };
+      } | null;
+    }>({
+      query: `
+        ${SHOP_PRODUCT_FRAGMENT}
+        query GetCollectionByHandle($handle: String!) {
+          collection(handle: $handle) {
+            handle
+            title
+            description
+            descriptionHtml
+            products(first: 100, sortKey: TITLE) {
+              edges {
+                node {
+                  ...ShopProductFields
+                }
+              }
+            }
+          }
+        }
+      `,
+      variables: { handle },
+    });
+
+    const c = result?.collection;
+    if (!c) return null;
+
+    const desc = (c.descriptionHtml || c.description || "").trim();
+    return {
+      handle: c.handle,
+      title: c.title,
+      products: c.products.edges.map((e) => e.node),
+      collectionDescription: desc || undefined,
+    };
+  } catch (e) {
+    console.error("getCollectionByHandle error:", e);
+    return null;
+  }
+}
+
+/** Fetch related products from a collection, excluding one by handle. */
+export async function getRelatedProducts(
+  collectionHandle: string,
+  excludeHandle: string,
+  limit = 4
+): Promise<ShopProduct[]> {
+  try {
+    const result = await shopifyFetch<{
+      collection: {
+        products: { edges: Array<{ node: ShopProduct }> };
+      } | null;
+    }>({
+      query: `
+        ${SHOP_PRODUCT_FRAGMENT}
+        query GetRelatedProducts($handle: String!, $first: Int!) {
+          collection(handle: $handle) {
+            products(first: $first, sortKey: TITLE) {
+              edges {
+                node {
+                  ...ShopProductFields
+                }
+              }
+            }
+          }
+        }
+      `,
+      variables: { handle: collectionHandle, first: Math.min(limit + 10, 50) },
+    });
+
+    const edges = result?.collection?.products?.edges ?? [];
+    const filtered = edges
+      .map((e) => e.node)
+      .filter((p) => p.handle !== excludeHandle)
+      .slice(0, limit);
+    return filtered;
+  } catch (e) {
+    console.error("getRelatedProducts error:", e);
+    return [];
+  }
+}
+
+/** Fetch a single product by handle. Returns null if not found. Only returns published (active) products. */
+export async function getProductByHandle(
+  handle: string
+): Promise<ProductWithSellingPlans | null> {
+  try {
+    const result = await shopifyFetch<{
+      product: (ShopProduct & {
+        collections?: { edges: Array<{ node: { handle: string } }> };
+        sellingPlanGroups?: {
+          edges: Array<{
+            node: {
+              name: string;
+              appName?: string;
+              sellingPlans: { edges: Array<{ node: { id: string; name: string } }> };
+            };
+          }>;
+        };
+      }) | null;
+    }>({
+      query: `
+        ${SHOP_PRODUCT_FRAGMENT}
+        query GetProductByHandle($handle: String!) {
+          product(handle: $handle) {
+            ...ShopProductFields
+            collections(first: 1) {
+              edges {
+                node { handle }
+              }
+            }
+            sellingPlanGroups(first: 5) {
+              edges {
+                node {
+                  name
+                  appName
+                  sellingPlans(first: 20) {
+                    edges {
+                      node {
+                        id
+                        name
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `,
+      variables: { handle },
+    });
+
+    const product = result?.product;
+    if (!product) return null;
+
+    return {
+      ...product,
+      sellingPlanGroups: product.sellingPlanGroups,
+    };
+  } catch (e) {
+    console.error("getProductByHandle error:", e);
+    return null;
+  }
+}
+
+export type CartLineInput = {
+  merchandiseId: string;
+  quantity?: number;
+  sellingPlanId?: string;
+};
+
+export async function createCartAndAddLine(
+  variantId: string,
+  sellingPlanId?: string
+) {
+  return createCartAndAddLines([{ merchandiseId: variantId, sellingPlanId }]);
+}
+
+export async function createCartAndAddLines(
+  lines: CartLineInput[] | string[]
+) {
+  const normalizedLines: CartLineInput[] = lines.map((item) =>
+    typeof item === "string"
+      ? { merchandiseId: item, quantity: 1 }
+      : { merchandiseId: item.merchandiseId, quantity: item.quantity ?? 1, sellingPlanId: item.sellingPlanId }
+  );
   const result = await shopifyFetch<{
     cartCreate: {
       cart: { checkoutUrl: string; id: string } | null;
@@ -509,7 +729,7 @@ export async function createCartAndAddLines(variantIds: string[]) {
       }
     `,
     variables: {
-      input: { lines },
+      input: { lines: normalizedLines },
     },
   });
 
@@ -523,15 +743,23 @@ export async function createCartAndAddLines(variantIds: string[]) {
   return { checkoutUrl: cart.checkoutUrl, cartId: cart.id };
 }
 
-export async function addLineToExistingCart(cartId: string, variantId: string) {
-  return addLinesToExistingCart(cartId, [variantId]);
+export async function addLineToExistingCart(
+  cartId: string,
+  variantId: string,
+  sellingPlanId?: string
+) {
+  return addLinesToExistingCart(cartId, [{ merchandiseId: variantId, sellingPlanId }]);
 }
 
 export async function addLinesToExistingCart(
   cartId: string,
-  variantIds: string[]
+  lines: CartLineInput[] | string[]
 ) {
-  const lines = variantIds.map((id) => ({ merchandiseId: id, quantity: 1 }));
+  const normalizedLines: CartLineInput[] = lines.map((item) =>
+    typeof item === "string"
+      ? { merchandiseId: item, quantity: 1 }
+      : { merchandiseId: item.merchandiseId, quantity: item.quantity ?? 1, sellingPlanId: item.sellingPlanId }
+  );
   const result = await shopifyFetch<{
     cartLinesAdd: {
       cart: { checkoutUrl: string } | null;
@@ -550,7 +778,7 @@ export async function addLinesToExistingCart(
         }
       }
     `,
-    variables: { cartId, lines },
+    variables: { cartId, lines: normalizedLines },
   });
 
   const { cart, userErrors } = result.cartLinesAdd;

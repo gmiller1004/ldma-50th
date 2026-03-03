@@ -7,12 +7,14 @@ import { ShoppingBag, Loader2 } from "lucide-react";
 
 export function AddToCartButton({
   variantId,
+  sellingPlanId,
   className = "",
   label = "Add to Cart",
   addingLabel = "Adding...",
   disabled = false,
 }: {
   variantId: string;
+  sellingPlanId?: string;
   className?: string;
   label?: string;
   addingLabel?: string;
@@ -26,7 +28,7 @@ export function AddToCartButton({
     setLoading(true);
     setError(null);
     try {
-      await addToCart(variantId);
+      await addToCart(variantId, sellingPlanId);
       await refreshCart();
       openDrawer();
     } catch (e) {
