@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Pickaxe, Camera, Loader2, Bell, Users, HelpCircle, X, Plus, Info, ShoppingBag, Sparkles } from "lucide-react";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { getCompanionAddOnProduct } from "@/app/actions/membership";
-import { deriveLegacyOfferType, getLegacyOfferConfig } from "@/lib/legacy-offer";
+import { deriveLegacyOfferType, getLegacyOfferConfig, getLegacyOfferProductHandle } from "@/lib/legacy-offer";
 import type { MembershipProductInfo } from "@/app/actions/membership";
 
 function LegacyOfferModal({ onClose }: { onClose: () => void }) {
@@ -60,7 +60,7 @@ function LegacyOfferModal({ onClose }: { onClose: () => void }) {
           </section>
 
           <p className="text-[#e8e0d5]/70 text-sm pt-2 border-t border-[#d4af37]/20">
-            To see which offers apply to your membership, close this and click <strong className="text-[#d4af37]">Request My Personalized Offer</strong>. We&apos;ll review your account and email you within 72 hours.
+            To see which offers apply to your membership, close this and click <strong className="text-[#d4af37]">Request My Personalized Offer</strong>. We&apos;ll review your account and email you typically within 72 hours.
           </p>
         </div>
         <div className="sticky bottom-0 p-4 border-t border-[#d4af37]/20 bg-[#1a120b]">
@@ -389,19 +389,20 @@ export function ProfileContent() {
                   {legacyOfferConfig.regularPrice}
                 </span>
               </p>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-3 items-center">
                 <a
-                  href="tel:8884653717"
+                  href={`/products/${getLegacyOfferProductHandle(legacyOfferType!)}`}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
                 >
-                  Call (888) 465-3717 to Purchase
+                  <ShoppingBag className="w-4 h-4" />
+                  Purchase
                 </a>
                 <span className="px-2 py-2.5 text-[#e8e0d5]/60 text-sm">or</span>
                 <a
-                  href="/members"
+                  href="tel:8884653717"
                   className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#d4af37]/40 text-[#d4af37] font-medium rounded-lg hover:bg-[#d4af37]/10 transition-colors"
                 >
-                  Member Dashboard
+                  Call (888) 465-3717 to Purchase
                 </a>
               </div>
             </>
@@ -423,7 +424,7 @@ export function ProfileContent() {
                 </button>
                 {legacyOfferRequested ? (
                   <p className="px-4 py-2 text-sm text-[#e8e0d5]/80">
-                    We&apos;ve received your request. You&apos;ll hear from us within 72 hours.
+                    We&apos;ve received your request. You&apos;ll hear from us typically within 72 hours.
                   </p>
                 ) : (
                   <button

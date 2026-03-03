@@ -146,6 +146,61 @@ trigger ContactLegacyOfferTrigger on Contact (after update) {
 
 ---
 
+## Step 4b: Create the Apex Test Class (Required for Production Deployment)
+
+Salesforce requires test coverage to deploy to Production. Create this test class in your sandbox, then add it to your Change Set.
+
+1. Setup → Quick Find: **Apex Classes** → **New**.
+2. Name: `LegacyOfferEmailCalloutTest`.
+3. Paste the code below.
+4. Click **Save**.
+5. Add `LegacyOfferEmailCalloutTest` to your Outbound Change Set (Step B1).
+
+```apex
+@isTest
+private class LegacyOfferEmailCalloutTest {
+    @testSetup
+    static void setup() {
+        // Create Custom Setting record (required for getInstance)
+        LDMA_Webhook_Setting__c setting = new LDMA_Webhook_Setting__c(
+            Name = 'Org',
+            Secret__c = 'test-secret-for-unit-test'
+        );
+        insert setting;
+
+        Contact c = new Contact(
+            FirstName = 'Test',
+            LastName = 'User',
+            Email = 'test@example.com'
+        );
+        insert c;
+    }
+
+    @isTest
+    static void testSendLegacyOfferEmail() {
+        Test.setMock(HttpCalloutMock.class, new LegacyOfferMock());
+        Contact c = [SELECT Id FROM Contact WHERE Email = 'test@example.com' LIMIT 1];
+
+        Test.startTest();
+        LegacyOfferEmailCallout.sendLegacyOfferEmail(c.Id);
+        Test.stopTest();
+
+        // No exception = success
+    }
+
+    private class LegacyOfferMock implements HttpCalloutMock {
+        public HttpResponse respond(HttpRequest req) {
+            HttpResponse res = new HttpResponse();
+            res.setStatusCode(200);
+            res.setBody('{"ok":true}');
+            return res;
+        }
+    }
+}
+```
+
+---
+
 ## Step 5: Add Contact Fields to Page Layout
 
 1. Setup → **Object Manager** → **Contact**.
@@ -181,7 +236,7 @@ trigger ContactLegacyOfferTrigger on Contact (after update) {
 3. Name: `Legacy Offer Integration` (or similar).
 4. Click **Save**.
 5. Click **Add** next to the appropriate section and add:
-   - **Apex Classes:** `LegacyOfferEmailCallout`
+   - **Apex Classes:** `LegacyOfferEmailCallout`, `LegacyOfferEmailCalloutTest`
    - **Apex Triggers:** `ContactLegacyOfferTrigger`
    - **Custom Settings:** `LDMA_Webhook_Setting`
    - **Custom Setting Fields:** the Secret field
@@ -196,8 +251,10 @@ trigger ContactLegacyOfferTrigger on Contact (after update) {
 2. Setup → Quick Find: **Inbound Change Sets**.
 3. Click **Inbound Change Sets**.
 4. Find your change set and click **Deploy**.
-5. Click **Deploy** again to confirm.
-6. Wait for the deployment to finish.
+5. On the deploy screen, select **Run Specified Tests** (not "Run Local Tests") and add only: `LegacyOfferEmailCalloutTest`.
+   - *This avoids failing on unrelated org tests while still validating the new Apex code.*
+6. Click **Deploy** again to confirm.
+7. Wait for the deployment to finish.
 
 ### Step B3: Configure Production (Manual Steps)
 

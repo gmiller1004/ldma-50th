@@ -70,3 +70,15 @@ export function getLegacyOfferConfig(type: LegacyOfferType): {
       };
   }
 }
+
+/** Shopify product handle for each legacy offer type (matches legacy-offer-products-shopify.csv). */
+export function getLegacyOfferProductHandle(type: LegacyOfferType): string {
+  const handles: Record<LegacyOfferType, string> = {
+    "all-three": "legacy-complete-package",
+    "transferability-prepay": "legacy-transferability-prepay",
+    "companion-prepay": "legacy-companion-prepay",
+    "companion-only": "legacy-companion-only",
+    "prepay-only": "legacy-prepay-only",
+  };
+  return handles[type];
+}
