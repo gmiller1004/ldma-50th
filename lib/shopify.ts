@@ -190,8 +190,9 @@ export type SellingPlanOption = {
   name: string;
 };
 
-/** Product with optional selling plans (subscription). Requires unauthenticated_read_selling_plans for sellingPlanGroups. */
+/** Product with optional selling plans and collection membership. getProductByHandle returns this. */
 export type ProductWithSellingPlans = ShopProduct & {
+  collections?: { edges: Array<{ node: { handle: string } }> };
   sellingPlanGroups?: {
     edges: Array<{
       node: {
