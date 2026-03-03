@@ -595,11 +595,13 @@ export async function getCollectionByHandle(
     const c = result?.collection;
     if (!c) return null;
 
+    const edges = c.products?.edges;
+    const products = Array.isArray(edges) ? edges.map((e) => e.node) : [];
     const desc = (c.descriptionHtml || c.description || "").trim();
     return {
       handle: c.handle,
       title: c.title,
-      products: c.products.edges.map((e) => e.node),
+      products,
       collectionDescription: desc || undefined,
     };
   } catch (e) {
