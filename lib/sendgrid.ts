@@ -298,6 +298,9 @@ Questions? Call us at ${phone}.`;
       subject: `Your LDMA Family Legacy Offer — ${config.headline}`,
       text: textContent,
       html: htmlContent,
+      trackingSettings: {
+        clickTracking: { enable: false },
+      },
     });
     return true;
   } catch (e) {
