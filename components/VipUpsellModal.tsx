@@ -80,7 +80,7 @@ export function VipUpsellModal() {
       if (data.product?.variants?.edges?.length) {
         const first = data.product.variants.edges[0]?.node;
         const initial: Record<string, string> = {};
-        (first?.selectedOptions ?? []).forEach((o) => {
+        (first?.selectedOptions ?? []).forEach((o: { name: string; value: string }) => {
           initial[o.name] = o.value;
         });
         setSelectedOptions(initial);
