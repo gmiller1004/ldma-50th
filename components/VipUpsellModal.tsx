@@ -69,6 +69,7 @@ export function VipUpsellModal() {
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   const fetchProduct = useCallback(async () => {
     setLoading(true);
@@ -194,16 +195,31 @@ export function VipUpsellModal() {
                     )}
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-[#e8e0d5]">{product.title}</h3>
-                      {product.descriptionHtml && (
-                        <p className="mt-2 text-sm text-[#e8e0d5]/80 line-clamp-3">
-                          {product.descriptionHtml
-                            .replace(/<[^>]+>/g, " ")
-                            .replace(/\s+/g, " ")
-                            .trim()
-                            .slice(0, 180)}
-                          {product.descriptionHtml.length > 180 ? "…" : ""}
-                        </p>
-                      )}
+                      {product.descriptionHtml && (() => {
+                        const plain = product.descriptionHtml
+                          .replace(/<[^>]+>/g, " ")
+                          .replace(/\s+/g, " ")
+                          .trim();
+                        const truncated = plain.slice(0, 180);
+                        const isLong = plain.length > 180;
+                        const showTruncated = isLong && !descriptionExpanded;
+                        return (
+                          <div className="mt-2 text-sm text-[#e8e0d5]/80">
+                            <p className={showTruncated ? "line-clamp-3" : ""}>
+                              {showTruncated ? truncated + "…" : plain}
+                            </p>
+                            {isLong && (
+                              <button
+                                type="button"
+                                onClick={() => setDescriptionExpanded((e) => !e)}
+                                className="mt-1 text-[#d4af37] hover:text-[#f0d48f] font-medium text-xs focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50 rounded"
+                              >
+                                {descriptionExpanded ? "Show less" : "Read more"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -275,7 +291,7 @@ export function VipUpsellModal() {
                   )}
 
                   <p className="text-sm text-[#e8e0d5]/70">
-                    Your Dirt Fest ticket covers everyone in your vehicle. The VIP package is per
+                    Your Dirt Fest ticket covers everyone in your campsite. The VIP package is per
                     person—add one only for each person who wants this upgrade.
                   </p>
 
