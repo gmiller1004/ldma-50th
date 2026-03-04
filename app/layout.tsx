@@ -45,6 +45,10 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  icons: {
+    icon: "/images/LDMA_50_Badge_2-02.png",
+    apple: "/images/LDMA_50_Badge_2-02.png",
+  },
 };
 
 export default function RootLayout({
