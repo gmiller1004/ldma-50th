@@ -7,11 +7,8 @@ export function GoogleAnalytics() {
 
   return (
     <>
-      <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`}
-        strategy="afterInteractive"
-      />
-      <Script id="google-analytics" strategy="afterInteractive">
+      {/* Inline runs first (dataLayer + gtag stub), then gtag.js loads and processes */}
+      <Script id="google-analytics-config" strategy="afterInteractive">
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
@@ -19,6 +16,10 @@ export function GoogleAnalytics() {
           gtag('config', '${MEASUREMENT_ID}');
         `}
       </Script>
+      <Script
+        src={`https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`}
+        strategy="afterInteractive"
+      />
     </>
   );
 }
