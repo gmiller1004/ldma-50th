@@ -1,9 +1,7 @@
 "use server";
 
 import {
-  createCartAndAddLine,
   createCartAndAddLines,
-  addLineToExistingCart,
   addLinesToExistingCart,
   cartLinesUpdate,
   cartLinesRemove,
@@ -12,8 +10,53 @@ import {
 } from "@/lib/shopify";
 import { cookies } from "next/headers";
 import { isLdmaLifetimeProduct, isMembershipProduct } from "@/lib/membership-config";
+import {
+  getMailchimpStore,
+  getMemberByUniqueEmailId,
+  addOrUpdateCustomer,
+  addOrUpdateCart,
+  isMailchimpConfigured,
+} from "@/lib/mailchimp";
 
 const CART_ID_COOKIE = "shopify_cart_id";
+const MAILCHIMP_EID_COOKIE = "mailchimp_eid";
+
+/** Sync current Shopify cart to Mailchimp E-commerce when we have mc_eid (known contact from email). Non-blocking; logs errors. */
+async function syncCartToMailchimp(cartId: string, mailchimpEid: string) {
+  if (!isMailchimpConfigured()) return;
+  const storeId = process.env.MAILCHIMP_STORE_ID!;
+  try {
+    const store = await getMailchimpStore(storeId);
+    if (!store?.list_id) return;
+    const member = await getMemberByUniqueEmailId(store.list_id, mailchimpEid);
+    if (!member?.email_address) return;
+    const email = member.email_address;
+    const customerId = email;
+    await addOrUpdateCustomer(storeId, customerId, {
+      email_address: email,
+      opt_in_status: false,
+    });
+    const cart = await getCart(cartId);
+    if (!cart) return;
+    const orderTotal = parseFloat(cart.cost.subtotalAmount.amount);
+    const currencyCode = cart.cost.subtotalAmount.currencyCode ?? "USD";
+    const lines = cart.lines.edges.map(({ node }) => ({
+      id: node.id,
+      product_id: node.merchandise.product.id,
+      product_variant_id: node.merchandise.id,
+      quantity: node.quantity,
+      price: parseFloat(node.cost.totalAmount.amount),
+    }));
+    await addOrUpdateCart(storeId, cartId, customerId, {
+      currency_code: currencyCode,
+      order_total: orderTotal,
+      checkout_url: cart.checkoutUrl,
+      lines,
+    });
+  } catch (err) {
+    console.error("[Mailchimp] cart sync failed:", err);
+  }
+}
 
 export async function addToCart(
   variantId: string,
@@ -22,6 +65,7 @@ export async function addToCart(
 ) {
   const cookieStore = await cookies();
   const existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
+  const mailchimpEid = cookieStore.get(MAILCHIMP_EID_COOKIE)?.value;
   const line = {
     merchandiseId: variantId,
     quantity: Math.max(1, Math.min(100, quantity)),
@@ -29,13 +73,16 @@ export async function addToCart(
   };
 
   let checkoutUrl: string;
+  let cartId: string | undefined;
 
   if (existingCartId) {
     const result = await addLinesToExistingCart(existingCartId, [line]);
     checkoutUrl = result.checkoutUrl;
+    cartId = existingCartId;
   } else {
     const result = await createCartAndAddLines([line]);
     checkoutUrl = result.checkoutUrl;
+    cartId = result.cartId;
     if (result.cartId) {
       cookieStore.set(CART_ID_COOKIE, result.cartId, {
         path: "/",
@@ -45,6 +92,9 @@ export async function addToCart(
     }
   }
 
+  if (cartId && mailchimpEid) {
+    syncCartToMailchimp(cartId, mailchimpEid).catch(() => {});
+  }
   return { checkoutUrl };
 }
 
@@ -53,19 +103,29 @@ export async function addMembershipToCart(variantIds: string[]) {
   if (variantIds.length === 0) throw new Error("No variants to add");
   const cookieStore = await cookies();
   let existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
-
+  const mailchimpEid = cookieStore.get(MAILCHIMP_EID_COOKIE)?.value;
   const lines = variantIds.map((id) => ({ merchandiseId: id, quantity: 1 }));
+
+  let cartId: string | undefined;
+  let checkoutUrl: string;
 
   try {
     if (existingCartId) {
       const result = await addLinesToExistingCart(existingCartId, lines);
-      return { checkoutUrl: result.checkoutUrl };
+      checkoutUrl = result.checkoutUrl;
+      cartId = existingCartId;
+      if (cartId && mailchimpEid) {
+        syncCartToMailchimp(cartId, mailchimpEid).catch(() => {});
+      }
+      return { checkoutUrl };
     }
   } catch {
     existingCartId = undefined;
   }
 
   const result = await createCartAndAddLines(lines);
+  checkoutUrl = result.checkoutUrl;
+  cartId = result.cartId;
   if (result.cartId) {
     cookieStore.set(CART_ID_COOKIE, result.cartId, {
       path: "/",
@@ -73,7 +133,10 @@ export async function addMembershipToCart(variantIds: string[]) {
       sameSite: "lax",
     });
   }
-  return { checkoutUrl: result.checkoutUrl };
+  if (cartId && mailchimpEid) {
+    syncCartToMailchimp(cartId, mailchimpEid).catch(() => {});
+  }
+  return { checkoutUrl };
 }
 
 /** Update the optional note on the cart (e.g. order instructions). Passes through to the order at checkout. */
@@ -115,4 +178,27 @@ export async function removeCartLine(lineId: string) {
   }
 
   await cartLinesRemove(cartId, [lineId]);
+}
+
+/** Remove the cart line that has the given variant (by variant GID). No-op if not found or no cart. */
+export async function removeCartLineByVariantId(variantId: string) {
+  const cookieStore = await cookies();
+  const cartId = cookieStore.get(CART_ID_COOKIE)?.value;
+  if (!cartId) return;
+  const cart = await getCart(cartId);
+  if (!cart) return;
+  const line = cart.lines.edges.find((e) => e.node.merchandise.id === variantId)?.node;
+  if (!line) return;
+  await cartLinesRemove(cartId, [line.id]);
+}
+
+/** Remove all lines from the current cart. No-op if no cart. Used when user exits membership quiz without finishing. */
+export async function clearCart() {
+  const cookieStore = await cookies();
+  const cartId = cookieStore.get(CART_ID_COOKIE)?.value;
+  if (!cartId) return;
+  const cart = await getCart(cartId);
+  if (!cart || !cart.lines.edges.length) return;
+  const lineIds = cart.lines.edges.map((e) => e.node.id);
+  await cartLinesRemove(cartId, lineIds);
 }

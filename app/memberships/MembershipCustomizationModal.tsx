@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -15,7 +15,11 @@ import {
   BookOpen,
 } from "lucide-react";
 import { getMembershipProductsForFlow } from "@/app/actions/membership";
-import { addMembershipToCart } from "@/app/actions/cart";
+import {
+  addMembershipToCart,
+  clearCart,
+  removeCartLineByVariantId,
+} from "@/app/actions/cart";
 import { useCart } from "@/context/CartContext";
 import { trackMembershipQuizComplete, trackAddToCart } from "@/lib/analytics";
 import type { MembershipProductInfo } from "@/app/actions/membership";
@@ -83,6 +87,8 @@ export function MembershipCustomizationModal({
   const [choices, setChoices] = useState<Record<string, StepStatus>>({});
   const [adding, setAdding] = useState(false);
   const { refreshCart, openDrawer } = useCart();
+  /** Variant IDs we've added to the cart in the background (so we can remove on Skip). */
+  const addedInBackgroundRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isOpen) return;
@@ -90,11 +96,18 @@ export function MembershipCustomizationModal({
     setError(null);
     setStepIndex(0);
     setChoices({});
+    addedInBackgroundRef.current = new Set();
     getMembershipProductsForFlow()
       .then((list) => {
         setProducts(list);
         if (list.length > 0) {
           setChoices({ [list[0].key]: "add" });
+          // Add membership to cart in background so Mailchimp can track; don't refresh UI.
+          addMembershipToCart([list[0].variantId])
+            .then(() => {
+              addedInBackgroundRef.current.add(list[0].variantId);
+            })
+            .catch(() => {});
         }
       })
       .catch(() => setError("Could not load membership options"))
@@ -117,6 +130,13 @@ export function MembershipCustomizationModal({
 
   const handleAdd = () => {
     setChoices((c) => ({ ...c, [current.key]: "add" }));
+    if (current.key !== "lifetime") {
+      addMembershipToCart([current.variantId])
+        .then(() => {
+          addedInBackgroundRef.current.add(current.variantId);
+        })
+        .catch(() => {});
+    }
     if (isLastProductStep) {
       setStepIndex(products.length);
     } else {
@@ -125,6 +145,10 @@ export function MembershipCustomizationModal({
   };
 
   const handleSkip = () => {
+    if (current.key !== "lifetime" && addedInBackgroundRef.current.has(current.variantId)) {
+      removeCartLineByVariantId(current.variantId).catch(() => {});
+      addedInBackgroundRef.current.delete(current.variantId);
+    }
     setChoices((c) => ({ ...c, [current.key]: "skip" }));
     if (isLastProductStep) {
       setStepIndex(products.length);
@@ -138,24 +162,28 @@ export function MembershipCustomizationModal({
   };
 
   const handleFinish = async () => {
-    const toAdd = products.filter((p) => choices[p.key] === "add");
-    const variantIds = toAdd.map((p) => p.variantId);
-    if (variantIds.length === 0) return;
     setAdding(true);
     try {
-      await addMembershipToCart(variantIds);
       trackMembershipQuizComplete();
       trackAddToCart("membership");
       await refreshCart();
       onClose();
       openDrawer();
     } catch {
-      setError(
-        "Could not add to cart. Please try again. If it keeps happening, try clearing your browser cookies for this site or use a private/incognito window."
-      );
+      setError("Could not load cart. Please try again.");
     } finally {
       setAdding(false);
     }
+  };
+
+  const handleCloseWithoutFinish = async () => {
+    try {
+      await clearCart();
+      await refreshCart();
+    } catch {
+      // best effort
+    }
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -167,7 +195,7 @@ export function MembershipCustomizationModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
+        onClick={handleCloseWithoutFinish}
       >
         <motion.div
           className="relative max-w-lg w-full max-h-[90vh] overflow-hidden rounded-2xl bg-[#1a120b] border border-[#d4af37]/30 shadow-xl flex flex-col"
@@ -181,7 +209,7 @@ export function MembershipCustomizationModal({
               Customize Your Membership
             </h2>
             <button
-              onClick={onClose}
+              onClick={handleCloseWithoutFinish}
               className="p-2 text-[#e8e0d5]/70 hover:text-[#d4af37] rounded-lg transition-colors"
               aria-label="Close"
             >
@@ -281,7 +309,7 @@ export function MembershipCustomizationModal({
                     {adding ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Adding…
+                        Opening cart…
                       </>
                     ) : (
                       "Go to Cart"
@@ -324,8 +352,8 @@ function StepSummary({
         Your Membership Summary
       </h3>
       <p className="text-[#e8e0d5]/80 text-sm">
-        Review your selection below. Click &ldquo;Go to Cart&rdquo; to add these
-        items and proceed.
+        Review your selection below. Your cart is ready — click &ldquo;Go to
+        Cart&rdquo; to proceed.
       </p>
       <ul className="space-y-2">
         {selected.map((p) => (

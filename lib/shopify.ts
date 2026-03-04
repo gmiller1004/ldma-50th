@@ -911,6 +911,7 @@ export type CartLine = {
   merchandise: {
     id: string;
     product: {
+      id: string;
       title: string;
       handle: string;
       featuredImage: { url: string } | null;
@@ -951,7 +952,7 @@ export async function getCart(cartId: string): Promise<CartData | null> {
                 merchandise {
                   ... on ProductVariant {
                     id
-                    product { title handle featuredImage { url } }
+                    product { id title handle featuredImage { url } }
                     title
                     price { amount currencyCode }
                     compareAtPrice { amount currencyCode }
