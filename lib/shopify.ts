@@ -96,6 +96,7 @@ export type EventVariant = {
   price: { amount: string; currencyCode: string };
   compareAtPrice: { amount: string; currencyCode: string } | null;
   selectedOptions: Array<{ name: string; value: string }>;
+  metafields?: Array<{ key: string; value: string }>;
 };
 
 export type EventProductOption = {
@@ -118,6 +119,18 @@ export type EventProduct = {
   variants: {
     edges: Array<{ node: EventVariant }>;
   };
+};
+
+/** Product for VIP upsell modal (variant metafields for price_level). */
+export type VipUpsellProduct = {
+  id: string;
+  title: string;
+  handle: string;
+  descriptionHtml?: string;
+  featuredImage: EventProductImage | null;
+  images?: { edges: Array<{ node: EventProductImage }> };
+  options?: EventProductOption[];
+  variants: { edges: Array<{ node: EventVariant }> };
 };
 
 const PRODUCT_FRAGMENT = `
@@ -246,6 +259,51 @@ const SHOP_PRODUCT_FRAGMENT = `
   }
 `;
 
+/** Product with variant price_level metafields (for VIP upsell). */
+const VIP_PRODUCT_FRAGMENT = `
+  fragment VipProductFields on Product {
+    id
+    title
+    handle
+    descriptionHtml
+    featuredImage {
+      url
+      altText
+      width
+      height
+    }
+    images(first: 5) {
+      edges {
+        node {
+          url
+          altText
+          width
+          height
+        }
+      }
+    }
+    options(first: 10) {
+      name
+      optionValues { name }
+    }
+    variants(first: 50) {
+      edges {
+        node {
+          id
+          availableForSale
+          price { amount currencyCode }
+          compareAtPrice { amount currencyCode }
+          selectedOptions { name value }
+          metafields(identifiers: [{ namespace: "custom", key: "price_level" }]) {
+            key
+            value
+          }
+        }
+      }
+    }
+  }
+`;
+
 /** Product fragment for events. Requires unauthenticated_read_product_tags scope for tags. */
 const EVENT_PRODUCT_FRAGMENT = `
   fragment EventProductFields on Product {
@@ -289,6 +347,10 @@ const EVENT_PRODUCT_FRAGMENT = `
           price { amount currencyCode }
           compareAtPrice { amount currencyCode }
           selectedOptions { name value }
+          metafields(identifiers: [{ namespace: "custom", key: "price_level" }]) {
+            key
+            value
+          }
         }
       }
     }
@@ -711,6 +773,31 @@ export async function getProductByHandle(
     };
   } catch (e) {
     console.error("getProductByHandle error:", e);
+    return null;
+  }
+}
+
+/** Fetch a product by handle with variant price_level metafields (for VIP upsell modal). */
+export async function getProductByHandleWithVariantMetafields(
+  handle: string
+): Promise<VipUpsellProduct | null> {
+  try {
+    const result = await shopifyFetch<{
+      product: VipUpsellProduct | null;
+    }>({
+      query: `
+        ${VIP_PRODUCT_FRAGMENT}
+        query GetVipUpsellProduct($handle: String!) {
+          product(handle: $handle) {
+            ...VipProductFields
+          }
+        }
+      `,
+      variables: { handle },
+    });
+    return result?.product ?? null;
+  } catch (e) {
+    console.error("getProductByHandleWithVariantMetafields error:", e);
     return null;
   }
 }

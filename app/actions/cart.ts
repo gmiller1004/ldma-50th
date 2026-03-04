@@ -14,21 +14,26 @@ import { isLdmaLifetimeProduct, isMembershipProduct } from "@/lib/membership-con
 
 const CART_ID_COOKIE = "shopify_cart_id";
 
-export async function addToCart(variantId: string, sellingPlanId?: string) {
+export async function addToCart(
+  variantId: string,
+  sellingPlanId?: string,
+  quantity: number = 1
+) {
   const cookieStore = await cookies();
   const existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
+  const line = {
+    merchandiseId: variantId,
+    quantity: Math.max(1, Math.min(100, quantity)),
+    ...(sellingPlanId && { sellingPlanId }),
+  };
 
   let checkoutUrl: string;
 
   if (existingCartId) {
-    const result = await addLineToExistingCart(
-      existingCartId,
-      variantId,
-      sellingPlanId
-    );
+    const result = await addLinesToExistingCart(existingCartId, [line]);
     checkoutUrl = result.checkoutUrl;
   } else {
-    const result = await createCartAndAddLine(variantId, sellingPlanId);
+    const result = await createCartAndAddLines([line]);
     checkoutUrl = result.checkoutUrl;
     if (result.cartId) {
       cookieStore.set(CART_ID_COOKIE, result.cartId, {

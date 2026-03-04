@@ -8,7 +8,7 @@ import { MapPin, Calendar, Info, X, ChevronLeft, ChevronRight } from "lucide-rea
 import { ShareButton } from "@/components/ShareButton";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { AddToCartButton } from "@/components/AddToCartButton";
-import { EVENT_TYPES, CAMP_FILTERS } from "@/lib/events-config";
+import { EVENT_TYPES, CAMP_FILTERS, PRICE_LEVEL_METAFIELD } from "@/lib/events-config";
 import type { EventProduct, EventVariant } from "@/lib/shopify";
 
 type EventWithVariant = EventProduct;
@@ -184,6 +184,52 @@ function getVariants(product: EventProduct): EventVariant[] {
   return (product.variants?.edges ?? []).map((e) => e.node).filter(Boolean);
 }
 
+/** Classify variant as "member" or "general" from the price_level variant metafield; "unset" if missing or unknown. */
+function getVariantPricingType(variant: EventVariant): "member" | "general" | "unset" {
+  const raw = (variant.metafields ?? []).find(
+    (m) => m && m.key === PRICE_LEVEL_METAFIELD.key && m.value
+  )?.value;
+  const v = (raw ?? "").trim().toLowerCase();
+  if (v === "member") return "member";
+  if (v === "non member" || v === "nonmember") return "general";
+  return "unset";
+}
+
+/**
+ * Return event with variants filtered by member login state:
+ * - Not logged in: only "general" variants (general admission); "unset" included.
+ * - Logged in: only "member" variants; if none, fall back to all so event stays registerable.
+ */
+function filterEventVariantsByMember(
+  event: EventProduct,
+  isMemberLoggedIn: boolean
+): EventProduct {
+  const allVariants = getVariants(event);
+  if (allVariants.length === 0) return event;
+
+  const types = allVariants.map((v) => getVariantPricingType(v));
+  const hasMember = types.some((t) => t === "member");
+  const hasGeneral = types.some((t) => t === "general");
+
+  let keep: (v: EventVariant) => boolean;
+  if (isMemberLoggedIn) {
+    if (hasMember) keep = (v) => getVariantPricingType(v) === "member";
+    else keep = () => true;
+  } else {
+    if (hasGeneral) keep = (v) => getVariantPricingType(v) === "general" || getVariantPricingType(v) === "unset";
+    else keep = () => true;
+  }
+
+  const filtered = allVariants.filter(keep);
+  if (filtered.length === allVariants.length) return event;
+
+  const edges = filtered.map((node) => ({ node }));
+  return {
+    ...event,
+    variants: { edges },
+  } as EventProduct;
+}
+
 /** Get displayable options (exclude Title if only "Default Title") for variant selection */
 function getVariantOptions(product: EventProduct): Array<{
   name: string;
@@ -200,6 +246,22 @@ function getVariantOptions(product: EventProduct): Array<{
       name: opt.name,
       values: opt.optionValues?.map((v) => v.name) ?? [],
     }));
+}
+
+/** Option values for one option that exist in the given variant list (keeps product order). */
+function getOptionValuesFromVariants(
+  variants: EventVariant[],
+  optionName: string,
+  productOptionValues: string[]
+): string[] {
+  const inVariants = new Set(
+    variants
+      .map((v) =>
+        (v.selectedOptions ?? []).find((o) => o.name === optionName)?.value
+      )
+      .filter(Boolean)
+  );
+  return productOptionValues.filter((val) => inVariants.has(val));
 }
 
 /** Find variant matching selected option values */
@@ -268,13 +330,14 @@ function EventVariantSelector({
     );
   }
 
-  // Single option with multiple values: one select
+  // Single option with multiple values: one select — only show values that exist in filtered variants
   if (options.length === 1) {
     const opt = options[0]!;
+    const valuesToShow = getOptionValuesFromVariants(variants, opt.name, opt.values);
     const selectedVariant = variants.find((v) => v.id === selectedVariantId);
     const currentValue =
       selectedVariant?.selectedOptions?.find((o) => o.name === opt.name)
-        ?.value ?? opt.values[0];
+        ?.value ?? valuesToShow[0];
 
     return (
       <div className={className}>
@@ -298,7 +361,7 @@ function EventVariantSelector({
           }}
           className="w-full px-3 py-2 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] text-sm focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50"
         >
-          {opt.values.map((val) => {
+          {valuesToShow.map((val) => {
             const v = variants.find(
               (x) =>
                 x.selectedOptions?.find((o) => o.name === opt.name)?.value ===
@@ -321,7 +384,7 @@ function EventVariantSelector({
     );
   }
 
-  // Multiple options: select per option, find matching variant
+  // Multiple options: select per option — only show values that exist in filtered variants
   const selectedVariant = variants.find((v) => v.id === selectedVariantId);
   const selectedOptions: Record<string, string> = {};
   for (const o of selectedVariant?.selectedOptions ?? []) {
@@ -335,50 +398,58 @@ function EventVariantSelector({
       {selectedIsSoldOut && (
         <p className="text-amber-400/90 text-sm font-medium">This option is sold out</p>
       )}
-      {options.map((opt) => (
-        <div key={opt.name}>
-          <label
-            htmlFor={`variant-${event.id}-${opt.name}`}
-            className="block text-sm font-medium text-[#e8e0d5]/70 mb-1"
-          >
-            {opt.name}
-          </label>
-          <select
-            id={`variant-${event.id}-${opt.name}`}
-            value={selectedOptions[opt.name] ?? opt.values[0]}
-            onChange={(e) => {
-              const next = { ...selectedOptions, [opt.name]: e.target.value };
-              const v = findVariantByOptions(event, next);
-              if (v) onSelect(v.id);
-            }}
-            className="w-full px-3 py-2 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] text-sm focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50"
-          >
-            {opt.values.map((val) => (
-              <option key={val} value={val}>
-                {val}
-              </option>
-            ))}
-          </select>
-        </div>
-      ))}
+      {options.map((opt) => {
+        const valuesToShow = getOptionValuesFromVariants(variants, opt.name, opt.values);
+        return (
+          <div key={opt.name}>
+            <label
+              htmlFor={`variant-${event.id}-${opt.name}`}
+              className="block text-sm font-medium text-[#e8e0d5]/70 mb-1"
+            >
+              {opt.name}
+            </label>
+            <select
+              id={`variant-${event.id}-${opt.name}`}
+              value={selectedOptions[opt.name] ?? valuesToShow[0]}
+              onChange={(e) => {
+                const next = { ...selectedOptions, [opt.name]: e.target.value };
+                const v = findVariantByOptions(event, next);
+                if (v) onSelect(v.id);
+              }}
+              className="w-full px-3 py-2 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] text-sm focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50"
+            >
+              {valuesToShow.map((val) => (
+                <option key={val} value={val}>
+                  {val}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 export function EventsPageContent({
   events,
+  isMemberLoggedIn,
 }: {
   events: EventProduct[];
+  isMemberLoggedIn: boolean;
 }) {
   const [eventType, setEventType] = useState<string>("all");
   const [camp, setCamp] = useState<string>("all");
   const [detailEvent, setDetailEvent] = useState<EventWithVariant | null>(null);
 
   const eventsWithVariant: EventWithVariant[] = useMemo(() => {
-    return events.filter(
+    const withVariants = events.filter(
       (e) => (e.variants?.edges?.length ?? 0) > 0
     ) as EventWithVariant[];
-  }, [events]);
+    return withVariants.map((e) =>
+      filterEventVariantsByMember(e, isMemberLoggedIn)
+    ) as EventWithVariant[];
+  }, [events, isMemberLoggedIn]);
 
   const filtered = useMemo(() => {
     const list = eventsWithVariant.filter(
@@ -434,6 +505,22 @@ export function EventsPageContent({
             Dirt Fest, detector days, Gold N BBQ, and more — across all LDMA
             campgrounds. Register for your next adventure.
           </motion.p>
+          {!isMemberLoggedIn && (
+            <motion.p
+              className="mt-6 text-[#e8e0d5]/80 text-sm md:text-base max-w-xl mx-auto"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              Log in to see member-only pricing.{" "}
+              <Link
+                href="/members/login?redirect=/events"
+                className="font-medium text-[#d4af37] hover:text-[#f0d48f] underline underline-offset-2 transition-colors"
+              >
+                Sign in
+              </Link>
+            </motion.p>
+          )}
         </div>
       </section>
 
@@ -519,6 +606,7 @@ export function EventsPageContent({
                   event={event}
                   index={i}
                   onMoreInfo={() => setDetailEvent(event)}
+                  isMemberLoggedIn={isMemberLoggedIn}
                 />
               ))}
             </div>
@@ -530,6 +618,7 @@ export function EventsPageContent({
                 key={detailEvent.id}
                 event={detailEvent}
                 onClose={() => setDetailEvent(null)}
+                isMemberLoggedIn={isMemberLoggedIn}
               />
             )}
           </AnimatePresence>
@@ -543,9 +632,11 @@ export function EventsPageContent({
 function EventDetailModal({
   event,
   onClose,
+  isMemberLoggedIn,
 }: {
   event: EventWithVariant;
   onClose: () => void;
+  isMemberLoggedIn: boolean;
 }) {
   const dates = getEventDates(event);
   const campSlug = getCampSlug(event);
@@ -579,6 +670,7 @@ function EventDetailModal({
     variants.find((v) => v.id === selectedVariantId) ?? defaultVariant;
   const isSoldOut =
     selectedVariant ? selectedVariant.availableForSale === false : false;
+  const memberPricingOnly = variants.length === 0 && !isMemberLoggedIn;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -726,34 +818,51 @@ function EventDetailModal({
               />
             )}
 
-            <EventVariantSelector
-              event={event}
-              selectedVariantId={selectedVariantId}
-              onSelect={setSelectedVariantId}
-              className="mb-6"
-            />
-
-            <div className="flex items-center justify-between gap-4 pt-4 border-t border-[#d4af37]/20">
-              <span className="text-[#d4af37] font-bold text-xl">
-                $
-                {selectedVariant
-                  ? parseFloat(selectedVariant.price.amount).toFixed(2)
-                  : "0.00"}
-              </span>
-              {isSoldOut ? (
-                <span className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-[#e8e0d5]/60 bg-[#d4af37]/10 rounded-lg cursor-not-allowed border border-[#d4af37]/20">
-                  Sold out
-                </span>
-              ) : (
-                <AddToCartButton
-                  variantId={selectedVariant?.id ?? ""}
-                  className="!py-3 !px-6"
-                  label="Register"
-                  addingLabel="Registering…"
-                  disabled={!selectedVariant}
+            {memberPricingOnly ? (
+              <div className="mb-6 p-4 rounded-lg bg-[#d4af37]/10 border border-[#d4af37]/30 text-center">
+                <p className="text-[#e8e0d5]/90 mb-3">
+                  Member pricing is available for this event. Log in to see options and register.
+                </p>
+                <Link
+                  href={`/members/login?redirect=${encodeURIComponent(`/events?product=${event.handle}`)}`}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+                >
+                  Log in to view member pricing
+                </Link>
+              </div>
+            ) : (
+              <>
+                <EventVariantSelector
+                  event={event}
+                  selectedVariantId={selectedVariantId}
+                  onSelect={setSelectedVariantId}
+                  className="mb-6"
                 />
-              )}
-            </div>
+
+                <div className="flex items-center justify-between gap-4 pt-4 border-t border-[#d4af37]/20">
+                  <span className="text-[#d4af37] font-bold text-xl">
+                    $
+                    {selectedVariant
+                      ? parseFloat(selectedVariant.price.amount).toFixed(2)
+                      : "0.00"}
+                  </span>
+                  {isSoldOut ? (
+                    <span className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-[#e8e0d5]/60 bg-[#d4af37]/10 rounded-lg cursor-not-allowed border border-[#d4af37]/20">
+                      Sold out
+                    </span>
+                  ) : (
+                    <AddToCartButton
+                      variantId={selectedVariant?.id ?? ""}
+                      className="!py-3 !px-6"
+                      label="Register"
+                      addingLabel="Registering…"
+                      disabled={!selectedVariant}
+                      isDirtFestEvent={getEventType(event) === "dirtfest"}
+                    />
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </motion.div>
@@ -771,10 +880,12 @@ function EventCard({
   event,
   index,
   onMoreInfo,
+  isMemberLoggedIn,
 }: {
   event: EventWithVariant;
   index: number;
   onMoreInfo: () => void;
+  isMemberLoggedIn: boolean;
 }) {
   const variants = getVariants(event);
   const defaultVariant =
@@ -786,6 +897,7 @@ function EventCard({
     variants.find((v) => v.id === selectedVariantId) ?? defaultVariant;
   const isSoldOut =
     selectedVariant ? selectedVariant.availableForSale === false : false;
+  const memberPricingOnly = variants.length === 0 && !isMemberLoggedIn;
 
   const campSlug = getCampSlug(event);
   const campLabel =
@@ -852,46 +964,61 @@ function EventCard({
               {campLabel}
             </p>
           )}
-          <EventVariantSelector
-            event={event}
-            selectedVariantId={selectedVariantId}
-            onSelect={setSelectedVariantId}
-            className="mb-4"
-          />
-          <div className="mt-auto pt-2 flex flex-wrap items-center justify-between gap-3">
-            <span className="text-[#d4af37] font-bold">
-              $
-              {selectedVariant
-                ? parseFloat(selectedVariant.price.amount).toFixed(2)
-                : "0.00"}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMoreInfo();
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#e8e0d5] border border-[#d4af37]/40 rounded-lg hover:bg-[#d4af37]/10 hover:border-[#d4af37]/60 transition-colors"
+          {memberPricingOnly ? (
+            <div className="mb-4 p-3 rounded-lg bg-[#d4af37]/10 border border-[#d4af37]/20 text-center">
+              <p className="text-[#e8e0d5]/90 text-sm mb-2">Member pricing — log in to view</p>
+              <Link
+                href={`/members/login?redirect=${encodeURIComponent("/events")}`}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#d4af37] border border-[#d4af37]/40 rounded-lg hover:bg-[#d4af37]/10 transition-colors"
               >
-                <Info className="w-4 h-4" />
-                More Info
-              </button>
-              {isSoldOut ? (
-                <span className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-[#e8e0d5]/60 bg-[#d4af37]/10 rounded-lg cursor-not-allowed border border-[#d4af37]/20">
-                  Sold out
-                </span>
-              ) : (
-                <AddToCartButton
-                  variantId={selectedVariant?.id ?? ""}
-                  className="!py-2 !px-4 text-sm"
-                  label="Register"
-                  addingLabel="Registering…"
-                  disabled={!selectedVariant}
-                />
-              )}
+                Log in
+              </Link>
             </div>
-          </div>
+          ) : (
+            <>
+              <EventVariantSelector
+                event={event}
+                selectedVariantId={selectedVariantId}
+                onSelect={setSelectedVariantId}
+                className="mb-4"
+              />
+              <div className="mt-auto pt-2 flex flex-wrap items-center justify-between gap-3">
+                <span className="text-[#d4af37] font-bold">
+                  $
+                  {selectedVariant
+                    ? parseFloat(selectedVariant.price.amount).toFixed(2)
+                    : "0.00"}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMoreInfo();
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#e8e0d5] border border-[#d4af37]/40 rounded-lg hover:bg-[#d4af37]/10 hover:border-[#d4af37]/60 transition-colors"
+                  >
+                    <Info className="w-4 h-4" />
+                    More Info
+                  </button>
+                  {isSoldOut ? (
+                    <span className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-[#e8e0d5]/60 bg-[#d4af37]/10 rounded-lg cursor-not-allowed border border-[#d4af37]/20">
+                      Sold out
+                    </span>
+                  ) : (
+                    <AddToCartButton
+                      variantId={selectedVariant?.id ?? ""}
+                      className="!py-2 !px-4 text-sm"
+                      label="Register"
+                      addingLabel="Registering…"
+                      disabled={!selectedVariant}
+                      isDirtFestEvent={getEventType(event) === "dirtfest"}
+                    />
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </motion.article>

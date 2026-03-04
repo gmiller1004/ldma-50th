@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { addToCart } from "@/app/actions/cart";
 import { useCart } from "@/context/CartContext";
+import { useVipUpsell } from "@/context/VipUpsellContext";
 import { ShoppingBag, Loader2 } from "lucide-react";
+
+const VIP_UPSELL_DISMISS_KEY = "vip-upsell-dismissed";
 
 export function AddToCartButton({
   variantId,
@@ -12,6 +15,7 @@ export function AddToCartButton({
   label = "Add to Cart",
   addingLabel = "Adding...",
   disabled = false,
+  isDirtFestEvent = false,
 }: {
   variantId: string;
   sellingPlanId?: string;
@@ -19,10 +23,13 @@ export function AddToCartButton({
   label?: string;
   addingLabel?: string;
   disabled?: boolean;
+  /** When true, after adding we show the VIP upsell modal instead of opening the cart (unless user dismissed it this session). */
+  isDirtFestEvent?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { openDrawer, refreshCart } = useCart();
+  const { openVipUpsell } = useVipUpsell();
 
   async function handleClick() {
     setLoading(true);
@@ -30,7 +37,15 @@ export function AddToCartButton({
     try {
       await addToCart(variantId, sellingPlanId);
       await refreshCart();
-      openDrawer();
+      const showVipUpsell =
+        isDirtFestEvent &&
+        typeof window !== "undefined" &&
+        !sessionStorage.getItem(VIP_UPSELL_DISMISS_KEY);
+      if (showVipUpsell) {
+        openVipUpsell();
+      } else {
+        openDrawer();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to add to cart");
     } finally {
