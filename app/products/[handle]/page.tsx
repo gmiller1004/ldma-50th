@@ -42,62 +42,88 @@ function productInExclusiveOffers(product: { collections?: { edges: Array<{ node
 }
 
 export default async function ProductPage({ params }: Props) {
-  const { handle } = await params;
-  const product = await getProductByHandle(handle);
-  if (!product) notFound();
+  try {
+    const { handle } = await params;
+    const product = await getProductByHandle(handle);
+    if (!product) notFound();
 
-  if (productInExclusiveOffers(product)) {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("member_session")?.value;
-    const session = token ? await verifySessionToken(token) : null;
-    if (!session) {
-      const loginUrl = `/members/login?redirect=${encodeURIComponent(`/products/${handle}`)}`;
-      return (
-        <>
-          <Navbar />
-          <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
-            <div className="max-w-2xl mx-auto px-4 py-16">
-              <div className="mt-8 p-8 rounded-xl border border-[#d4af37]/30 bg-[#1a120b]/80 text-center">
-                <h1 className="font-serif text-2xl font-semibold text-[#f0d48f] mb-3">
-                  Member-only product
-                </h1>
-                <p className="text-[#e8e0d5]/80 mb-6">
-                  This product is part of our exclusive offers for LDMA members. Please log in to view it.
-                </p>
-                <Link
-                  href={loginUrl}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
-                >
-                  Log in to view product
-                </Link>
+    if (productInExclusiveOffers(product)) {
+      const cookieStore = await cookies();
+      const token = cookieStore.get("member_session")?.value;
+      const session = token ? await verifySessionToken(token) : null;
+      if (!session) {
+        const loginUrl = `/members/login?redirect=${encodeURIComponent(`/products/${handle}`)}`;
+        return (
+          <>
+            <Navbar />
+            <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
+              <div className="max-w-2xl mx-auto px-4 py-16">
+                <div className="mt-8 p-8 rounded-xl border border-[#d4af37]/30 bg-[#1a120b]/80 text-center">
+                  <h1 className="font-serif text-2xl font-semibold text-[#f0d48f] mb-3">
+                    Member-only product
+                  </h1>
+                  <p className="text-[#e8e0d5]/80 mb-6">
+                    This product is part of our exclusive offers for LDMA members. Please log in to view it.
+                  </p>
+                  <Link
+                    href={loginUrl}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+                  >
+                    Log in to view product
+                  </Link>
+                </div>
               </div>
-            </div>
-          </main>
-          <Footer />
-        </>
-      );
+            </main>
+            <Footer />
+          </>
+        );
+      }
     }
+
+    const collectionHandle =
+      (product as { collections?: { edges: Array<{ node: { handle: string } }> } })
+        ?.collections?.edges?.[0]?.node?.handle ?? SHOP_COLLECTION_HANDLE;
+    const relatedProducts = await getRelatedProducts(collectionHandle, handle, 4);
+
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
+
+    return (
+      <>
+        <Navbar />
+        <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
+          <ProductPageTemplate
+            product={product}
+            relatedProducts={relatedProducts}
+            baseUrl={baseUrl}
+          />
+        </main>
+        <Footer />
+      </>
+    );
+  } catch (error) {
+    console.error("[ProductPage] render error:", error);
+    return (
+      <>
+        <Navbar />
+        <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b] flex flex-col items-center justify-center px-4">
+          <div className="text-center max-w-lg">
+            <h1 className="font-serif text-2xl font-semibold text-[#f0d48f] mb-2">
+              Something went wrong
+            </h1>
+            <p className="text-[#e8e0d5]/80 mb-6">
+              We couldn&apos;t load this product. Please try again or head back to the shop.
+            </p>
+            <Link
+              href="/shop"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+            >
+              Back to Shop
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
   }
-
-  const collectionHandle =
-    (product as { collections?: { edges: Array<{ node: { handle: string } }> } })
-      ?.collections?.edges?.[0]?.node?.handle ?? SHOP_COLLECTION_HANDLE;
-  const relatedProducts = await getRelatedProducts(collectionHandle, handle, 4);
-
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
-
-  return (
-    <>
-      <Navbar />
-      <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
-        <ProductPageTemplate
-          product={product}
-          relatedProducts={relatedProducts}
-          baseUrl={baseUrl}
-        />
-      </main>
-      <Footer />
-    </>
-  );
 }

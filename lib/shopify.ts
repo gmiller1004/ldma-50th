@@ -704,7 +704,7 @@ export async function getRelatedProducts(
     const edges = result?.collection?.products?.edges ?? [];
     const filtered = edges
       .map((e) => e.node)
-      .filter((p) => p.handle !== excludeHandle)
+      .filter((p): p is NonNullable<typeof p> => p != null && p.handle !== excludeHandle)
       .slice(0, limit);
     return filtered;
   } catch (e) {

@@ -10,6 +10,7 @@ export type MemberSession = {
   exp: number;
 };
 
+/** Returns the session secret; throws in production if unset (use for creating sessions). */
 export function getSessionSecret(): string {
   const secret = process.env.MEMBER_SESSION_SECRET;
   if (!secret) {
@@ -17,6 +18,18 @@ export function getSessionSecret(): string {
       return "dev-session-secret-change-in-production";
     }
     throw new Error("MEMBER_SESSION_SECRET is not set");
+  }
+  return secret;
+}
+
+/** Returns the session secret or null if unset. Use in verifySessionToken so missing env does not crash the page. */
+function getSessionSecretOrNull(): string | null {
+  const secret = process.env.MEMBER_SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "development") {
+      return "dev-session-secret-change-in-production";
+    }
+    return null;
   }
   return secret;
 }
@@ -36,7 +49,9 @@ export async function verifySessionToken(
   token: string
 ): Promise<MemberSession | null> {
   try {
-    const secret = new TextEncoder().encode(getSessionSecret());
+    const secretValue = getSessionSecretOrNull();
+    if (!secretValue) return null;
+    const secret = new TextEncoder().encode(secretValue);
     const { payload } = await jwtVerify(token, secret);
     return payload as unknown as MemberSession;
   } catch {
