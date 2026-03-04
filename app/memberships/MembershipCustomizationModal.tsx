@@ -17,6 +17,7 @@ import {
 import { getMembershipProductsForFlow } from "@/app/actions/membership";
 import { addMembershipToCart } from "@/app/actions/cart";
 import { useCart } from "@/context/CartContext";
+import { trackMembershipQuizComplete, trackAddToCart } from "@/lib/analytics";
 import type { MembershipProductInfo } from "@/app/actions/membership";
 
 const STEP_COPY: Record<
@@ -143,6 +144,8 @@ export function MembershipCustomizationModal({
     setAdding(true);
     try {
       await addMembershipToCart(variantIds);
+      trackMembershipQuizComplete();
+      trackAddToCart("membership");
       await refreshCart();
       onClose();
       openDrawer();

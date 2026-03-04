@@ -4,6 +4,7 @@ import { useState } from "react";
 import { addToCart } from "@/app/actions/cart";
 import { useCart } from "@/context/CartContext";
 import { useVipUpsell } from "@/context/VipUpsellContext";
+import { trackAddToCart } from "@/lib/analytics";
 import { ShoppingBag, Loader2 } from "lucide-react";
 
 const VIP_UPSELL_DISMISS_KEY = "vip-upsell-dismissed";
@@ -16,6 +17,7 @@ export function AddToCartButton({
   addingLabel = "Adding...",
   disabled = false,
   isDirtFestEvent = false,
+  trackCategory,
 }: {
   variantId: string;
   sellingPlanId?: string;
@@ -25,6 +27,8 @@ export function AddToCartButton({
   disabled?: boolean;
   /** When true, after adding we show the VIP upsell modal instead of opening the cart (unless user dismissed it this session). */
   isDirtFestEvent?: boolean;
+  /** GA4 add_to_cart category: event, membership, or shop */
+  trackCategory?: "event" | "membership" | "shop";
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +40,7 @@ export function AddToCartButton({
     setError(null);
     try {
       await addToCart(variantId, sellingPlanId);
+      if (trackCategory) trackAddToCart(trackCategory);
       await refreshCart();
       const showVipUpsell =
         isDirtFestEvent &&

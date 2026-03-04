@@ -7,6 +7,7 @@ import { X, Loader2, ShoppingBag } from "lucide-react";
 import { useVipUpsell } from "@/context/VipUpsellContext";
 import { useCart } from "@/context/CartContext";
 import { addToCart } from "@/app/actions/cart";
+import { trackVipUpsellAddToCart, trackVipUpsellMaybeLater } from "@/lib/analytics";
 import type { VipUpsellProduct } from "@/lib/shopify";
 import type { EventVariant } from "@/lib/shopify";
 
@@ -114,6 +115,7 @@ export function VipUpsellModal() {
   }
 
   function handleMaybeLater() {
+    trackVipUpsellMaybeLater();
     try {
       if (typeof window !== "undefined") {
         sessionStorage.setItem(DISMISS_STORAGE_KEY, "1");

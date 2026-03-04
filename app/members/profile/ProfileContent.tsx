@@ -508,6 +508,7 @@ export function ProfileContent() {
                           label="Add to Cart"
                           addingLabel="Adding…"
                           className="!w-auto"
+                          trackCategory="membership"
                         />
                         <p className="text-xs text-[#e8e0d5]/60">or call (888) 465-3717</p>
                       </>

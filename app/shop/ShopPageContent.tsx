@@ -466,6 +466,7 @@ function ProductDetailModal({
                   label="Add to Cart"
                   addingLabel="Adding…"
                   disabled={!selectedVariant}
+                  trackCategory="shop"
                 />
               )}
             </div>
@@ -576,6 +577,7 @@ function ProductCard({
                 label="Add to Cart"
                 addingLabel="Adding…"
                 disabled={!selectedVariant}
+                trackCategory="shop"
               />
             )}
           </div>

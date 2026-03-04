@@ -118,7 +118,7 @@ function ProductCard({
             ))}
           </div>
         )}
-        {variant && <AddToCartButton variantId={variant.id} />}
+        {variant && <AddToCartButton variantId={variant.id} trackCategory="shop" />}
       </div>
     </motion.article>
   );

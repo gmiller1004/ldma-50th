@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
+import { trackLogin } from "@/lib/analytics";
 
 type Step = "number" | "code";
 
@@ -66,6 +67,7 @@ export function LoginForm() {
         return;
       }
 
+      trackLogin();
       window.location.href = data.redirect || "/members";
     } catch {
       setError("Something went wrong. Please try again.");

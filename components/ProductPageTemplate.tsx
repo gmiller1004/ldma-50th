@@ -318,6 +318,7 @@ export function ProductPageTemplate({
           <AddToCartButton
             variantId={currentVariantId}
             sellingPlanId={isSubscription ? selectedSellingPlanId : undefined}
+            trackCategory="shop"
             disabled={
               !currentVariant?.availableForSale ||
               (isSubscription && !selectedSellingPlanId)

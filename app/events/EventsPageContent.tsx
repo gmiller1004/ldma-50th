@@ -858,6 +858,7 @@ function EventDetailModal({
                       addingLabel="Registering…"
                       disabled={!selectedVariant}
                       isDirtFestEvent={getEventType(event) === "dirtfest"}
+                      trackCategory="event"
                     />
                   )}
                 </div>
@@ -1013,6 +1014,7 @@ function EventCard({
                       addingLabel="Registering…"
                       disabled={!selectedVariant}
                       isDirtFestEvent={getEventType(event) === "dirtfest"}
+                      trackCategory="event"
                     />
                   )}
                 </div>

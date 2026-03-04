@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Minus, Plus, Trash2, Loader2 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { updateCartLineQuantity, removeCartLine } from "@/app/actions/cart";
+import { trackBeginCheckout } from "@/lib/analytics";
 
 export function CartDrawer() {
   const { cart, isDrawerOpen, closeDrawer, refreshCart } = useCart();
@@ -43,6 +44,7 @@ export function CartDrawer() {
 
   const handleCheckout = useCallback(() => {
     if (cart?.checkoutUrl) {
+      trackBeginCheckout();
       window.location.href = cart.checkoutUrl;
     }
   }, [cart?.checkoutUrl]);

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Sparkles, Loader2 } from "lucide-react";
+import { trackNewsletterSignup } from "@/lib/analytics";
 
 export function NewsletterSignup() {
   const [email, setEmail] = useState("");
@@ -29,6 +30,7 @@ export function NewsletterSignup() {
       };
 
       if (res.ok && data.success) {
+        trackNewsletterSignup();
         setStatus("success");
       } else {
         setStatus("error");
