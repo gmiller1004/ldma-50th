@@ -12,6 +12,7 @@ const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
 const STATIC_PATHS = [
   "",
   "/about",
+  "/about-events",
   "/blog",
   "/campgrounds",
   "/contact",

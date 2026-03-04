@@ -505,6 +505,19 @@ export function EventsPageContent({
             Dirt Fest, detector days, Gold N BBQ, and more — across all LDMA
             campgrounds. Register for your next adventure.
           </motion.p>
+          <motion.p
+            className="mt-4 text-[#e8e0d5]/80 text-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.35 }}
+          >
+            <Link
+              href="/about-events"
+              className="text-[#d4af37] hover:text-[#f0d48f] font-medium underline underline-offset-2"
+            >
+              Learn more about LDMA events
+            </Link>
+          </motion.p>
           {!isMemberLoggedIn && (
             <motion.p
               className="mt-6 text-[#e8e0d5]/80 text-sm md:text-base max-w-xl mx-auto"
