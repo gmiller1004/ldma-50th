@@ -23,6 +23,7 @@ export async function GET() {
         id: cart.id,
         checkoutUrl: cart.checkoutUrl,
         totalQuantity: cart.totalQuantity,
+        note: cart.note ?? undefined,
         cost: cart.cost,
         lines: cart.lines.edges.map((e) => e.node),
       },

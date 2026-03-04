@@ -1,16 +1,26 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Minus, Plus, Trash2, Loader2 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
-import { updateCartLineQuantity, removeCartLine } from "@/app/actions/cart";
+import { updateCartLineQuantity, removeCartLine, updateCartNote } from "@/app/actions/cart";
 import { trackBeginCheckout } from "@/lib/analytics";
 
 export function CartDrawer() {
   const { cart, isDrawerOpen, closeDrawer, refreshCart } = useCart();
   const [updatingLineId, setUpdatingLineId] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [checkoutPending, setCheckoutPending] = useState(false);
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (isDrawerOpen && !wasOpenRef.current) {
+      setNote(cart?.note ?? "");
+    }
+    wasOpenRef.current = isDrawerOpen;
+  }, [isDrawerOpen, cart?.note]);
 
   const handleQuantityChange = useCallback(
     async (lineId: string, delta: number) => {
@@ -42,12 +52,17 @@ export function CartDrawer() {
     [refreshCart]
   );
 
-  const handleCheckout = useCallback(() => {
-    if (cart?.checkoutUrl) {
+  const handleCheckout = useCallback(async () => {
+    if (!cart?.checkoutUrl) return;
+    setCheckoutPending(true);
+    try {
+      await updateCartNote(note.trim());
       trackBeginCheckout();
       window.location.href = cart.checkoutUrl;
+    } catch {
+      setCheckoutPending(false);
     }
-  }, [cart?.checkoutUrl]);
+  }, [cart?.checkoutUrl, note]);
 
   const isEmpty = !cart || cart.lines.length === 0;
 
@@ -197,6 +212,19 @@ export function CartDrawer() {
 
             {!isEmpty && cart && (
               <div className="p-4 border-t border-[#d4af37]/20 space-y-4">
+                <div>
+                  <label htmlFor="cart-note" className="block text-sm font-medium text-[#e8e0d5]/80 mb-1">
+                    Order notes (optional)
+                  </label>
+                  <textarea
+                    id="cart-note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Special instructions, gift message, etc."
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] text-sm placeholder:text-[#e8e0d5]/40 focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50 resize-none"
+                  />
+                </div>
                 {(() => {
                   const compareAtTotal = cart.lines.reduce((sum, line) => {
                     const cap = line.merchandise.compareAtPrice;
@@ -236,10 +264,18 @@ export function CartDrawer() {
                   );
                 })()}
                 <button
-                  onClick={handleCheckout}
-                  className="w-full py-3 px-4 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+                  onClick={() => handleCheckout()}
+                  disabled={checkoutPending}
+                  className="w-full py-3 px-4 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-70 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
-                  Proceed to Checkout
+                  {checkoutPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    "Proceed to Checkout"
+                  )}
                 </button>
               </div>
             )}

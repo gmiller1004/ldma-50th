@@ -7,6 +7,7 @@ import {
   addLinesToExistingCart,
   cartLinesUpdate,
   cartLinesRemove,
+  cartNoteUpdate,
   getCart,
 } from "@/lib/shopify";
 import { cookies } from "next/headers";
@@ -73,6 +74,14 @@ export async function addMembershipToCart(variantIds: string[]) {
     });
   }
   return { checkoutUrl: result.checkoutUrl };
+}
+
+/** Update the optional note on the cart (e.g. order instructions). Passes through to the order at checkout. */
+export async function updateCartNote(note: string) {
+  const cookieStore = await cookies();
+  const cartId = cookieStore.get(CART_ID_COOKIE)?.value;
+  if (!cartId) return;
+  await cartNoteUpdate(cartId, note);
 }
 
 export async function updateCartLineQuantity(lineId: string, quantity: number) {

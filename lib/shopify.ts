@@ -926,6 +926,7 @@ export type CartData = {
   id: string;
   checkoutUrl: string;
   totalQuantity: number;
+  note?: string | null;
   cost: { subtotalAmount: { amount: string; currencyCode: string } };
   lines: { edges: Array<{ node: CartLine }> };
 };
@@ -938,6 +939,7 @@ export async function getCart(cartId: string): Promise<CartData | null> {
           id
           checkoutUrl
           totalQuantity
+          note
           cost {
             subtotalAmount { amount currencyCode }
           }
@@ -965,6 +967,30 @@ export async function getCart(cartId: string): Promise<CartData | null> {
     variables: { cartId },
   });
   return result?.cart ?? null;
+}
+
+export async function cartNoteUpdate(cartId: string, note: string) {
+  const result = await shopifyFetch<{
+    cartNoteUpdate: {
+      cart: { checkoutUrl: string } | null;
+      userErrors: Array<{ message: string }>;
+    };
+  }>({
+    query: `
+      mutation cartNoteUpdate($cartId: ID!, $note: String!) {
+        cartNoteUpdate(cartId: $cartId, note: $note) {
+          cart { checkoutUrl }
+          userErrors { message }
+        }
+      }
+    `,
+    variables: { cartId, note },
+  });
+  const { cart, userErrors } = result.cartNoteUpdate;
+  if (userErrors?.length) {
+    throw new Error(userErrors[0].message);
+  }
+  return { checkoutUrl: cart?.checkoutUrl };
 }
 
 export async function cartLinesUpdate(

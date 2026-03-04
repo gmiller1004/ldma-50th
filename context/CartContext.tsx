@@ -30,6 +30,7 @@ export type Cart = {
   id: string;
   checkoutUrl: string;
   totalQuantity: number;
+  note?: string;
   cost: { subtotalAmount: { amount: string; currencyCode: string } };
   lines: CartLine[];
 } | null;
