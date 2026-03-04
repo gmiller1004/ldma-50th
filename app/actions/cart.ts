@@ -47,30 +47,32 @@ export async function addToCart(
   return { checkoutUrl };
 }
 
-/** Add multiple membership products to cart (e.g. from customization flow) */
+/** Add multiple membership products to cart (e.g. from customization flow). Retries with a fresh cart if the existing cart is invalid (expired or already used). */
 export async function addMembershipToCart(variantIds: string[]) {
   if (variantIds.length === 0) throw new Error("No variants to add");
   const cookieStore = await cookies();
-  const existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
+  let existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
 
-  let checkoutUrl: string;
+  const lines = variantIds.map((id) => ({ merchandiseId: id, quantity: 1 }));
 
-  if (existingCartId) {
-    const result = await addLinesToExistingCart(existingCartId, variantIds);
-    checkoutUrl = result.checkoutUrl;
-  } else {
-    const result = await createCartAndAddLines(variantIds);
-    checkoutUrl = result.checkoutUrl;
-    if (result.cartId) {
-      cookieStore.set(CART_ID_COOKIE, result.cartId, {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 30,
-        sameSite: "lax",
-      });
+  try {
+    if (existingCartId) {
+      const result = await addLinesToExistingCart(existingCartId, lines);
+      return { checkoutUrl: result.checkoutUrl };
     }
+  } catch {
+    existingCartId = undefined;
   }
 
-  return { checkoutUrl };
+  const result = await createCartAndAddLines(lines);
+  if (result.cartId) {
+    cookieStore.set(CART_ID_COOKIE, result.cartId, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+      sameSite: "lax",
+    });
+  }
+  return { checkoutUrl: result.checkoutUrl };
 }
 
 export async function updateCartLineQuantity(lineId: string, quantity: number) {

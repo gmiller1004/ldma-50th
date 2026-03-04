@@ -150,7 +150,9 @@ export function MembershipCustomizationModal({
       onClose();
       openDrawer();
     } catch {
-      setError("Could not add to cart. Please try again.");
+      setError(
+        "Could not add to cart. Please try again. If it keeps happening, try clearing your browser cookies for this site or use a private/incognito window."
+      );
     } finally {
       setAdding(false);
     }
@@ -196,9 +198,16 @@ export function MembershipCustomizationModal({
             ) : error ? (
               <div className="py-8 text-center">
                 <p className="text-red-400 mb-4">{error}</p>
-                <p className="text-[#e8e0d5]/60 text-sm">
+                <p className="text-[#e8e0d5]/60 text-sm mb-4">
                   Visit our shop or contact info@myldma.com or (888) 465-3717
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="text-[#d4af37] hover:text-[#f0d48f] font-medium text-sm underline"
+                >
+                  Try again
+                </button>
               </div>
             ) : !current && !isSummaryStep ? (
               <p className="text-[#e8e0d5]/60 text-center py-8">
