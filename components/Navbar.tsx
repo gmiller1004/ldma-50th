@@ -85,6 +85,44 @@ function MemberIconButton({
   );
 }
 
+function MemberIconWithHint({
+  authenticated,
+  isLdmaAdmin,
+  showHint,
+}: {
+  authenticated: boolean;
+  isLdmaAdmin: boolean;
+  showHint: boolean;
+}) {
+  return (
+    <div className="relative">
+      <MemberIconButton authenticated={authenticated} isLdmaAdmin={isLdmaAdmin} />
+      <AnimatePresence>
+        {showHint && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.25 }}
+            className="absolute left-1/2 -translate-x-1/2 top-full pt-1 z-10 pointer-events-none"
+          >
+            <motion.div
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="flex flex-col items-center gap-0.5"
+            >
+              <ChevronUp className="w-5 h-5 text-[#d4af37]" strokeWidth={2.5} />
+              <span className="text-xs font-medium text-[#e8e0d5]/90 whitespace-nowrap bg-[#1a120b]/90 backdrop-blur-sm px-2 py-1 rounded border border-[#d4af37]/30 shadow-lg">
+                Member Login
+              </span>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 const SCROLL_THRESHOLD = 120;
 
 export function Navbar() {
@@ -155,7 +193,11 @@ export function Navbar() {
                 </div>
               </div>
             </div>
-            <MemberIconButton authenticated={auth.authenticated} isLdmaAdmin={auth.isLdmaAdmin} />
+            <MemberIconWithHint
+              authenticated={auth.authenticated}
+              isLdmaAdmin={auth.isLdmaAdmin}
+              showHint={showMemberLoginHint}
+            />
             <CartButton />
             <Link
               href="/memberships"
@@ -167,7 +209,11 @@ export function Navbar() {
 
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center gap-3">
-            <MemberIconButton authenticated={auth.authenticated} isLdmaAdmin={auth.isLdmaAdmin} />
+            <MemberIconWithHint
+              authenticated={auth.authenticated}
+              isLdmaAdmin={auth.isLdmaAdmin}
+              showHint={showMemberLoginHint}
+            />
             <CartButton />
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
@@ -213,30 +259,6 @@ export function Navbar() {
         )}
       </AnimatePresence>
       </nav>
-
-      {/* Floating "Member Login" hint — only at top of page when not logged in */}
-      <AnimatePresence>
-        {showMemberLoginHint && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.25 }}
-            className="fixed z-40 pointer-events-none top-[5.25rem] right-20 md:right-40 md:top-[5.5rem]"
-          >
-            <motion.div
-              animate={{ y: [0, -4, 0] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="flex flex-col items-center gap-0.5"
-            >
-              <ChevronUp className="w-5 h-5 text-[#d4af37]" strokeWidth={2.5} />
-              <span className="text-xs font-medium text-[#e8e0d5]/90 whitespace-nowrap bg-[#1a120b]/90 backdrop-blur-sm px-2 py-1 rounded border border-[#d4af37]/30 shadow-lg">
-                Member Login
-              </span>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 }
