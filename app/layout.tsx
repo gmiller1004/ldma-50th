@@ -4,6 +4,7 @@ import { CartProvider } from "@/context/CartContext";
 import { VipUpsellProvider } from "@/context/VipUpsellContext";
 import { CartDrawer } from "@/components/CartDrawer";
 import { VipUpsellModal } from "@/components/VipUpsellModal";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 
 // Never use Shopify store URL for site base (canonical, og:url, etc.)
 const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
@@ -54,6 +55,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="antialiased bg-[#1a120b] text-[#e8e0d5] font-sans">
+        <GoogleAnalytics />
         <CartProvider>
           <VipUpsellProvider>
             {children}
