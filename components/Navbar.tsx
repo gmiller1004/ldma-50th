@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Pickaxe, Menu, X, ShoppingBag, User, Share2 } from "lucide-react";
+import { Pickaxe, Menu, X, ShoppingBag, User, Share2, ChevronUp } from "lucide-react";
 import { SocialLinks } from "./SocialLinks";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
@@ -85,12 +85,22 @@ function MemberIconButton({
   );
 }
 
+const SCROLL_THRESHOLD = 120;
+
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [atTop, setAtTop] = useState(true);
   const [auth, setAuth] = useState<{ authenticated: boolean; isLdmaAdmin: boolean }>({
     authenticated: false,
     isLdmaAdmin: false,
   });
+
+  useEffect(() => {
+    const onScroll = () => setAtTop(window.scrollY < SCROLL_THRESHOLD);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     fetch("/api/members/me")
@@ -104,9 +114,12 @@ export function Navbar() {
       .catch(() => setAuth({ authenticated: false, isLdmaAdmin: false }));
   }, []);
 
+  const showMemberLoginHint = atTop && !auth.authenticated;
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/95 backdrop-blur-md border-b border-[#d4af37]/20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <>
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/95 backdrop-blur-md border-b border-[#d4af37]/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 md:h-20">
           <Link
             href="/"
@@ -199,6 +212,31 @@ export function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
-    </nav>
+      </nav>
+
+      {/* Floating "Member Login" hint — only at top of page when not logged in */}
+      <AnimatePresence>
+        {showMemberLoginHint && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.25 }}
+            className="fixed z-40 pointer-events-none top-[5.25rem] right-20 md:right-40 md:top-[5.5rem]"
+          >
+            <motion.div
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="flex flex-col items-center gap-0.5"
+            >
+              <ChevronUp className="w-5 h-5 text-[#d4af37]" strokeWidth={2.5} />
+              <span className="text-xs font-medium text-[#e8e0d5]/90 whitespace-nowrap bg-[#1a120b]/90 backdrop-blur-sm px-2 py-1 rounded border border-[#d4af37]/30 shadow-lg">
+                Member Login
+              </span>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
