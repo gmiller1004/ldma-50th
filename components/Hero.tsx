@@ -80,7 +80,7 @@ export function Hero() {
             textShadow: "0 0 40px rgba(212,175,55,0.2), 0 2px 4px rgba(0,0,0,0.3)",
           }}
         >
-          50 YEARS OF GOLD, GRIT & BROTHERHOOD
+          50 YEARS OF GOLD, DISCOVERY, AND ADVENTURE
         </motion.h1>
 
         {/* Subheadline */}

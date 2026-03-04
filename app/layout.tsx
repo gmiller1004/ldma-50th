@@ -14,11 +14,11 @@ const siteUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "LDMA | 50 Years of Gold, Grit & Brotherhood • 1976–2026",
+  title: "LDMA | 50 Years of Gold, Discovery, and Adventure • 1976–2026",
   description:
     "The Lost Dutchman's Mining Association celebrates 50 years of gold prospecting, camaraderie, and the great outdoors. Join us for DirtFest 2026, memberships, and more.",
   openGraph: {
-    title: "LDMA | 50 Years of Gold, Grit & Brotherhood",
+    title: "LDMA | 50 Years of Gold, Discovery, and Adventure",
     description:
       "The Lost Dutchman's Mining Association — 50 years of adventure, discovery, and fellowship.",
     type: "website",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "LDMA | 50 Years of Gold, Grit & Brotherhood",
+    title: "LDMA | 50 Years of Gold, Discovery, and Adventure",
     description:
       "The Lost Dutchman's Mining Association — 50 years of adventure, discovery, and fellowship.",
     images: ["/images/home/hero-george-italian-bar.jpg"],

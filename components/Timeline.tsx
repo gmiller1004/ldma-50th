@@ -8,7 +8,7 @@ const milestones = [
     year: "1976",
     title: "LDMA Founded",
     description:
-      'George "Buzzard" Massie establishes the Lost Dutchman\'s Mining Association with a vision of gold, grit, and brotherhood.',
+      'George "Buzzard" Massie establishes the Lost Dutchman\'s Mining Association with a vision of gold, discovery, and adventure.',
   },
   {
     year: "1976",

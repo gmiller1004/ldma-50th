@@ -53,7 +53,7 @@ const faqs = [
   },
   {
     q: "What is the 50th anniversary celebration?",
-    a: "2026 marks LDMA's 50th anniversary. We are celebrating five decades of gold, grit, and brotherhood with special events, merchandise, and commemorative experiences. This site is part of that celebration.",
+    a: "2026 marks LDMA's 50th anniversary. We are celebrating five decades of gold, discovery, and adventure with special events, merchandise, and commemorative experiences. This site is part of that celebration.",
   },
 ];
 

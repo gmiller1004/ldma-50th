@@ -37,7 +37,7 @@ If you didn't request this code, you can safely ignore this email.`;
           <tr>
             <td style="padding: 32px 24px; text-align: center; border-bottom: 1px solid #d4af3720;">
               <h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #f0d48f; letter-spacing: 0.05em;">LDMA</h1>
-              <p style="margin: 8px 0 0; font-size: 14px; color: #e8e0d5b3;">50 Years of Gold, Grit & Brotherhood</p>
+              <p style="margin: 8px 0 0; font-size: 14px; color: #e8e0d5b3;">50 Years of Gold, Discovery, and Adventure</p>
             </td>
           </tr>
           <tr>

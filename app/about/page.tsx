@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description:
     "The Lost Dutchman's Mining Association has been bringing families together through gold prospecting and RV camping since 1976. 12 private campgrounds, 6,500+ members, and countless memories.",
   openGraph: {
-    title: "About LDMA | 50 Years of Gold, Grit & Brotherhood",
+    title: "About LDMA | 50 Years of Gold, Discovery, and Adventure",
     description:
       "Since 1976, LDMA has offered exclusive access to gold-bearing land, family-friendly camping, and a community of adventurers. Learn our story.",
   },
@@ -74,7 +74,7 @@ export default function AboutPage() {
                   Since 1976
                 </h3>
                 <p className="text-[#e8e0d5]/80 text-sm">
-                  Nearly 50 years of gold, grit, and brotherhood
+                  Nearly 50 years of gold, discovery, and adventure
                 </p>
               </div>
             </div>

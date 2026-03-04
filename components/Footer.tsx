@@ -41,7 +41,7 @@ export function Footer() {
             </Link>
             <p className="mt-4 text-[#e8e0d5]/70 text-sm">
               The Lost Dutchman&apos;s Mining Association — 50 years of gold,
-              grit, and brotherhood.
+              discovery, and adventure.
             </p>
           </div>
           <div>

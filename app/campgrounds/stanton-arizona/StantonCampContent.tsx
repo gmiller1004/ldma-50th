@@ -260,7 +260,7 @@ export function StantonCampContent() {
             </p>
             <p className="text-[#d4af37]/90 text-base italic border-l-4 border-[#d4af37]/40 pl-4">
               One of LDMA&apos;s original camps — a cornerstone of our 50-year legacy
-              of gold, grit, and brotherhood.
+              of gold, discovery, and adventure.
             </p>
           </motion.div>
         </div>

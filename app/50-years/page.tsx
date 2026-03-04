@@ -6,7 +6,7 @@ import { FiftyYearsPageContent } from "./FiftyYearsPageContent";
 export const metadata: Metadata = {
   title: "50 Years | LDMA 50th Anniversary",
   description:
-    "Five decades of gold, grit, and brotherhood. Explore LDMA's journey from the first outing at Italian Bar to 12 camps across America.",
+    "Five decades of gold, discovery, and adventure. Explore LDMA's journey from the first outing at Italian Bar to 12 camps across America.",
 };
 
 export default function FiftyYearsPage() {

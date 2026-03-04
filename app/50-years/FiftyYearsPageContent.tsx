@@ -12,7 +12,7 @@ const milestones = [
     year: "1976",
     title: "LDMA Founded",
     description:
-      'George "Buzzard" Massie establishes the Lost Dutchman\'s Mining Association with a vision of gold, grit, and brotherhood.',
+      'George "Buzzard" Massie establishes the Lost Dutchman\'s Mining Association with a vision of gold, discovery, and adventure.',
   },
   {
     year: "1976",
@@ -244,7 +244,7 @@ export function FiftyYearsPageContent() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
           >
-            50 Years of Gold, Grit & Brotherhood
+            50 Years of Gold, Discovery, and Adventure
           </motion.h1>
           <motion.p
             className="text-[#e8e0d5]/90 text-lg md:text-xl max-w-2xl mx-auto"
@@ -449,7 +449,7 @@ export function FiftyYearsPageContent() {
           >
             Join thousands of members prospecting across 12 premier camps. Get
             access to exclusive events, claims, and a community built on 50 years
-            of gold, grit, and brotherhood.
+            of gold, discovery, and adventure.
           </motion.p>
           <motion.div
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
