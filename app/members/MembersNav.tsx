@@ -11,11 +11,13 @@ export function MembersNav() {
   const [isCaretaker, setIsCaretaker] = useState(false);
 
   useEffect(() => {
-    fetch("/api/members/me")
-      .then((res) => res.json())
+    fetch("/api/members/me", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.resolve(null)))
       .then((data) => {
-        setIsLdmaAdmin(data.isLdmaAdmin === true);
-        setIsCaretaker(data.isCaretaker === true);
+        if (data && typeof data === "object") {
+          setIsLdmaAdmin(data.isLdmaAdmin === true);
+          setIsCaretaker(data.isCaretaker === true);
+        }
       })
       .catch(() => {
         setIsLdmaAdmin(false);

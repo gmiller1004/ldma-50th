@@ -148,13 +148,19 @@ export function ProfileContent() {
   });
 
   function loadProfile() {
-    return fetch("/api/members/me")
-      .then((res) => res.json())
-      .then((data) => {
+    return fetch("/api/members/me", { cache: "no-store" })
+      .then((res) => res.json().then((data) => ({ res, data })))
+      .then(({ res, data }) => {
         setProfile(data);
-        if (!data.authenticated) {
+        if (res.status === 401 || (res.ok && data.authenticated === false)) {
           window.location.href = "/members/login";
-        } else {
+          return;
+        }
+        if (!res.ok) {
+          setError("Failed to load profile");
+          return;
+        }
+        if (data.authenticated) {
           setForm({
             phone: data.phone ?? "",
             otherStreet: data.otherStreet ?? "",
