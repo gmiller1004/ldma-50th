@@ -98,7 +98,21 @@ export async function PATCH(
     FROM caretaker_check_ins WHERE id = ${id} LIMIT 1
   `;
   const updatedArr = Array.isArray(updated) ? updated : [];
-  const row = updatedArr[0];
+  const row = updatedArr[0] as
+    | {
+        id: string;
+        camp_slug: string;
+        member_contact_id: string;
+        member_number: string;
+        member_display_name: string | null;
+        check_in_date: string;
+        check_out_date: string;
+        nights: number;
+        points_awarded: number;
+        created_at: string;
+        updated_at: string;
+      }
+    | undefined;
   if (!row) {
     return NextResponse.json({ ok: true, id });
   }
