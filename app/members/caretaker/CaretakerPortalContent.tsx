@@ -243,7 +243,7 @@ export function CaretakerPortalContent({
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <dl className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
               <div>
                 <dt className="text-[#e8e0d5]/60">Maintenance fees due</dt>
                 <dd className="text-[#e8e0d5] font-medium">{formatCurrency(lookupResult.maintenanceFeesDue)}</dd>
@@ -251,10 +251,6 @@ export function CaretakerPortalContent({
               <div>
                 <dt className="text-[#e8e0d5]/60">Membership dues owed</dt>
                 <dd className="text-[#e8e0d5] font-medium">{formatCurrency(lookupResult.membershipDuesOwed)}</dd>
-              </div>
-              <div>
-                <dt className="text-[#e8e0d5]/60">Membership balance</dt>
-                <dd className="text-[#e8e0d5] font-medium">{formatCurrency(lookupResult.membershipBalance)}</dd>
               </div>
             </dl>
             <button
