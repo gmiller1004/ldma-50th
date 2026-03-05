@@ -10,25 +10,67 @@ import {
   setExclusiveOffersNotify,
 } from "@/lib/notification-preferences";
 
+/** Minimal payload when Salesforce lookup fails so UI still shows logged in (no 500). */
+function minimalMePayload(memberNumber: string) {
+  return {
+    authenticated: true,
+    memberNumber,
+    contactId: null,
+    avatarUrl: null,
+    commentDigestEnabled: false,
+    exclusiveOffersNotify: false,
+    email: null,
+    firstName: null,
+    lastName: null,
+    phone: null,
+    otherStreet: null,
+    otherCity: null,
+    otherState: null,
+    otherPostalCode: null,
+    duesOwed: null,
+    maintenancePaidThru: null,
+    showMaintenance: false,
+    hideMaintenance: false,
+    isOnAutoPay: false,
+    maintenancePaymentUrl: null,
+    companionTransferable: false,
+    companion: null,
+    legacyOfferRequestDate: null,
+    legacyOfferStatus: null,
+    legacyOfferIsTransferable: false,
+    legacyOfferIsCompanion: false,
+    legacyOfferIsPrePay: false,
+    isLdmaAdmin: false,
+    isCaretaker: false,
+    caretakerAtCamp: null,
+  };
+}
+
 export async function GET() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("member_session")?.value;
+  if (!token) {
+    return NextResponse.json({ authenticated: false }, { status: 401 });
+  }
+
+  const session = await verifySessionToken(token);
+  if (!session) {
+    return NextResponse.json({ authenticated: false }, { status: 401 });
+  }
+
+  let member;
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("member_session")?.value;
-    if (!token) {
-      return NextResponse.json({ authenticated: false }, { status: 401 });
-    }
+    member = await lookupMember(session.memberNumber);
+  } catch (e) {
+    console.error("Me route: lookupMember failed", e);
+    return NextResponse.json(minimalMePayload(session.memberNumber), { status: 200 });
+  }
 
-    const session = await verifySessionToken(token);
-    if (!session) {
-      return NextResponse.json({ authenticated: false }, { status: 401 });
-    }
+  if (!member.valid) {
+    return NextResponse.json({ authenticated: false }, { status: 401 });
+  }
 
-    const member = await lookupMember(session.memberNumber);
-
-    if (!member.valid) {
-      return NextResponse.json({ authenticated: false }, { status: 401 });
-    }
-
+  try {
     const [avatarUrl, commentDigestEnabled, exclusiveOffersNotify] = await Promise.all([
       getAvatarUrl(member.contactId ?? null),
       getCommentDigestEnabled(session.memberNumber),
@@ -74,11 +116,8 @@ export async function GET() {
       caretakerAtCamp: member.caretakerAtCamp ?? null,
     });
   } catch (e) {
-    console.error("Me route error:", e);
-    return NextResponse.json(
-      { error: "Something went wrong" },
-      { status: 500 }
-    );
+    console.error("Me route: post-lookup failed", e);
+    return NextResponse.json(minimalMePayload(session.memberNumber), { status: 200 });
   }
 }
 
