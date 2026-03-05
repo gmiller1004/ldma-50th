@@ -26,6 +26,8 @@ export const POINTS = {
   discussion_video: 10,
   comment: 3,
   reaction: 1,
+  /** Per night for caretaker check-in (not capped by daily community cap). */
+  caretaker_check_in_per_night: 50,
 } as const;
 
 export type MemberRewards = {
@@ -61,10 +63,13 @@ async function getTodayCommunityPoints(contactId: string): Promise<number> {
   return row?.total ?? 0;
 }
 
+const ADJUSTMENT_REASONS = ["caretaker_check_in_adjustment"];
+
 /**
  * Award points to a member. Only call when the member is authenticated (has contact_id).
  * When reference_type and reference_id are provided, the grant is idempotent (one per reference).
  * Community points (discussion_start, comment, reaction) are capped at DAILY_COMMUNITY_CAP per member per day.
+ * Negative pointsDelta is allowed only for ADJUSTMENT_REASONS (e.g. caretaker checkout edit).
  */
 export async function addPoints(
   contactId: string,
@@ -73,9 +78,11 @@ export async function addPoints(
   referenceType?: string | null,
   referenceId?: string | null
 ): Promise<{ ok: boolean; alreadyGranted?: boolean; capped?: boolean }> {
-  if (!hasDb() || !sql || pointsDelta <= 0) return { ok: false };
+  if (!hasDb() || !sql) return { ok: false };
+  const isAdjustment = ADJUSTMENT_REASONS.includes(reason);
+  if (pointsDelta === 0 || (pointsDelta < 0 && !isAdjustment)) return { ok: false };
 
-  if (referenceType != null && referenceId != null) {
+  if (pointsDelta > 0 && referenceType != null && referenceId != null) {
     const existing = await sql`
       SELECT 1 FROM member_point_transactions
       WHERE reference_type = ${referenceType} AND reference_id = ${referenceId}
@@ -85,7 +92,7 @@ export async function addPoints(
     if (arr.length > 0) return { ok: true, alreadyGranted: true };
   }
 
-  if (COMMUNITY_REASONS.includes(reason)) {
+  if (pointsDelta > 0 && COMMUNITY_REASONS.includes(reason)) {
     const todayTotal = await getTodayCommunityPoints(contactId);
     const headroom = Math.max(0, DAILY_COMMUNITY_CAP - todayTotal);
     if (headroom <= 0) return { ok: true, capped: true };
@@ -103,21 +110,38 @@ export async function addPoints(
     throw e;
   }
 
-  const tier = getTierForLifetimePoints(0 + pointsDelta);
-  await sql`
-    INSERT INTO member_rewards (contact_id, points_balance, lifetime_points, tier, updated_at)
-    VALUES (${contactId}, ${pointsDelta}, ${pointsDelta}, ${tier}, NOW())
-    ON CONFLICT (contact_id) DO UPDATE SET
-      points_balance = member_rewards.points_balance + ${pointsDelta},
-      lifetime_points = member_rewards.lifetime_points + ${pointsDelta},
-      tier = CASE
-        WHEN member_rewards.lifetime_points + ${pointsDelta} >= ${TIER_THRESHOLDS.sourdough} THEN 'sourdough'
-        WHEN member_rewards.lifetime_points + ${pointsDelta} >= ${TIER_THRESHOLDS.miner} THEN 'miner'
-        WHEN member_rewards.lifetime_points + ${pointsDelta} >= ${TIER_THRESHOLDS.prospector} THEN 'prospector'
-        ELSE 'camper'
-      END,
-      updated_at = NOW()
-  `;
+  if (pointsDelta > 0) {
+    const tier = getTierForLifetimePoints(0 + pointsDelta);
+    await sql`
+      INSERT INTO member_rewards (contact_id, points_balance, lifetime_points, tier, updated_at)
+      VALUES (${contactId}, ${pointsDelta}, ${pointsDelta}, ${tier}, NOW())
+      ON CONFLICT (contact_id) DO UPDATE SET
+        points_balance = GREATEST(0, member_rewards.points_balance + ${pointsDelta}),
+        lifetime_points = GREATEST(0, member_rewards.lifetime_points + ${pointsDelta}),
+        tier = CASE
+          WHEN GREATEST(0, member_rewards.lifetime_points + ${pointsDelta}) >= ${TIER_THRESHOLDS.sourdough} THEN 'sourdough'
+          WHEN GREATEST(0, member_rewards.lifetime_points + ${pointsDelta}) >= ${TIER_THRESHOLDS.miner} THEN 'miner'
+          WHEN GREATEST(0, member_rewards.lifetime_points + ${pointsDelta}) >= ${TIER_THRESHOLDS.prospector} THEN 'prospector'
+          ELSE 'camper'
+        END,
+        updated_at = NOW()
+    `;
+  } else {
+    await sql`
+      INSERT INTO member_rewards (contact_id, points_balance, lifetime_points, tier, updated_at)
+      VALUES (${contactId}, 0, 0, 'camper', NOW())
+      ON CONFLICT (contact_id) DO UPDATE SET
+        points_balance = GREATEST(0, member_rewards.points_balance + ${pointsDelta}),
+        lifetime_points = GREATEST(0, member_rewards.lifetime_points + ${pointsDelta}),
+        tier = CASE
+          WHEN GREATEST(0, member_rewards.lifetime_points + ${pointsDelta}) >= ${TIER_THRESHOLDS.sourdough} THEN 'sourdough'
+          WHEN GREATEST(0, member_rewards.lifetime_points + ${pointsDelta}) >= ${TIER_THRESHOLDS.miner} THEN 'miner'
+          WHEN GREATEST(0, member_rewards.lifetime_points + ${pointsDelta}) >= ${TIER_THRESHOLDS.prospector} THEN 'prospector'
+          ELSE 'camper'
+        END,
+        updated_at = NOW()
+    `;
+  }
   return { ok: true };
 }
 
@@ -162,4 +186,31 @@ export async function awardPointsForReaction(
 ): Promise<void> {
   const referenceId = `reaction:${targetType}:${targetId}:${contactId}`;
   await addPoints(contactId, POINTS.reaction, "reaction", "reaction", referenceId);
+}
+
+/** Award points for caretaker check-in (50 per night). Not capped by daily community cap. */
+export async function awardPointsForCaretakerCheckIn(
+  contactId: string,
+  nights: number,
+  checkInId: string
+): Promise<void> {
+  if (nights <= 0) return;
+  const total = nights * POINTS.caretaker_check_in_per_night;
+  await addPoints(contactId, total, "caretaker_check_in", "check_in", checkInId);
+}
+
+/** Adjust points when caretaker edits checkout (delta can be negative). */
+export async function adjustPointsForCaretakerCheckIn(
+  contactId: string,
+  pointsDelta: number,
+  checkInId: string
+): Promise<void> {
+  if (pointsDelta === 0) return;
+  await addPoints(
+    contactId,
+    pointsDelta,
+    "caretaker_check_in_adjustment",
+    "check_in_adjustment",
+    `${checkInId}-${Date.now()}`
+  );
 }

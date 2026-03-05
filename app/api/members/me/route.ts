@@ -70,6 +70,8 @@ export async function GET() {
       legacyOfferIsCompanion: member.isCompanion ?? false,
       legacyOfferIsPrePay: member.isPrePayTransfer ?? false,
       isLdmaAdmin: member.isLdmaAdmin ?? false,
+      isCaretaker: member.isCaretaker ?? false,
+      caretakerAtCamp: member.caretakerAtCamp ?? null,
     });
   } catch (e) {
     console.error("Me route error:", e);

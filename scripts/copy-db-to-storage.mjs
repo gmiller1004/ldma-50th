@@ -38,6 +38,7 @@ const COPY_ORDER = [
   "member_shopify_tokens",
   "member_rewards",
   "member_point_transactions",
+  "caretaker_check_ins",
   "oauth_state",
 ];
 

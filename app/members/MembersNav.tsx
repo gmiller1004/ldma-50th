@@ -3,17 +3,24 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { User, LogOut, Map, FileEdit } from "lucide-react";
+import { User, LogOut, Map, FileEdit, Tent } from "lucide-react";
 
 export function MembersNav() {
   const router = useRouter();
   const [isLdmaAdmin, setIsLdmaAdmin] = useState(false);
+  const [isCaretaker, setIsCaretaker] = useState(false);
 
   useEffect(() => {
     fetch("/api/members/me")
       .then((res) => res.json())
-      .then((data) => setIsLdmaAdmin(data.isLdmaAdmin === true))
-      .catch(() => setIsLdmaAdmin(false));
+      .then((data) => {
+        setIsLdmaAdmin(data.isLdmaAdmin === true);
+        setIsCaretaker(data.isCaretaker === true);
+      })
+      .catch(() => {
+        setIsLdmaAdmin(false);
+        setIsCaretaker(false);
+      });
   }, []);
 
   async function handleLogout() {
@@ -51,6 +58,15 @@ export function MembersNav() {
         >
           <FileEdit className="w-4 h-4" />
           Blog Admin
+        </Link>
+      )}
+      {isCaretaker && (
+        <Link
+          href="/members/caretaker"
+          className="flex items-center gap-2 text-[#e8e0d5]/80 hover:text-[#d4af37] transition-colors"
+        >
+          <Tent className="w-4 h-4" />
+          Caretaker Portal
         </Link>
       )}
       <button
