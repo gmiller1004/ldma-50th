@@ -165,6 +165,9 @@ export function CampCommunityContent({
                     </div>
                   </div>
                 )}
+                {claims.length === 0 && !claim && (
+                  <p className="mt-6 text-sm text-[#e8e0d5]/60">Claim Directory Coming Soon</p>
+                )}
               </div>
             </div>
           )}
