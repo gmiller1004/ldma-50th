@@ -131,3 +131,58 @@ export async function PATCH(
     updatedAt: row.updated_at,
   });
 }
+
+/**
+ * DELETE /api/members/caretaker/check-ins/[id]
+ * Cancel reservation: deduct points and set check-out to yesterday so it moves to archives.
+ */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const caretaker = await getCaretakerContext();
+  if (!caretaker) {
+    return NextResponse.json({ error: "Caretaker access required" }, { status: 403 });
+  }
+  if (!hasDb() || !sql) {
+    return NextResponse.json({ error: "Database not available" }, { status: 503 });
+  }
+
+  const { id } = await params;
+  if (!id) {
+    return NextResponse.json({ error: "Check-in id required" }, { status: 400 });
+  }
+
+  const existing = await sql`
+    SELECT id, camp_slug, member_contact_id, check_in_date, points_awarded
+    FROM caretaker_check_ins
+    WHERE id = ${id} AND camp_slug = ${caretaker.campSlug}
+    LIMIT 1
+  `;
+  const existingArr = Array.isArray(existing) ? existing : [];
+  const existingRow = existingArr[0] as CheckInRow | undefined;
+  if (!existingRow) {
+    return NextResponse.json({ error: "Check-in not found" }, { status: 404 });
+  }
+
+  const pointsToDeduct = existingRow.points_awarded ?? 0;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+  if (pointsToDeduct > 0) {
+    adjustPointsForCaretakerCheckIn(
+      existingRow.member_contact_id,
+      -pointsToDeduct,
+      id
+    ).catch((e) => console.error("[caretaker] cancel deduct points failed:", e));
+  }
+
+  await sql`
+    UPDATE caretaker_check_ins
+    SET check_out_date = ${yesterdayStr}, nights = 0, points_awarded = 0, updated_at = NOW()
+    WHERE id = ${id}
+  `;
+
+  return NextResponse.json({ ok: true, cancelled: true });
+}

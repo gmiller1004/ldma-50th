@@ -49,6 +49,9 @@ export function CaretakerPortalContent({
   const [editingCheckIn, setEditingCheckIn] = useState<CheckIn | null>(null);
   const [newCheckOutDate, setNewCheckOutDate] = useState("");
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancellingCheckIn, setCancellingCheckIn] = useState<CheckIn | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
   function loadCheckIns() {
     setListLoading(true);
@@ -129,6 +132,34 @@ export function CaretakerPortalContent({
     setEditingCheckIn(checkIn);
     setNewCheckOutDate(checkIn.checkOutDate);
     setEditModalOpen(true);
+  }
+
+  function openCancelModal(checkIn: CheckIn) {
+    setCancellingCheckIn(checkIn);
+    setCancelModalOpen(true);
+  }
+
+  async function handleCancelConfirm() {
+    if (!cancellingCheckIn) return;
+    setLookupError(null);
+    setCancelSubmitting(true);
+    try {
+      const res = await fetch(`/api/members/caretaker/check-ins/${cancellingCheckIn.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setLookupError(data.error ?? "Cancel failed");
+        return;
+      }
+      setCancelModalOpen(false);
+      setCancellingCheckIn(null);
+      loadCheckIns();
+    } catch {
+      setLookupError("Cancel failed");
+    } finally {
+      setCancelSubmitting(false);
+    }
   }
 
   async function handleEditSubmit(e: React.FormEvent) {
@@ -266,13 +297,22 @@ export function CaretakerPortalContent({
                   <span>{c.nights} night{c.nights !== 1 ? "s" : ""}</span>
                   <span>{c.pointsAwarded} pts</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => openEditModal(c)}
-                  className="px-3 py-1.5 text-sm bg-[#d4af37]/20 text-[#d4af37] rounded hover:bg-[#d4af37]/30"
-                >
-                  Edit
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(c)}
+                    className="px-3 py-1.5 text-sm bg-[#d4af37]/20 text-[#d4af37] rounded hover:bg-[#d4af37]/30"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openCancelModal(c)}
+                    className="px-3 py-1.5 text-sm bg-red-950/50 text-red-300 rounded hover:bg-red-900/40 border border-red-800/50"
+                  >
+                    Cancel reservation
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -339,6 +379,33 @@ export function CaretakerPortalContent({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel reservation confirmation modal */}
+      {cancelModalOpen && cancellingCheckIn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !cancelSubmitting && (setCancelModalOpen(false), setCancellingCheckIn(null))}>
+          <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-[#f0d48f]">Cancel reservation</h3>
+              <button type="button" onClick={() => !cancelSubmitting && (setCancelModalOpen(false), setCancellingCheckIn(null))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-[#e8e0d5]/90 text-sm mb-4">
+              Cancel this reservation for {cancellingCheckIn.memberDisplayName || `#${cancellingCheckIn.memberNumber}`}?{" "}
+              <strong className="text-[#e8e0d5]">{cancellingCheckIn.pointsAwarded} points</strong> will be deducted and the reservation will move to archives.
+            </p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => !cancelSubmitting && (setCancelModalOpen(false), setCancellingCheckIn(null))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">
+                Keep reservation
+              </button>
+              <button type="button" onClick={handleCancelConfirm} disabled={cancelSubmitting} className="flex-1 py-2.5 bg-red-800/80 text-red-100 font-semibold rounded-lg hover:bg-red-700/80 disabled:opacity-50 flex items-center justify-center gap-2">
+                {cancelSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Yes, cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
