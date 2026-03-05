@@ -47,7 +47,8 @@ export function AddToCartButton({
         typeof window !== "undefined" &&
         !sessionStorage.getItem(VIP_UPSELL_DISMISS_KEY);
       if (showVipUpsell) {
-        openVipUpsell();
+        // Defer so any RSC revalidation triggered by cookie-setting completes first (avoids "Server Components render" error on Dirt Fest).
+        setTimeout(() => openVipUpsell(), 150);
       } else {
         openDrawer();
       }

@@ -16,25 +16,38 @@ export const metadata: Metadata = {
 };
 
 export default async function EventsPage() {
-  let events: Awaited<ReturnType<typeof getEventProducts>> = [];
   try {
-    events = await getEventProducts();
+    let events: Awaited<ReturnType<typeof getEventProducts>> = [];
+    try {
+      events = await getEventProducts();
+    } catch {
+      events = [];
+    }
+
+    const cookieStore = await cookies();
+    const token = cookieStore.get("member_session")?.value;
+    const session = token ? await verifySessionToken(token) : null;
+    const isMemberLoggedIn = !!session;
+
+    return (
+      <>
+        <Navbar />
+        <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
+          <EventsPageContent events={events} isMemberLoggedIn={isMemberLoggedIn} />
+        </main>
+        <Footer />
+      </>
+    );
   } catch {
-    events = [];
+    // Defensive: if anything throws during render (e.g. revalidation after add-to-cart cookie), show page without crashing.
+    return (
+      <>
+        <Navbar />
+        <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
+          <EventsPageContent events={[]} isMemberLoggedIn={false} />
+        </main>
+        <Footer />
+      </>
+    );
   }
-
-  const cookieStore = await cookies();
-  const token = cookieStore.get("member_session")?.value;
-  const session = token ? await verifySessionToken(token) : null;
-  const isMemberLoggedIn = !!session;
-
-  return (
-    <>
-      <Navbar />
-      <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
-        <EventsPageContent events={events} isMemberLoggedIn={isMemberLoggedIn} />
-      </main>
-      <Footer />
-    </>
-  );
 }
