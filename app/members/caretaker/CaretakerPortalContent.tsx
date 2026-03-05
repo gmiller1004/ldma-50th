@@ -43,7 +43,7 @@ export function CaretakerPortalContent({
   const [archivedCheckIns, setArchivedCheckIns] = useState<CheckIn[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [checkInModalOpen, setCheckInModalOpen] = useState(false);
-  const [nights, setNights] = useState(1);
+  const [nightsInput, setNightsInput] = useState("1");
   const [checkInSubmitting, setCheckInSubmitting] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingCheckIn, setEditingCheckIn] = useState<CheckIn | null>(null);
@@ -96,7 +96,8 @@ export function CaretakerPortalContent({
 
   async function handleCheckInSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!lookupResult || nights < 1) return;
+    const nights = Math.max(1, Math.min(365, parseInt(nightsInput, 10) || 1));
+    if (!lookupResult) return;
     setCheckInSubmitting(true);
     try {
       const res = await fetch("/api/members/caretaker/check-ins", {
@@ -106,7 +107,7 @@ export function CaretakerPortalContent({
           memberContactId: lookupResult.contactId,
           memberNumber: lookupResult.memberNumber,
           memberDisplayName: lookupResult.displayName,
-          nights: Math.max(1, Math.min(365, nights)),
+          nights,
         }),
       });
       if (!res.ok) {
@@ -115,7 +116,7 @@ export function CaretakerPortalContent({
         return;
       }
       setCheckInModalOpen(false);
-      setNights(1);
+      setNightsInput("1");
       loadCheckIns();
     } catch {
       setLookupError("Check-in failed");
@@ -193,11 +194,23 @@ export function CaretakerPortalContent({
                 <span className="font-medium text-[#e8e0d5]">{lookupResult.displayName}</span>
                 <span className="text-[#e8e0d5]/60">#{lookupResult.memberNumber}</span>
               </div>
-              {lookupResult.isLdmaMember && (
-                <span className="px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm font-medium">
-                  LDMA Member
-                </span>
-              )}
+              <span
+                className={
+                  lookupResult.isLdmaMember
+                    ? "px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm font-medium"
+                    : "px-2 py-0.5 rounded bg-[#4a3a0f] text-[#e8c547] text-sm font-medium"
+                }
+              >
+                {lookupResult.isLdmaMember ? "LDMA Member" : "No Valid Membership Found"}
+              </span>
+              <button
+                type="button"
+                onClick={() => { setLookupResult(null); setLookupError(null); }}
+                className="ml-auto p-1.5 text-[#e8e0d5]/60 hover:text-[#e8e0d5] rounded"
+                aria-label="Close lookup"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
             <dl className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
               <div>
@@ -215,7 +228,7 @@ export function CaretakerPortalContent({
             </dl>
             <button
               type="button"
-              onClick={() => setCheckInModalOpen(true)}
+              onClick={() => { setNightsInput("1"); setCheckInModalOpen(true); }}
               className="mt-3 px-4 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f]"
             >
               Check in member
@@ -312,8 +325,8 @@ export function CaretakerPortalContent({
                 type="number"
                 min={1}
                 max={365}
-                value={nights}
-                onChange={(e) => setNights(parseInt(e.target.value, 10) || 1)}
+                value={nightsInput}
+                onChange={(e) => setNightsInput(e.target.value)}
                 className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-4"
               />
               <div className="flex gap-2">

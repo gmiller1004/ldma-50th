@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCaretakerContext } from "@/lib/caretaker-auth";
 import { lookupMember } from "@/lib/salesforce";
-import { formatMemberDisplayName } from "@/lib/community-auth";
 
 /**
  * POST /api/members/caretaker/lookup
@@ -34,12 +33,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const displayName = formatMemberDisplayName(member.firstName, member.lastName);
+  const displayName = [member.firstName, member.lastName].filter(Boolean).join(" ").trim() || "LDMA Member";
 
   return NextResponse.json({
     contactId: member.contactId,
     memberNumber,
-    displayName: displayName || "LDMA Member",
+    displayName,
     isLdmaMember: member.active === true,
     maintenanceFeesDue: member.duesOwed ?? null,
     membershipDuesOwed: member.membershipDuesOwed ?? null,

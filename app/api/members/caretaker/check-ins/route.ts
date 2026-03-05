@@ -3,6 +3,8 @@ import { getCaretakerContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { awardPointsForCaretakerCheckIn } from "@/lib/rewards";
 import { getValidCampSlugs } from "@/lib/caretaker-camps";
+import { lookupMember } from "@/lib/salesforce";
+import { sendCaretakerCheckInWelcomeEmail } from "@/lib/sendgrid";
 
 type CheckInRow = {
   id: string;
@@ -153,6 +155,22 @@ export async function POST(request: NextRequest) {
   awardPointsForCaretakerCheckIn(memberContactId, nights, row.id).catch((e) =>
     console.error("[caretaker] award points failed:", e)
   );
+
+  // Send welcome email (fire-and-forget)
+  lookupMember(memberNumber)
+    .then((member) => {
+      const email = member.valid && member.email && member.email.trim() ? member.email.trim() : null;
+      if (!email) return;
+      const displayName = memberDisplayName || `#${memberNumber}`;
+      return sendCaretakerCheckInWelcomeEmail(
+        email,
+        caretaker.campName,
+        displayName,
+        checkInDateStr,
+        checkOutDateStr
+      );
+    })
+    .catch((e) => console.error("[caretaker] welcome email lookup/send failed:", e));
 
   return NextResponse.json(rowToJson(row), { status: 201 });
 }

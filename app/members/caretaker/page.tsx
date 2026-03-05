@@ -21,11 +21,10 @@ export default async function CaretakerPortalPage() {
       />
       <MembersNav />
       <h1 className="font-serif text-3xl font-semibold text-[#f0d48f] mb-2">
-        Caretaker Portal
+        Caretaker Portal: {caretaker.campName}
       </h1>
       <p className="text-[#e8e0d5]/70 mb-8">
-        You are the caretaker at <strong>{caretaker.campName}</strong>. Look up members to verify
-        membership and check them in.
+        Look up members to verify membership and check them in.
       </p>
       <CaretakerPortalContent campSlug={caretaker.campSlug} campName={caretaker.campName} />
     </>
