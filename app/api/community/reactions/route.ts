@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { toggleReaction, getUserReaction, type ReactionTarget } from "@/lib/community";
 import { getAuthenticatedMemberForPost } from "@/lib/community-auth";
+import { awardPointsForReaction } from "@/lib/rewards";
 
 export async function POST(request: NextRequest) {
   const member = await getAuthenticatedMemberForPost();
@@ -33,6 +34,10 @@ export async function POST(request: NextRequest) {
     member.contactId,
     reaction_type as "up" | "down"
   );
+
+  if (result.user_reaction === "up" && member.contactId) {
+    awardPointsForReaction(member.contactId, target_type as "discussion" | "comment", String(target_id)).catch(() => {});
+  }
 
   return NextResponse.json(result);
 }

@@ -36,6 +36,8 @@ const COPY_ORDER = [
   "member_avatars",
   "member_notification_preferences",
   "member_shopify_tokens",
+  "member_rewards",
+  "member_point_transactions",
   "oauth_state",
 ];
 

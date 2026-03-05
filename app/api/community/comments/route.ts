@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCommentsByDiscussion, createComment } from "@/lib/community";
 import { getAuthenticatedMemberForPost } from "@/lib/community-auth";
+import { awardPointsForNewComment } from "@/lib/rewards";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -50,6 +51,10 @@ export async function POST(request: NextRequest) {
       { error: "Database not configured or insert failed" },
       { status: 500 }
     );
+  }
+
+  if (member.contactId) {
+    awardPointsForNewComment(member.contactId, result.id).catch(() => {});
   }
 
   return NextResponse.json({ id: result.id });

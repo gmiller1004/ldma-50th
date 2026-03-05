@@ -9,6 +9,7 @@ import {
 import { getValidCampSlugs } from "@/lib/directory-camps";
 import { getAuthenticatedMemberForPost } from "@/lib/community-auth";
 import { getClaimBySlug } from "@/lib/claims";
+import { awardPointsForNewDiscussion } from "@/lib/rewards";
 
 const MAX_PHOTO_SIZE = 4 * 1024 * 1024; // 4MB per photo
 const MAX_PHOTOS = 5;
@@ -152,6 +153,13 @@ export async function POST(request: NextRequest) {
       console.error("Photo upload error:", e);
       // Continue - discussion was created; photos are best-effort
     }
+  }
+
+  if (member.contactId) {
+    awardPointsForNewDiscussion(member.contactId, result.id, {
+      hasPhotos: photoFiles.length > 0,
+      hasVideo: false,
+    }).catch(() => {});
   }
 
   return NextResponse.json({ id: result.id });
