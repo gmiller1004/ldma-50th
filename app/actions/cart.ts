@@ -58,13 +58,19 @@ async function syncCartToMailchimp(cartId: string, mailchimpEid: string) {
   }
 }
 
+/** True if the error means the cart ID is invalid (expired, completed, or deleted). */
+function isCartNotFoundError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /cart does not exist|cart not found|invalid cart/i.test(msg);
+}
+
 export async function addToCart(
   variantId: string,
   sellingPlanId?: string,
   quantity: number = 1
 ) {
   const cookieStore = await cookies();
-  const existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
+  let existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
   const mailchimpEid = cookieStore.get(MAILCHIMP_EID_COOKIE)?.value;
   const line = {
     merchandiseId: variantId,
@@ -76,9 +82,26 @@ export async function addToCart(
   let cartId: string | undefined;
 
   if (existingCartId) {
-    const result = await addLinesToExistingCart(existingCartId, [line]);
-    checkoutUrl = result.checkoutUrl;
-    cartId = existingCartId;
+    try {
+      const result = await addLinesToExistingCart(existingCartId, [line]);
+      checkoutUrl = result.checkoutUrl;
+      cartId = existingCartId;
+    } catch (e) {
+      if (isCartNotFoundError(e)) {
+        const result = await createCartAndAddLines([line]);
+        checkoutUrl = result.checkoutUrl;
+        cartId = result.cartId;
+        if (result.cartId) {
+          cookieStore.set(CART_ID_COOKIE, result.cartId, {
+            path: "/",
+            maxAge: 60 * 60 * 24 * 30, // 30 days
+            sameSite: "lax",
+          });
+        }
+      } else {
+        throw e;
+      }
+    }
   } else {
     const result = await createCartAndAddLines([line]);
     checkoutUrl = result.checkoutUrl;
