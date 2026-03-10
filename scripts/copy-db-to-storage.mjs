@@ -39,6 +39,7 @@ const COPY_ORDER = [
   "member_rewards",
   "member_point_transactions",
   "caretaker_check_ins",
+  "caretaker_guest_check_ins",
   "oauth_state",
 ];
 

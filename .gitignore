@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 
+# addendum (HTML/PDF — do not commit)
+/addendum/
+/LDMA Addendum*.pdf
+
 # debug
 npm-debug.log*
 yarn-debug.log*

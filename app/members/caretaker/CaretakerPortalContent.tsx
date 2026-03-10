@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Loader2, Calendar, User, X } from "lucide-react";
+import { Search, Loader2, Calendar, User, UserPlus, X } from "lucide-react";
 
 type LookupResult = {
   contactId: string;
@@ -21,6 +21,17 @@ type CheckIn = {
   checkOutDate: string;
   nights: number;
   pointsAwarded: number;
+};
+
+type GuestCheckIn = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  checkInDate: string;
+  checkOutDate: string;
+  nights: number;
 };
 
 function formatCurrency(val: number | null | undefined): string {
@@ -53,15 +64,38 @@ export function CaretakerPortalContent({
   const [cancellingCheckIn, setCancellingCheckIn] = useState<CheckIn | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
+  // Guest check-in
+  const [activeGuestCheckIns, setActiveGuestCheckIns] = useState<GuestCheckIn[]>([]);
+  const [archivedGuestCheckIns, setArchivedGuestCheckIns] = useState<GuestCheckIn[]>([]);
+  const [guestCheckInModalOpen, setGuestCheckInModalOpen] = useState(false);
+  const [guestFirstName, setGuestFirstName] = useState("");
+  const [guestLastName, setGuestLastName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestNightsInput, setGuestNightsInput] = useState("1");
+  const [guestCheckInSubmitting, setGuestCheckInSubmitting] = useState(false);
+  const [guestError, setGuestError] = useState<string | null>(null);
+  const [editingGuestCheckIn, setEditingGuestCheckIn] = useState<GuestCheckIn | null>(null);
+  const [guestEditModalOpen, setGuestEditModalOpen] = useState(false);
+  const [newGuestCheckOutDate, setNewGuestCheckOutDate] = useState("");
+  const [guestEditSubmitting, setGuestEditSubmitting] = useState(false);
+  const [cancellingGuestCheckIn, setCancellingGuestCheckIn] = useState<GuestCheckIn | null>(null);
+  const [guestCancelModalOpen, setGuestCancelModalOpen] = useState(false);
+  const [guestCancelSubmitting, setGuestCancelSubmitting] = useState(false);
+
   function loadCheckIns() {
     setListLoading(true);
     Promise.all([
       fetch("/api/members/caretaker/check-ins?status=active").then((r) => r.json()),
       fetch("/api/members/caretaker/check-ins?status=archived").then((r) => r.json()),
+      fetch("/api/members/caretaker/guest-check-ins?status=active").then((r) => r.json()),
+      fetch("/api/members/caretaker/guest-check-ins?status=archived").then((r) => r.json()),
     ])
-      .then(([activeRes, archivedRes]) => {
+      .then(([activeRes, archivedRes, guestActiveRes, guestArchivedRes]) => {
         setActiveCheckIns(activeRes.checkIns ?? []);
         setArchivedCheckIns(archivedRes.checkIns ?? []);
+        setActiveGuestCheckIns(guestActiveRes.checkIns ?? []);
+        setArchivedGuestCheckIns(guestArchivedRes.checkIns ?? []);
       })
       .catch(() => {})
       .finally(() => setListLoading(false));
@@ -187,6 +221,112 @@ export function CaretakerPortalContent({
     }
   }
 
+  async function handleGuestCheckInSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const firstName = guestFirstName.trim();
+    const lastName = guestLastName.trim();
+    const email = guestEmail.trim();
+    if (!firstName || !lastName || !email) {
+      setGuestError("First name, last name, and email are required");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setGuestError("Please enter a valid email address");
+      return;
+    }
+    const nights = Math.max(1, Math.min(365, parseInt(guestNightsInput, 10) || 1));
+    setGuestError(null);
+    setGuestCheckInSubmitting(true);
+    try {
+      const res = await fetch("/api/members/caretaker/guest-check-ins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email,
+          phone: guestPhone.trim() || undefined,
+          nights,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setGuestError(data.error ?? "Check-in failed");
+        return;
+      }
+      setGuestCheckInModalOpen(false);
+      setGuestFirstName("");
+      setGuestLastName("");
+      setGuestEmail("");
+      setGuestPhone("");
+      setGuestNightsInput("1");
+      loadCheckIns();
+    } catch {
+      setGuestError("Check-in failed");
+    } finally {
+      setGuestCheckInSubmitting(false);
+    }
+  }
+
+  function openGuestEditModal(guest: GuestCheckIn) {
+    setEditingGuestCheckIn(guest);
+    setNewGuestCheckOutDate(guest.checkOutDate);
+    setGuestEditModalOpen(true);
+  }
+
+  function openGuestCancelModal(guest: GuestCheckIn) {
+    setCancellingGuestCheckIn(guest);
+    setGuestCancelModalOpen(true);
+  }
+
+  async function handleGuestEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingGuestCheckIn || !newGuestCheckOutDate) return;
+    setGuestEditSubmitting(true);
+    try {
+      const res = await fetch(`/api/members/caretaker/guest-check-ins/${editingGuestCheckIn.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checkOutDate: newGuestCheckOutDate }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error ?? "Update failed");
+        return;
+      }
+      setGuestEditModalOpen(false);
+      setEditingGuestCheckIn(null);
+      loadCheckIns();
+    } catch {
+      alert("Update failed");
+    } finally {
+      setGuestEditSubmitting(false);
+    }
+  }
+
+  async function handleGuestCancelConfirm() {
+    if (!cancellingGuestCheckIn) return;
+    setGuestCancelSubmitting(true);
+    try {
+      const res = await fetch(`/api/members/caretaker/guest-check-ins/${cancellingGuestCheckIn.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setGuestError(data.error ?? "Cancel failed");
+        return;
+      }
+      setGuestCancelModalOpen(false);
+      setCancellingGuestCheckIn(null);
+      setGuestError(null);
+      loadCheckIns();
+    } catch {
+      setGuestError("Cancel failed");
+    } finally {
+      setGuestCancelSubmitting(false);
+    }
+  }
+
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -264,11 +404,29 @@ export function CaretakerPortalContent({
         )}
       </section>
 
+      {/* Check in guest */}
+      <section className="p-4 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg">
+        <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
+          <UserPlus className="w-5 h-5" />
+          Check in guest
+        </h2>
+        <p className="text-[#e8e0d5]/80 text-sm mb-3">
+          Guest check-in bypasses member lookup. Capture name, email, and phone for marketing; a separate welcome email is sent.
+        </p>
+        <button
+          type="button"
+          onClick={() => { setGuestError(null); setGuestCheckInModalOpen(true); }}
+          className="px-4 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f]"
+        >
+          Check in guest
+        </button>
+      </section>
+
       {/* Active check-ins */}
       <section>
         <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
           <Calendar className="w-5 h-5" />
-          Active check-ins
+          Active member check-ins
         </h2>
         {listLoading ? (
           <p className="text-[#e8e0d5]/60">Loading…</p>
@@ -315,9 +473,60 @@ export function CaretakerPortalContent({
         )}
       </section>
 
+      {/* Active guest check-ins */}
+      <section>
+        <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
+          <UserPlus className="w-5 h-5" />
+          Active guest check-ins
+        </h2>
+        {listLoading ? (
+          <p className="text-[#e8e0d5]/60">Loading…</p>
+        ) : activeGuestCheckIns.length === 0 ? (
+          <p className="text-[#e8e0d5]/60">No active guest check-ins.</p>
+        ) : (
+          <ul className="space-y-2">
+            {activeGuestCheckIns.map((c) => (
+              <li
+                key={c.id}
+                className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg"
+              >
+                <div>
+                  <span className="font-medium text-[#e8e0d5]">
+                    {c.firstName} {c.lastName}
+                  </span>
+                  <span className="text-[#e8e0d5]/60 ml-2">{c.email}</span>
+                  {c.phone ? <span className="text-[#e8e0d5]/50 ml-2 text-sm">{c.phone}</span> : null}
+                </div>
+                <div className="flex items-center gap-4 text-sm text-[#e8e0d5]/80">
+                  <span>Check-in: {c.checkInDate}</span>
+                  <span>Check-out: {c.checkOutDate}</span>
+                  <span>{c.nights} night{c.nights !== 1 ? "s" : ""}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openGuestEditModal(c)}
+                    className="px-3 py-1.5 text-sm bg-[#d4af37]/20 text-[#d4af37] rounded hover:bg-[#d4af37]/30"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openGuestCancelModal(c)}
+                    className="px-3 py-1.5 text-sm bg-red-950/50 text-red-300 rounded hover:bg-red-900/40 border border-red-800/50"
+                  >
+                    Cancel reservation
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       {/* Archived check-ins */}
       <section>
-        <h2 className="font-semibold text-[#e8e0d5]/80 mb-3">Archived check-ins</h2>
+        <h2 className="font-semibold text-[#e8e0d5]/80 mb-3">Archived member check-ins</h2>
         {listLoading ? null : archivedCheckIns.length === 0 ? (
           <p className="text-[#e8e0d5]/60">No archived check-ins.</p>
         ) : (
@@ -335,6 +544,32 @@ export function CaretakerPortalContent({
                   <span>{c.checkInDate} – {c.checkOutDate}</span>
                   <span>{c.nights} night{c.nights !== 1 ? "s" : ""}</span>
                   <span>{c.pointsAwarded} pts</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Archived guest check-ins */}
+      <section>
+        <h2 className="font-semibold text-[#e8e0d5]/80 mb-3">Archived guest check-ins</h2>
+        {listLoading ? null : archivedGuestCheckIns.length === 0 ? (
+          <p className="text-[#e8e0d5]/60">No archived guest check-ins.</p>
+        ) : (
+          <ul className="space-y-2">
+            {archivedGuestCheckIns.map((c) => (
+              <li
+                key={c.id}
+                className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/40 border border-[#d4af37]/10 rounded-lg text-[#e8e0d5]/80"
+              >
+                <div>
+                  <span className="font-medium">{c.firstName} {c.lastName}</span>
+                  <span className="ml-2 opacity-70">{c.email}</span>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <span>{c.checkInDate} – {c.checkOutDate}</span>
+                  <span>{c.nights} night{c.nights !== 1 ? "s" : ""}</span>
                 </div>
               </li>
             ))}
@@ -434,6 +669,145 @@ export function CaretakerPortalContent({
                 </button>
                 <button type="submit" disabled={editSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
                   {editSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Guest check-in modal */}
+      {guestCheckInModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setGuestCheckInModalOpen(false)}>
+          <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-[#f0d48f]">Check in guest</h3>
+              <button type="button" onClick={() => setGuestCheckInModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {guestError && <p className="mb-3 text-red-400 text-sm">{guestError}</p>}
+            <form onSubmit={handleGuestCheckInSubmit} className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-[#e8e0d5] mb-1">First name *</label>
+                <input
+                  type="text"
+                  value={guestFirstName}
+                  onChange={(e) => setGuestFirstName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Last name *</label>
+                <input
+                  type="text"
+                  value={guestLastName}
+                  onChange={(e) => setGuestLastName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Phone (optional)</label>
+                <input
+                  type="tel"
+                  value={guestPhone}
+                  onChange={(e) => setGuestPhone(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Nights</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={guestNightsInput}
+                  onChange={(e) => setGuestNightsInput(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setGuestCheckInModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">
+                  Cancel
+                </button>
+                <button type="submit" disabled={guestCheckInSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
+                  {guestCheckInSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Check in guest
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Guest cancel reservation modal */}
+      {guestCancelModalOpen && cancellingGuestCheckIn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !guestCancelSubmitting && (setGuestCancelModalOpen(false), setCancellingGuestCheckIn(null))}>
+          <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-[#f0d48f]">Cancel guest reservation</h3>
+              <button type="button" onClick={() => !guestCancelSubmitting && (setGuestCancelModalOpen(false), setCancellingGuestCheckIn(null))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-[#e8e0d5]/90 text-sm mb-4">
+              Cancel this reservation for {cancellingGuestCheckIn.firstName} {cancellingGuestCheckIn.lastName}? The reservation will move to archives.
+            </p>
+            {guestError && <p className="mb-2 text-red-400 text-sm">{guestError}</p>}
+            <div className="flex gap-2">
+              <button type="button" onClick={() => !guestCancelSubmitting && (setGuestCancelModalOpen(false), setCancellingGuestCheckIn(null))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">
+                Keep reservation
+              </button>
+              <button type="button" onClick={handleGuestCancelConfirm} disabled={guestCancelSubmitting} className="flex-1 py-2.5 bg-red-800/80 text-red-100 font-semibold rounded-lg hover:bg-red-700/80 disabled:opacity-50 flex items-center justify-center gap-2">
+                {guestCancelSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Yes, cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Guest edit checkout modal */}
+      {guestEditModalOpen && editingGuestCheckIn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setGuestEditModalOpen(false)}>
+          <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-[#f0d48f]">Edit guest checkout date</h3>
+              <button type="button" onClick={() => setGuestEditModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-[#e8e0d5]/80 text-sm mb-4">
+              {editingGuestCheckIn.firstName} {editingGuestCheckIn.lastName}
+            </p>
+            <form onSubmit={handleGuestEditSubmit}>
+              <label className="block text-sm font-medium text-[#e8e0d5] mb-2">New checkout date</label>
+              <input
+                type="date"
+                min={editingGuestCheckIn.checkInDate}
+                value={newGuestCheckOutDate}
+                onChange={(e) => setNewGuestCheckOutDate(e.target.value)}
+                className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-4"
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setGuestEditModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">
+                  Cancel
+                </button>
+                <button type="submit" disabled={guestEditSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
+                  {guestEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   Save
                 </button>
               </div>

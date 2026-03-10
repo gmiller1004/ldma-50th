@@ -284,6 +284,102 @@ Lost Dutchman's Mining Association`;
   }
 }
 
+/**
+ * Send welcome email when a guest (non-member) is checked in at a caretaker camp.
+ * Includes CTA to /memberships for membership exploration.
+ */
+export async function sendCaretakerGuestCheckInWelcomeEmail(
+  to: string,
+  campName: string,
+  guestFirstName: string,
+  checkInDate: string,
+  checkOutDate: string,
+  baseUrl: string
+): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV] Caretaker guest welcome email for ${to}: ${campName}, ${checkInDate}–${checkOutDate}`);
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping caretaker guest welcome email");
+    return false;
+  }
+
+  sgMail.setApiKey(apiKey);
+
+  const name = guestFirstName?.trim() || "there";
+  const membershipsUrl = `${baseUrl.replace(/\/$/, "")}/memberships`;
+
+  const textContent = `Welcome to ${campName}!
+
+Hi ${name},
+
+You're checked in as our guest from ${checkInDate} to ${checkOutDate}. If you need anything during your stay, please stop by the caretaker or camp office—we're here to help.
+
+Save on site fees and access LDMA exclusive claims. Explore LDMA membership: ${membershipsUrl}
+
+We're glad you're here. Enjoy your time at camp!
+
+Lost Dutchman's Mining Association`;
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #1a120b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #1a120b; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #2a1f14; border-radius: 8px; border: 1px solid #d4af3740; overflow: hidden;">
+          <tr>
+            <td style="padding: 32px 24px; text-align: center; border-bottom: 1px solid #d4af3720;">
+              <h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #f0d48f; letter-spacing: 0.05em;">LDMA</h1>
+              <p style="margin: 8px 0 0; font-size: 14px; color: #e8e0d5b3;">Welcome to ${escapeHtml(campName)} — you're our guest</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 24px;">
+              <p style="margin: 0 0 16px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">Hi ${escapeHtml(name)},</p>
+              <p style="margin: 0 0 16px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">You're checked in as our guest from <strong>${escapeHtml(checkInDate)}</strong> to <strong>${escapeHtml(checkOutDate)}</strong>. If you need anything during your stay, please stop by the caretaker or camp office—we're here to help.</p>
+              <p style="margin: 0 0 24px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">Save on site fees and access LDMA exclusive claims. Explore LDMA membership:</p>
+              <p style="margin: 0 0 24px; text-align: center;">
+                <a href="${escapeHtml(membershipsUrl)}" style="display: inline-block; padding: 14px 24px; background-color: #d4af37; color: #1a120b; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 8px;">Explore LDMA Membership</a>
+              </p>
+              <p style="margin: 0; font-size: 16px; color: #e8e0d5; line-height: 1.5;">We're glad you're here. Enjoy your time at camp!</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 24px; background-color: #1a120b; border-top: 1px solid #d4af3720;">
+              <p style="margin: 0; font-size: 12px; color: #e8e0d560;">Lost Dutchman's Mining Association &bull; 1976–2026</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+
+  try {
+    await sgMail.send({
+      to,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `Welcome to ${campName} — you're checked in as our guest`,
+      text: textContent,
+      html: htmlContent,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid caretaker guest welcome email error:", e);
+    return false;
+  }
+}
+
 const EXCLUSIVE_OFFERS_COLLECTION_URL = "/collections/exclusive-offers-for-ldma-members";
 
 export type ExclusiveOfferProduct = { id: string; title: string; handle: string };
