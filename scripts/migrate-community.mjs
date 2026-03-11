@@ -36,6 +36,7 @@ const migrations = [
   "seed-stanton-claims.sql",
   "migrate-camp-sites.sql",
   "migrate-camp-reservations.sql",
+  "migrate-camp-reservations-event.sql",
   "migrate-camp-payments.sql",
 ];
 

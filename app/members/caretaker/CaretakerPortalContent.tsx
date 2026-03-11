@@ -15,7 +15,8 @@ import {
   isSameDay,
   getDay,
 } from "date-fns";
-import { campUsesReservations } from "@/lib/reservation-camps";
+import { campUsesReservations, isHookupSiteType } from "@/lib/reservation-camps";
+import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
 import { computeReservationTotalCents, formatCentsAsCurrency } from "@/lib/reservation-pricing";
 import { ReservationCalendarView } from "@/app/members/caretaker/ReservationCalendarView";
 
@@ -77,6 +78,8 @@ type Reservation = {
   guestPhone: string | null;
   status: string;
   checkedInAt: string | null;
+  eventProductHandle?: string | null;
+  eventSiteType?: string | null;
 };
 
 function formatCurrency(val: number | null | undefined): string {
@@ -326,6 +329,9 @@ export function CaretakerPortalContent({
   const [resPastDueMaintenanceCents, setResPastDueMaintenanceCents] = useState<number>(0);
   const [resPastDueMembershipCents, setResPastDueMembershipCents] = useState<number>(0);
   const [resPastDueSubmitting, setResPastDueSubmitting] = useState(false);
+  const [resEventParticipant, setResEventParticipant] = useState(false);
+  const [resEventProductHandle, setResEventProductHandle] = useState("");
+  const [resEventSiteType, setResEventSiteType] = useState<"" | "included_dry" | "upgrade_hookup">("");
   const [resViewMode, setResViewMode] = useState<"list" | "calendar">("list");
   const [resCalendarStart, setResCalendarStart] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -449,6 +455,23 @@ export function CaretakerPortalContent({
       : 0;
   const resCheckInIsToday = resCheckInDate === today;
 
+  const resEventIncludedDry = resEventParticipant && resEventSiteType === "included_dry";
+  const resEventUpgradeHookup = resEventParticipant && resEventSiteType === "upgrade_hookup";
+  const availableSitesForDropdown = sites.filter((s) => {
+    if (!availableSiteIds.includes(s.id)) return false;
+    if (!resEventParticipant || !resEventSiteType) return true;
+    if (resEventSiteType === "included_dry") return !isHookupSiteType(s.siteType);
+    if (resEventSiteType === "upgrade_hookup") return isHookupSiteType(s.siteType);
+    return true;
+  });
+  const resSiteIdValidForEvent = !resSiteId || availableSitesForDropdown.some((s) => s.id === resSiteId);
+
+  useEffect(() => {
+    if (resSiteId && !availableSitesForDropdown.some((s) => s.id === resSiteId)) {
+      setResSiteId("");
+    }
+  }, [resSiteId, availableSitesForDropdown]);
+
   async function handleCreateReservationCash(e: React.FormEvent) {
     e.preventDefault();
     if (!resSiteId || !resCheckInDate || !resCheckOutDate) {
@@ -469,6 +492,10 @@ export function CaretakerPortalContent({
         setResError("Enter guest first name, last name, and valid email");
         return;
       }
+    }
+    if (resEventUpgradeHookup && !resEventProductHandle.trim()) {
+      setResError("Select an event for upgrade reservation");
+      return;
     }
     if (resTotalCents < 1) {
       setResError("Invalid total");
@@ -497,6 +524,10 @@ export function CaretakerPortalContent({
         body.guestEmail = resGuestEmail.trim();
         body.guestPhone = resGuestPhone.trim() || undefined;
       }
+      if (resEventUpgradeHookup && resEventProductHandle.trim()) {
+        body.eventProductHandle = resEventProductHandle.trim();
+        body.eventSiteType = "upgrade_hookup";
+      }
       const res = await fetch("/api/members/caretaker/reservations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -515,6 +546,11 @@ export function CaretakerPortalContent({
       setResGuestLastName("");
       setResGuestEmail("");
       setResGuestPhone("");
+      if (resEventUpgradeHookup) {
+        setResEventParticipant(false);
+        setResEventProductHandle("");
+        setResEventSiteType("");
+      }
       loadReservations();
     } catch {
       setResError("Failed to create reservation");
@@ -544,6 +580,10 @@ export function CaretakerPortalContent({
         return;
       }
     }
+    if (resEventUpgradeHookup && !resEventProductHandle.trim()) {
+      setResError("Select an event for upgrade reservation");
+      return;
+    }
     if (resTotalCents < 1) {
       setResError("Invalid total");
       return;
@@ -572,6 +612,10 @@ export function CaretakerPortalContent({
         checkoutBody.guestEmail = resGuestEmail.trim();
         checkoutBody.guestPhone = resGuestPhone.trim() || undefined;
       }
+      if (resEventUpgradeHookup && resEventProductHandle.trim()) {
+        checkoutBody.eventProductHandle = resEventProductHandle.trim();
+        checkoutBody.eventSiteType = "upgrade_hookup";
+      }
       const res = await fetch("/api/members/caretaker/payments/checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -589,6 +633,73 @@ export function CaretakerPortalContent({
       setResError("No checkout URL returned");
     } catch {
       setResError("Failed to start checkout");
+    } finally {
+      setResSubmitting(false);
+    }
+  }
+
+  async function handleCreateEventIncludedReservation(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resEventIncludedDry || !resEventProductHandle.trim() || !resSiteId || !resCheckInDate || !resCheckOutDate) {
+      setResError("Select event, site, and dates");
+      return;
+    }
+    if (resType === "member") {
+      if (!resMemberLookup) {
+        setResError("Look up member first");
+        return;
+      }
+    } else {
+      if (!resGuestFirstName.trim() || !resGuestLastName.trim() || !resGuestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resGuestEmail.trim())) {
+        setResError("Enter guest first name, last name, and valid email");
+        return;
+      }
+    }
+    setResError(null);
+    setResSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {
+        siteId: resSiteId,
+        checkInDate: resCheckInDate,
+        checkOutDate: resCheckOutDate,
+        type: resType,
+        eventProductHandle: resEventProductHandle.trim(),
+        eventSiteType: "included_dry",
+      };
+      if (resType === "member" && resMemberLookup) {
+        body.memberContactId = resMemberLookup.contactId;
+        body.memberNumber = resMemberLookup.memberNumber;
+        body.memberDisplayName = resMemberLookup.displayName;
+      } else {
+        body.guestFirstName = resGuestFirstName.trim();
+        body.guestLastName = resGuestLastName.trim();
+        body.guestEmail = resGuestEmail.trim();
+        body.guestPhone = resGuestPhone.trim() || undefined;
+      }
+      const res = await fetch("/api/members/caretaker/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResError(data.error ?? "Failed to create event reservation");
+        return;
+      }
+      setCreateResModalOpen(false);
+      setResSiteId("");
+      setResMemberLookup(null);
+      setResMemberNumber("");
+      setResGuestFirstName("");
+      setResGuestLastName("");
+      setResGuestEmail("");
+      setResGuestPhone("");
+      setResEventParticipant(false);
+      setResEventProductHandle("");
+      setResEventSiteType("");
+      loadReservations();
+    } catch {
+      setResError("Failed to create event reservation");
     } finally {
       setResSubmitting(false);
     }
@@ -1331,6 +1442,7 @@ export function CaretakerPortalContent({
                     <span className="font-medium text-[#e8e0d5]">
                       {r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}
                     </span>
+                    {r.eventProductHandle ? <span className="text-xs px-1.5 py-0.5 rounded bg-[#d4af37]/20 text-[#f0d48f]">Event{r.eventSiteType === "upgrade_hookup" ? " (hookup)" : ""}</span> : null}
                     <ReservationDateRange checkInDate={r.checkInDate} checkOutDate={r.checkOutDate} nights={r.nights} />
                     {r.checkedInAt ? (
                       <span className="ml-1 px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm">Checked in</span>
@@ -1372,7 +1484,10 @@ export function CaretakerPortalContent({
             <ul className="space-y-2">
               {archivedReservations.map((r) => (
                 <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/40 border border-[#d4af37]/10 rounded-lg text-[#e8e0d5]/80">
-                  <span>{r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}</span>
+                  <span>
+                    {r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}
+                    {r.eventProductHandle ? <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#d4af37]/20 text-[#f0d48f]">Event{r.eventSiteType === "upgrade_hookup" ? " (hookup)" : ""}</span> : null}
+                  </span>
                   <span className="text-sm">{r.checkInDate} – {r.checkOutDate}</span>
                 </li>
               ))}
@@ -1403,12 +1518,49 @@ export function CaretakerPortalContent({
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Site *</label>
                   <select value={resSiteId} onChange={(e) => setResSiteId(e.target.value)} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required>
                     <option value="">Select site</option>
-                    {sites.filter((s) => availableSiteIds.includes(s.id)).map((s) => (
+                    {availableSitesForDropdown.map((s) => (
                       <option key={s.id} value={s.id}>{s.name} ({s.siteType})</option>
                     ))}
                   </select>
                   {resCheckInDate && resCheckOutDate && resCheckInDate < resCheckOutDate && availableSiteIds.length === 0 && (
                     <p className="text-amber-400 text-sm mt-1">No sites available for these dates.</p>
+                  )}
+                  {resEventParticipant && resEventSiteType && availableSitesForDropdown.length === 0 && availableSiteIds.length > 0 && (
+                    <p className="text-amber-400 text-sm mt-1">
+                      No {resEventSiteType === "included_dry" ? "dry" : "hookup"} sites available for these dates.
+                    </p>
+                  )}
+                </div>
+                <div className="pt-2 border-t border-[#d4af37]/20">
+                  <label className="flex items-center gap-2 cursor-pointer mb-2">
+                    <input type="checkbox" checked={resEventParticipant} onChange={(e) => { setResEventParticipant(e.target.checked); if (!e.target.checked) { setResEventProductHandle(""); setResEventSiteType(""); } setResError(null); }} />
+                    <span className="text-[#e8e0d5] font-medium">Event participant (e.g. Dirt Fest — free dry site or hookup upgrade)</span>
+                  </label>
+                  {resEventParticipant && (
+                    <div className="ml-6 space-y-2">
+                      <div>
+                        <label className="block text-sm text-[#e8e0d5]/80 mb-1">Event</label>
+                        <select value={resEventProductHandle} onChange={(e) => { setResEventProductHandle(e.target.value); setResError(null); }} className="w-full px-4 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]">
+                          <option value="">Select event</option>
+                          {EVENT_RESERVATION_PRODUCTS.map((ev) => (
+                            <option key={ev.handle} value={ev.handle}>{ev.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <span className="block text-sm text-[#e8e0d5]/80 mb-1">Site type</span>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="resEventSiteType" checked={resEventSiteType === "included_dry"} onChange={() => { setResEventSiteType("included_dry"); setResError(null); }} />
+                            <span className="text-[#e8e0d5]">Included dry (free)</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="resEventSiteType" checked={resEventSiteType === "upgrade_hookup"} onChange={() => { setResEventSiteType("upgrade_hookup"); setResError(null); }} />
+                            <span className="text-[#e8e0d5]">Upgrade to hookup</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
                 <div>
@@ -1474,23 +1626,34 @@ export function CaretakerPortalContent({
                     </div>
                   )}
                 </div>
-                {resTotalCents > 0 && (
+                {resEventIncludedDry && (
+                  <div className="pt-2 border-t border-[#d4af37]/20">
+                    <p className="text-[#e8e0d5] font-medium">Event included dry site — no charge</p>
+                  </div>
+                )}
+                {!resEventIncludedDry && resTotalCents > 0 && (
                   <div className="pt-2 border-t border-[#d4af37]/20">
                     <p className="text-[#e8e0d5] font-medium">Total: {formatCentsAsCurrency(resTotalCents)}</p>
                     <p className="text-[#e8e0d5]/60 text-xs mt-1">Payment in full required. Cash only when check-in is today.</p>
                   </div>
                 )}
                 <div className="flex flex-col gap-2 pt-2">
-                  <div className="flex gap-2">
-                    {resCheckInIsToday && (
-                      <button type="button" onClick={handleCreateReservationCash} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
-                        {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with cash
-                      </button>
-                    )}
-                    <button type="button" onClick={handleCreateReservationCard} disabled={resSubmitting} className={resCheckInIsToday ? "flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2" : "flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2"}>
-                      {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with card
+                  {resEventIncludedDry ? (
+                    <button type="button" onClick={handleCreateEventIncludedReservation} disabled={resSubmitting || !resSiteIdValidForEvent} className="py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
+                      {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Create (event included site)
                     </button>
-                  </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      {resCheckInIsToday && (
+                        <button type="button" onClick={handleCreateReservationCash} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
+                          {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with cash
+                        </button>
+                      )}
+                      <button type="button" onClick={handleCreateReservationCard} disabled={resSubmitting} className={resCheckInIsToday ? "flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2" : "flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2"}>
+                        {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with card
+                      </button>
+                    </div>
+                  )}
                   <button type="button" onClick={() => setCreateResModalOpen(false)} className="py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
                 </div>
               </form>
@@ -1519,6 +1682,15 @@ export function CaretakerPortalContent({
                   <p className="text-[#e8e0d5]/60 mb-0.5">Status</p>
                   <p className="text-[#e8e0d5]">{detailsReservation.checkedInAt ? "Checked in" : "Reserved"}</p>
                 </div>
+                {detailsReservation.eventProductHandle ? (
+                  <div>
+                    <p className="text-[#e8e0d5]/60 mb-0.5">Event</p>
+                    <p className="text-[#e8e0d5]">
+                      {EVENT_RESERVATION_PRODUCTS.find((ev) => ev.handle === detailsReservation.eventProductHandle)?.label ?? detailsReservation.eventProductHandle}
+                      {detailsReservation.eventSiteType === "upgrade_hookup" ? " (hookup upgrade)" : " (included dry)"}
+                    </p>
+                  </div>
+                ) : null}
                 {detailsReservation.reservationType === "member" ? (
                   <>
                     <div>

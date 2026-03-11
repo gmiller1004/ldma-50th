@@ -44,3 +44,14 @@ export const PRICE_LEVEL_METAFIELD = {
 
 /** Handle for the Dirt Fest VIP Gold Package add-on. Shown as upsell when user adds a Dirt Fest event to cart. */
 export const VIP_UPSELL_PRODUCT_HANDLE = "2026-event-vip-gold-package";
+
+/**
+ * Event products that include a free dry site and optional hookup upgrade.
+ * Used for caretaker "event participant" reservations so we document and restrict to these events.
+ * Add new events here when they offer included/upgrade sites (e.g. Dirt Fest at each camp).
+ */
+export const EVENT_RESERVATION_PRODUCTS: { handle: string; label: string }[] = [
+  { handle: "dirtfest-stanton-2026-march", label: "Dirt Fest Stanton 2026 (Mar)" },
+  { handle: "dirtfest-burnt-river-2026", label: "Dirt Fest Burnt River 2026" },
+  // Add more as needed (e.g. fall Dirt Fest, other camps)
+];

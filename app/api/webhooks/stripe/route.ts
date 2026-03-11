@@ -110,6 +110,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Site not available" }, { status: 400 });
     }
 
+    const eventProductHandle = metadata.event_product_handle?.trim() || null;
+    const eventSiteType = metadata.event_site_type === "upgrade_hookup" ? "upgrade_hookup" : null;
+
     if (reservationType === "member") {
       const memberContactId = metadata.member_contact_id ?? "";
       const memberNumber = metadata.member_number ?? "";
@@ -118,12 +121,12 @@ export async function POST(request: NextRequest) {
         INSERT INTO camp_reservations (
           site_id, camp_slug, check_in_date, check_out_date, nights,
           reservation_type, member_contact_id, member_number, member_display_name,
-          status, created_by_contact_id
+          status, created_by_contact_id, event_product_handle, event_site_type
         )
         VALUES (
           ${siteId}, ${campSlug}, ${checkInDate}, ${checkOutDate}, ${nights},
           'member', ${memberContactId}, ${memberNumber}, ${memberDisplayName},
-          'reserved', ${createdByContactId}
+          'reserved', ${createdByContactId}, ${eventProductHandle}, ${eventSiteType}
         )
         RETURNING id
       `;
@@ -138,12 +141,12 @@ export async function POST(request: NextRequest) {
         INSERT INTO camp_reservations (
           site_id, camp_slug, check_in_date, check_out_date, nights,
           reservation_type, guest_first_name, guest_last_name, guest_email, guest_phone,
-          status, created_by_contact_id
+          status, created_by_contact_id, event_product_handle, event_site_type
         )
         VALUES (
           ${siteId}, ${campSlug}, ${checkInDate}, ${checkOutDate}, ${nights},
           'guest', ${guestFirstName}, ${guestLastName}, ${guestEmail}, ${guestPhone},
-          'reserved', ${createdByContactId}
+          'reserved', ${createdByContactId}, ${eventProductHandle}, ${eventSiteType}
         )
         RETURNING id
       `;

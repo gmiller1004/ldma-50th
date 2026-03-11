@@ -44,6 +44,8 @@ export async function POST(request: NextRequest) {
     guestLastName?: string;
     guestEmail?: string;
     guestPhone?: string;
+    eventProductHandle?: string;
+    eventSiteType?: string;
     maintenanceAmountCents?: number;
     membershipAmountCents?: number;
   };
@@ -111,6 +113,10 @@ export async function POST(request: NextRequest) {
       metadata.guest_email = (body.guestEmail ?? "").toString().trim();
       metadata.guest_phone = (body.guestPhone ?? "").toString().trim();
     }
+    const eventProductHandle = typeof body.eventProductHandle === "string" ? body.eventProductHandle.trim() : "";
+    const eventSiteType = body.eventSiteType === "upgrade_hookup" ? "upgrade_hookup" : "";
+    if (eventProductHandle) metadata.event_product_handle = eventProductHandle;
+    if (eventSiteType) metadata.event_site_type = eventSiteType;
   } else {
     metadata.maintenance_amount_cents = String(body.maintenanceAmountCents ?? 0);
     metadata.membership_amount_cents = String(body.membershipAmountCents ?? 0);
