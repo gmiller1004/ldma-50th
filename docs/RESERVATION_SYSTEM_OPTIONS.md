@@ -130,6 +130,8 @@ Application-level check is simpler to add first; you can add an EXCLUDE constrai
 
 You can keep payment as a **second phase** after reservation + site + overlap are working: first “create reservation (maybe unpaid),” then “send payment link” or “take payment at desk.”
 
+**Modified reservations:** When a reservation is edited (e.g. earlier check-in, later checkout, or shorter stay), payment handling (proration, extensions, refunds) will need to be defined and implemented with Stripe—e.g. charge/refund the difference, or send a new payment link for the new total.
+
 ---
 
 ## 8. Options Summary and Suggested Order

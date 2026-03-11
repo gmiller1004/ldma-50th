@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCaretakerContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations } from "@/lib/reservation-camps";
+import { lookupMember } from "@/lib/salesforce";
+import { sendReservationConfirmationEmail } from "@/lib/sendgrid";
 
 type ReservationRow = {
   id: string;
@@ -214,6 +216,25 @@ export async function POST(request: NextRequest) {
     `;
     const row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
     if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
+
+    // Send confirmation email (fire-and-forget)
+    const siteRes = await sql`SELECT name FROM camp_sites WHERE id = ${siteId} LIMIT 1`;
+    const siteName = ((Array.isArray(siteRes) ? siteRes : []) as { name: string }[])[0]?.name ?? "Site";
+    lookupMember(memberNumber)
+      .then((m) => (m.valid && m.email?.trim() ? m.email.trim() : null))
+      .then((email) => {
+        if (!email) return;
+        return sendReservationConfirmationEmail(
+          email,
+          caretaker.campName,
+          siteName,
+          checkInDate,
+          checkOutDate,
+          memberDisplayName || `#${memberNumber}`
+        );
+      })
+      .catch((e) => console.error("[caretaker] reservation confirmation email failed:", e));
+
     return NextResponse.json(rowToJson(row), { status: 201 });
   }
 
@@ -246,5 +267,18 @@ export async function POST(request: NextRequest) {
   `;
   const row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
   if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
+
+  // Send confirmation email (fire-and-forget)
+  const siteRes = await sql`SELECT name FROM camp_sites WHERE id = ${siteId} LIMIT 1`;
+  const siteName = ((Array.isArray(siteRes) ? siteRes : []) as { name: string }[])[0]?.name ?? "Site";
+  sendReservationConfirmationEmail(
+    guestEmail,
+    caretaker.campName,
+    siteName,
+    checkInDate,
+    checkOutDate,
+    `${guestFirstName} ${guestLastName}`.trim() || "Guest"
+  ).catch((e) => console.error("[caretaker] reservation confirmation email failed:", e));
+
   return NextResponse.json(rowToJson(row), { status: 201 });
 }

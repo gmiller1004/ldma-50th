@@ -1,7 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, Loader2, Calendar, User, UserPlus, X, MapPin } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Search, Loader2, Calendar, User, UserPlus, X, MapPin, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  addMonths,
+  subMonths,
+  isBefore,
+  isAfter,
+  parseISO,
+  isSameDay,
+  getDay,
+} from "date-fns";
 import { campUsesReservations } from "@/lib/reservation-camps";
 
 type LookupResult = {
@@ -64,6 +77,148 @@ type Reservation = {
 function formatCurrency(val: number | null | undefined): string {
   if (val == null || Number.isNaN(val)) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val);
+}
+
+/** Small calendar-tile style display for a date (e.g. "FEB" / "26"). */
+function DateTile({ dateStr }: { dateStr: string }) {
+  let month = "";
+  let day = "";
+  try {
+    const d = parseISO(dateStr);
+    month = format(d, "MMM").toUpperCase();
+    day = format(d, "d");
+  } catch {
+    return <span className="text-[#e8e0d5]/60">{dateStr}</span>;
+  }
+  return (
+    <span className="inline-flex flex-col items-center justify-center w-11 rounded border border-[#d4af37]/30 bg-[#0f0a06]/80 text-center leading-tight">
+      <span className="text-[10px] font-medium text-[#d4af37]/90">{month}</span>
+      <span className="text-base font-semibold text-[#e8e0d5]">{day}</span>
+    </span>
+  );
+}
+
+/** Date range as two calendar tiles (start → end). */
+function ReservationDateRange({ checkInDate, checkOutDate, nights }: { checkInDate: string; checkOutDate: string; nights: number }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <DateTile dateStr={checkInDate} />
+      <span className="text-[#d4af37]/60">→</span>
+      <DateTile dateStr={checkOutDate} />
+      <span className="text-[#e8e0d5]/50 text-sm ml-1">({nights} night{nights !== 1 ? "s" : ""})</span>
+    </span>
+  );
+}
+
+/** Date input with popover calendar; min/max in YYYY-MM-DD. */
+function DatePickerWithCalendar({
+  value,
+  onChange,
+  min,
+  max,
+  placeholder = "Select date",
+  id,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  min?: string;
+  max?: string;
+  placeholder?: string;
+  id?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewingMonth, setViewingMonth] = useState(() => {
+    if (value) return parseISO(value);
+    if (min) return parseISO(min);
+    return new Date();
+  });
+  const ref = useRef<HTMLDivElement>(null);
+
+  const minDate = min ? parseISO(min) : null;
+  const maxDate = max ? parseISO(max) : null;
+  const start = startOfMonth(viewingMonth);
+  const end = endOfMonth(viewingMonth);
+  const days = eachDayOfInterval({ start, end });
+  const firstDow = getDay(start); // 0 = Sunday
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("click", h);
+    return () => document.removeEventListener("click", h);
+  }, [open]);
+
+  const select = (d: Date) => {
+    onChange(format(d, "yyyy-MM-dd"));
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <div className="flex gap-1">
+        <input
+          id={id}
+          type="date"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          min={min}
+          max={max}
+          placeholder={placeholder}
+          className="flex-1 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+        />
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="px-3 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#d4af37] hover:bg-[#d4af37]/10"
+          aria-label="Open calendar"
+        >
+          <Calendar className="w-5 h-5" />
+        </button>
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 left-0 p-3 rounded-lg border border-[#d4af37]/30 bg-[#1a120b] shadow-xl min-w-[260px]">
+          <div className="flex items-center justify-between mb-2">
+            <button type="button" onClick={() => setViewingMonth((m) => subMonths(m, 1))} className="p-1 text-[#e8e0d5]/80 hover:text-[#d4af37]">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-medium text-[#f0d48f]">{format(viewingMonth, "MMMM yyyy")}</span>
+            <button type="button" onClick={() => setViewingMonth((m) => addMonths(m, 1))} className="p-1 text-[#e8e0d5]/80 hover:text-[#d4af37]">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-0.5 text-center text-xs text-[#e8e0d5]/60 mb-1">
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+              <span key={d}>{d}</span>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-0.5">
+            {Array.from({ length: firstDow }, (_, i) => (
+              <div key={`pad-${i}`} />
+            ))}
+            {days.map((d) => {
+              const disabled = (minDate && isBefore(d, minDate)) || (maxDate && isAfter(d, maxDate));
+              const selected = value && isSameDay(d, parseISO(value));
+              return (
+                <button
+                  key={d.toISOString()}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => !disabled && select(d)}
+                  className={`w-8 h-8 rounded text-sm ${disabled ? "text-[#e8e0d5]/30 cursor-not-allowed" : "text-[#e8e0d5] hover:bg-[#d4af37]/20"} ${selected ? "bg-[#d4af37]/40 font-semibold" : ""}`}
+                >
+                  {format(d, "d")}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function CaretakerPortalContent({
@@ -643,15 +798,13 @@ export function CaretakerPortalContent({
                   key={r.id}
                   className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg"
                 >
-                  <div>
+                  <div className="flex flex-wrap items-center gap-2 gap-y-1">
                     <span className="font-medium text-[#e8e0d5]">
                       {r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}
                     </span>
-                    <span className="text-[#e8e0d5]/60 ml-2">
-                      {r.checkInDate} – {r.checkOutDate} ({r.nights} night{r.nights !== 1 ? "s" : ""})
-                    </span>
+                    <ReservationDateRange checkInDate={r.checkInDate} checkOutDate={r.checkOutDate} nights={r.nights} />
                     {r.checkedInAt ? (
-                      <span className="ml-2 px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm">Checked in</span>
+                      <span className="ml-1 px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm">Checked in</span>
                     ) : null}
                   </div>
                   <div className="flex items-center gap-2">
@@ -659,8 +812,9 @@ export function CaretakerPortalContent({
                       <button
                         type="button"
                         onClick={() => handleResCheckIn(r)}
-                        disabled={resCheckInSubmitting}
-                        className="px-3 py-1.5 text-sm bg-[#0f3d1e] text-[#6dd472] rounded hover:bg-[#0f3d1e]/80"
+                        disabled={resCheckInSubmitting || today < r.checkInDate}
+                        title={today < r.checkInDate ? `Check-in available from ${r.checkInDate}` : undefined}
+                        className="px-3 py-1.5 text-sm bg-[#0f3d1e] text-[#6dd472] rounded hover:bg-[#0f3d1e]/80 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {resCheckInSubmitting && checkingInReservation?.id === r.id ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Check in
                       </button>
@@ -706,11 +860,12 @@ export function CaretakerPortalContent({
               <form onSubmit={handleCreateReservation} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Check-in date *</label>
-                  <input type="date" value={resCheckInDate} onChange={(e) => setResCheckInDate(e.target.value)} min={today} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required />
+                  <DatePickerWithCalendar value={resCheckInDate} onChange={setResCheckInDate} min={today} placeholder="Select check-in" id="res-check-in" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Check-out date *</label>
-                  <input type="date" value={resCheckOutDate} onChange={(e) => setResCheckOutDate(e.target.value)} min={resCheckInDate || today} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required />
+                  <DatePickerWithCalendar value={resCheckOutDate} onChange={setResCheckOutDate} min={resCheckInDate || today} placeholder="Select check-out" id="res-check-out" />
+                  <p className="text-[#e8e0d5]/50 text-xs mt-1">Calendar starts at check-in date so you can pick quickly.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Site *</label>
@@ -777,7 +932,8 @@ export function CaretakerPortalContent({
               <p className="text-[#e8e0d5]/80 text-sm mb-4">{editingReservation.siteName} — {editingReservation.reservationType === "member" ? editingReservation.memberDisplayName : `${editingReservation.guestFirstName} ${editingReservation.guestLastName}`}</p>
               <form onSubmit={handleResEditSubmit}>
                 <label className="block text-sm font-medium text-[#e8e0d5] mb-2">New checkout date</label>
-                <input type="date" min={editingReservation.checkInDate} value={resEditCheckOutDate} onChange={(e) => setResEditCheckOutDate(e.target.value)} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-4" />
+                <input type="date" min={editingReservation.checkInDate} value={resEditCheckOutDate} onChange={(e) => setResEditCheckOutDate(e.target.value)} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-2" />
+                <p className="text-[#e8e0d5]/50 text-xs mb-4">Payment adjustments (proration, extensions) will be handled when payment is enabled.</p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setResEditModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
                   <button type="submit" disabled={resEditSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
