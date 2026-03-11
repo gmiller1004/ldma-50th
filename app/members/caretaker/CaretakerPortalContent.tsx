@@ -82,7 +82,7 @@ function formatCurrency(val: number | null | undefined): string {
 
 /** Normalize API date (YYYY-MM-DD or ISO timestamp) to YYYY-MM-DD for display. */
 function toDateOnly(dateStr: string): string {
-  if (!dateStr || typeof dateStr !== "string") return dateStr;
+  if (dateStr == null || typeof dateStr !== "string") return String(dateStr ?? "");
   const part = dateStr.slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : dateStr;
 }

@@ -55,6 +55,14 @@ function rowToJson(row: ReservationRow) {
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Normalize DB date (string or Date) to YYYY-MM-DD. */
+function toDateOnlyStr(val: string | Date | null | undefined): string {
+  if (val == null) return "";
+  if (typeof val === "string") return val.slice(0, 10);
+  if (val instanceof Date) return val.toISOString().slice(0, 10);
+  return String(val).slice(0, 10);
+}
+
 /**
  * PATCH /api/members/caretaker/reservations/[id]
  * Body: { checkInDate?: "YYYY-MM-DD", checkOutDate?: "YYYY-MM-DD", checkIn?: true } — update dates and/or mark as checked in.
@@ -117,11 +125,10 @@ export async function PATCH(
   const setCheckInRequested = body.checkIn === true;
   if (setCheckInRequested) {
     const today = new Date().toISOString().slice(0, 10);
-    const rawCheckIn = typeof body.checkInDate === "string" && DATE_REGEX.test(body.checkInDate.trim())
-      ? body.checkInDate.trim()
-      : existingRow.check_in_date;
-    const effectiveCheckIn = rawCheckIn.slice(0, 10);
-    if (today < effectiveCheckIn) {
+    const effectiveCheckIn = typeof body.checkInDate === "string" && DATE_REGEX.test(body.checkInDate.trim())
+      ? body.checkInDate.trim().slice(0, 10)
+      : toDateOnlyStr(existingRow.check_in_date);
+    if (effectiveCheckIn && today < effectiveCheckIn) {
       return NextResponse.json(
         { error: "Check-in is only allowed on or after the reservation check-in date. Edit the reservation to move the check-in date earlier if needed." },
         { status: 400 }
@@ -129,11 +136,11 @@ export async function PATCH(
     }
   }
 
-  // Resolve new check-in and check-out (from body or keep existing)
+  // Resolve new check-in and check-out (from body or keep existing); normalize DB dates (may be Date objects)
   const checkInCandidate = typeof body.checkInDate === "string" && DATE_REGEX.test(body.checkInDate.trim()) ? body.checkInDate.trim() : null;
   const checkOutCandidate = typeof body.checkOutDate === "string" && DATE_REGEX.test(body.checkOutDate.trim()) ? body.checkOutDate.trim() : null;
-  const newCheckIn = checkInCandidate ?? existingRow.check_in_date;
-  const newCheckOut = checkOutCandidate ?? existingRow.check_out_date;
+  const newCheckIn = checkInCandidate ?? toDateOnlyStr(existingRow.check_in_date);
+  const newCheckOut = checkOutCandidate ?? toDateOnlyStr(existingRow.check_out_date);
 
   if (newCheckIn >= newCheckOut) {
     return NextResponse.json({ error: "Check-out date must be after check-in date" }, { status: 400 });
@@ -199,10 +206,8 @@ export async function PATCH(
   }
 
   const setCheckIn = body.checkIn === true;
-  // Normalize to YYYY-MM-DD for email body (DB may return timestamp)
-  const toDateOnly = (s: string) => (/^\d{4}-\d{2}-\d{2}$/.test(s.slice(0, 10)) ? s.slice(0, 10) : s);
-  const emailCheckIn = toDateOnly(datesChanged ? newCheckIn : existingRow.check_in_date);
-  const emailCheckOut = toDateOnly(datesChanged ? newCheckOut : existingRow.check_out_date);
+  const emailCheckIn = toDateOnlyStr(datesChanged ? newCheckIn : existingRow.check_in_date);
+  const emailCheckOut = toDateOnlyStr(datesChanged ? newCheckOut : existingRow.check_out_date);
 
   let welcomeEmailSent = false;
   if (setCheckIn) {
