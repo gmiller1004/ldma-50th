@@ -63,18 +63,19 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const caretaker = await getCaretakerContext();
-  if (!caretaker) {
-    return NextResponse.json({ error: "Caretaker access required" }, { status: 403 });
-  }
-  if (!campUsesReservations(caretaker.campSlug)) {
-    return NextResponse.json({ error: "Reservation system not available for this camp" }, { status: 403 });
-  }
-  if (!hasDb() || !sql) {
-    return NextResponse.json({ error: "Database not available" }, { status: 503 });
-  }
+  try {
+    const caretaker = await getCaretakerContext();
+    if (!caretaker) {
+      return NextResponse.json({ error: "Caretaker access required" }, { status: 403 });
+    }
+    if (!campUsesReservations(caretaker.campSlug)) {
+      return NextResponse.json({ error: "Reservation system not available for this camp" }, { status: 403 });
+    }
+    if (!hasDb() || !sql) {
+      return NextResponse.json({ error: "Database not available" }, { status: 503 });
+    }
 
-  const { id } = await params;
+    const { id } = await params;
   if (!id) {
     return NextResponse.json({ error: "Reservation id required" }, { status: 400 });
   }
@@ -116,9 +117,10 @@ export async function PATCH(
   const setCheckInRequested = body.checkIn === true;
   if (setCheckInRequested) {
     const today = new Date().toISOString().slice(0, 10);
-    const effectiveCheckIn = typeof body.checkInDate === "string" && DATE_REGEX.test(body.checkInDate.trim())
+    const rawCheckIn = typeof body.checkInDate === "string" && DATE_REGEX.test(body.checkInDate.trim())
       ? body.checkInDate.trim()
       : existingRow.check_in_date;
+    const effectiveCheckIn = rawCheckIn.slice(0, 10);
     if (today < effectiveCheckIn) {
       return NextResponse.json(
         { error: "Check-in is only allowed on or after the reservation check-in date. Edit the reservation to move the check-in date earlier if needed." },
@@ -262,6 +264,13 @@ export async function PATCH(
   const payload = rowToJson(row) as Record<string, unknown>;
   if (setCheckIn) payload.welcomeEmailSent = welcomeEmailSent;
   return NextResponse.json(payload);
+  } catch (e) {
+    console.error("[caretaker] PATCH reservation error:", e);
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Check-in or update failed" },
+      { status: 500 }
+    );
+  }
 }
 
 /**

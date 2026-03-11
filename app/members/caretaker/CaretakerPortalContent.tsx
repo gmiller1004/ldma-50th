@@ -562,9 +562,16 @@ export function CaretakerPortalContent({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ checkIn: true }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: { error?: string; welcomeEmailSent?: boolean };
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        alert(!res.ok ? `Check-in failed (${res.status}). ${text.slice(0, 100)}` : "Check-in failed: invalid response.");
+        return;
+      }
       if (!res.ok) {
-        alert(data.error ?? "Check-in failed");
+        alert(data.error ?? `Check-in failed (${res.status})`);
         return;
       }
       setCheckingInReservation(null);
@@ -574,8 +581,8 @@ export function CaretakerPortalContent({
       } else if (data.welcomeEmailSent === true) {
         alert("Check-in recorded. Welcome email sent.");
       }
-    } catch {
-      alert("Check-in failed");
+    } catch (err) {
+      alert("Check-in failed. " + (err instanceof Error ? err.message : "Try again."));
     } finally {
       setResCheckInSubmitting(false);
     }
