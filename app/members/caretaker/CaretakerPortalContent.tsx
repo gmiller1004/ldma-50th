@@ -810,10 +810,7 @@ export function CaretakerPortalContent({
                     <span className="font-medium text-[#e8e0d5]">
                       {r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}
                     </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-[#d4af37]/70 shrink-0" aria-hidden />
-                      <ReservationDateRange checkInDate={r.checkInDate} checkOutDate={r.checkOutDate} nights={r.nights} />
-                    </span>
+                    <ReservationDateRange checkInDate={r.checkInDate} checkOutDate={r.checkOutDate} nights={r.nights} />
                     {r.checkedInAt ? (
                       <span className="ml-1 px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm">Checked in</span>
                     ) : null}
