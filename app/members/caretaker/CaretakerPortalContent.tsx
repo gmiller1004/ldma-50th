@@ -200,7 +200,7 @@ function DatePickerWithCalendar({
               <div key={`pad-${i}`} />
             ))}
             {days.map((d) => {
-              const disabled = (minDate && isBefore(d, minDate)) || (maxDate && isAfter(d, maxDate));
+              const disabled = !!(minDate && isBefore(d, minDate)) || !!(maxDate && isAfter(d, maxDate));
               const selected = value && isSameDay(d, parseISO(value));
               return (
                 <button
