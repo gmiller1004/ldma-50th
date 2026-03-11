@@ -79,9 +79,17 @@ function formatCurrency(val: number | null | undefined): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val);
 }
 
+/** Normalize API date (YYYY-MM-DD or ISO timestamp) to YYYY-MM-DD for display. */
+function toDateOnly(dateStr: string): string {
+  if (!dateStr || typeof dateStr !== "string") return dateStr;
+  const part = dateStr.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : dateStr;
+}
+
 /** Parse YYYY-MM-DD as local date (avoids timezone shifting display by one day). */
 function parseLocalDate(dateStr: string): Date {
-  const [y, m, d] = dateStr.split("-").map(Number);
+  const normalized = toDateOnly(dateStr);
+  const [y, m, d] = normalized.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
 
@@ -108,9 +116,9 @@ function DateTile({ dateStr }: { dateStr: string }) {
 function ReservationDateRange({ checkInDate, checkOutDate, nights }: { checkInDate: string; checkOutDate: string; nights: number }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <DateTile dateStr={checkInDate} />
+      <DateTile dateStr={toDateOnly(checkInDate)} />
       <span className="text-[#d4af37]/60">→</span>
-      <DateTile dateStr={checkOutDate} />
+      <DateTile dateStr={toDateOnly(checkOutDate)} />
       <span className="text-[#e8e0d5]/50 text-sm ml-1">({nights} night{nights !== 1 ? "s" : ""})</span>
     </span>
   );
@@ -466,8 +474,8 @@ export function CaretakerPortalContent({
 
   function openResEditModal(r: Reservation) {
     setEditingReservation(r);
-    setResEditCheckInDate(r.checkInDate);
-    setResEditCheckOutDate(r.checkOutDate);
+    setResEditCheckInDate(toDateOnly(r.checkInDate));
+    setResEditCheckOutDate(toDateOnly(r.checkOutDate));
     setResEditModalOpen(true);
   }
 
@@ -820,8 +828,8 @@ export function CaretakerPortalContent({
                       <button
                         type="button"
                         onClick={() => handleResCheckIn(r)}
-                        disabled={resCheckInSubmitting || today < r.checkInDate}
-                        title={today < r.checkInDate ? `Check-in available from ${r.checkInDate}` : undefined}
+                        disabled={resCheckInSubmitting || today < toDateOnly(r.checkInDate)}
+                        title={today < toDateOnly(r.checkInDate) ? `Check-in available from ${toDateOnly(r.checkInDate)}` : undefined}
                         className="px-3 py-1.5 text-sm bg-[#0f3d1e] text-[#6dd472] rounded hover:bg-[#0f3d1e]/80 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {resCheckInSubmitting && checkingInReservation?.id === r.id ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Check in
