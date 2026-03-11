@@ -52,9 +52,11 @@ function rowToJson(row: ReservationRow) {
   };
 }
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
  * PATCH /api/members/caretaker/reservations/[id]
- * Body: { checkOutDate?: "YYYY-MM-DD", checkIn?: true } — update checkout date and/or mark as checked in.
+ * Body: { checkInDate?: "YYYY-MM-DD", checkOutDate?: "YYYY-MM-DD", checkIn?: true } — update dates and/or mark as checked in.
  */
 export async function PATCH(
   request: NextRequest,
@@ -76,7 +78,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Reservation id required" }, { status: 400 });
   }
 
-  let body: { checkOutDate?: string; checkIn?: boolean };
+  let body: { checkInDate?: string; checkOutDate?: string; checkIn?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -113,7 +115,10 @@ export async function PATCH(
   const setCheckInRequested = body.checkIn === true;
   if (setCheckInRequested) {
     const today = new Date().toISOString().slice(0, 10);
-    if (today < existingRow.check_in_date) {
+    const effectiveCheckIn = typeof body.checkInDate === "string" && DATE_REGEX.test(body.checkInDate.trim())
+      ? body.checkInDate.trim()
+      : existingRow.check_in_date;
+    if (today < effectiveCheckIn) {
       return NextResponse.json(
         { error: "Check-in is only allowed on or after the reservation check-in date. Edit the reservation to move the check-in date earlier if needed." },
         { status: 400 }
@@ -121,32 +126,45 @@ export async function PATCH(
     }
   }
 
-  let checkOutDateStr: string | null = null;
-  if (typeof body.checkOutDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.checkOutDate.trim())) {
-    const candidate = body.checkOutDate.trim();
-    if (candidate <= existingRow.check_in_date) {
-      return NextResponse.json({ error: "Check-out date must be after check-in date" }, { status: 400 });
-    }
-    // Overlap check: no other non-cancelled reservation for this site overlapping new range (excluding this id)
+  // Resolve new check-in and check-out (from body or keep existing)
+  const checkInCandidate = typeof body.checkInDate === "string" && DATE_REGEX.test(body.checkInDate.trim()) ? body.checkInDate.trim() : null;
+  const checkOutCandidate = typeof body.checkOutDate === "string" && DATE_REGEX.test(body.checkOutDate.trim()) ? body.checkOutDate.trim() : null;
+  const newCheckIn = checkInCandidate ?? existingRow.check_in_date;
+  const newCheckOut = checkOutCandidate ?? existingRow.check_out_date;
+
+  if (newCheckIn >= newCheckOut) {
+    return NextResponse.json({ error: "Check-out date must be after check-in date" }, { status: 400 });
+  }
+
+  const datesChanged = checkInCandidate !== null || checkOutCandidate !== null;
+  if (datesChanged) {
     const overlap = await sql`
       SELECT id FROM camp_reservations
       WHERE site_id = ${existingRow.site_id}
         AND id != ${id}
         AND status != 'cancelled'
-        AND check_in_date < ${candidate}
-        AND check_out_date > ${existingRow.check_in_date}
+        AND check_in_date < ${newCheckOut}
+        AND check_out_date > ${newCheckIn}
       LIMIT 1
     `;
     if (Array.isArray(overlap) && overlap.length > 0) {
       return NextResponse.json({ error: "Site is not available for the new dates" }, { status: 400 });
     }
-    checkOutDateStr = candidate;
+    const checkIn = new Date(newCheckIn);
+    const checkOut = new Date(newCheckOut);
+    const newNights = Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (24 * 60 * 60 * 1000)));
+    await sql`
+      UPDATE camp_reservations
+      SET check_in_date = ${newCheckIn}, check_out_date = ${newCheckOut}, nights = ${newNights}, updated_at = NOW()
+      WHERE id = ${id}
+    `;
   }
 
   const setCheckIn = body.checkIn === true;
-
   if (setCheckIn) {
-    // Send welcome email (fire-and-forget)
+    // Send welcome email (fire-and-forget); use current dates after any update above
+    const emailCheckIn = datesChanged ? newCheckIn : existingRow.check_in_date;
+    const emailCheckOut = datesChanged ? newCheckOut : existingRow.check_out_date;
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
     if (existingRow.reservation_type === "member" && existingRow.member_number) {
       lookupMember(existingRow.member_number)
@@ -157,8 +175,8 @@ export async function PATCH(
             email,
             caretaker.campName,
             existingRow.member_display_name || `#${existingRow.member_number}`,
-            existingRow.check_in_date,
-            existingRow.check_out_date
+            emailCheckIn,
+            emailCheckOut
           );
         })
         .catch((e) => console.error("[caretaker] reservation check-in welcome email failed:", e));
@@ -167,23 +185,13 @@ export async function PATCH(
         existingRow.guest_email,
         caretaker.campName,
         existingRow.guest_first_name || "Guest",
-        existingRow.check_in_date,
-        existingRow.check_out_date,
+        emailCheckIn,
+        emailCheckOut,
         baseUrl
       ).catch((e) => console.error("[caretaker] reservation check-in welcome email failed:", e));
     }
   }
 
-  if (checkOutDateStr) {
-    const checkIn = new Date(existingRow.check_in_date);
-    const checkOut = new Date(checkOutDateStr);
-    const newNights = Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (24 * 60 * 60 * 1000)));
-    await sql`
-      UPDATE camp_reservations
-      SET check_out_date = ${checkOutDateStr}, nights = ${newNights}, updated_at = NOW()
-      WHERE id = ${id}
-    `;
-  }
   if (setCheckIn) {
     await sql`
       UPDATE camp_reservations

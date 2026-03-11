@@ -79,12 +79,18 @@ function formatCurrency(val: number | null | undefined): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val);
 }
 
+/** Parse YYYY-MM-DD as local date (avoids timezone shifting display by one day). */
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 /** Small calendar-tile style display for a date (e.g. "FEB" / "26"). */
 function DateTile({ dateStr }: { dateStr: string }) {
   let month = "";
   let day = "";
   try {
-    const d = parseISO(dateStr);
+    const d = parseLocalDate(dateStr);
     month = format(d, "MMM").toUpperCase();
     day = format(d, "d");
   } catch {
@@ -287,6 +293,7 @@ export function CaretakerPortalContent({
   const [availableSiteIds, setAvailableSiteIds] = useState<string[]>([]);
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
   const [resEditModalOpen, setResEditModalOpen] = useState(false);
+  const [resEditCheckInDate, setResEditCheckInDate] = useState("");
   const [resEditCheckOutDate, setResEditCheckOutDate] = useState("");
   const [resEditSubmitting, setResEditSubmitting] = useState(false);
   const [cancellingReservation, setCancellingReservation] = useState<Reservation | null>(null);
@@ -459,6 +466,7 @@ export function CaretakerPortalContent({
 
   function openResEditModal(r: Reservation) {
     setEditingReservation(r);
+    setResEditCheckInDate(r.checkInDate);
     setResEditCheckOutDate(r.checkOutDate);
     setResEditModalOpen(true);
   }
@@ -471,7 +479,7 @@ export function CaretakerPortalContent({
       const res = await fetch(`/api/members/caretaker/reservations/${editingReservation.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ checkOutDate: resEditCheckOutDate }),
+        body: JSON.stringify({ checkInDate: resEditCheckInDate, checkOutDate: resEditCheckOutDate }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -926,17 +934,19 @@ export function CaretakerPortalContent({
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setResEditModalOpen(false)}>
             <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-[#f0d48f]">Edit checkout date</h3>
+                <h3 className="font-semibold text-[#f0d48f]">Edit reservation dates</h3>
                 <button type="button" onClick={() => setResEditModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
               </div>
               <p className="text-[#e8e0d5]/80 text-sm mb-4">{editingReservation.siteName} — {editingReservation.reservationType === "member" ? editingReservation.memberDisplayName : `${editingReservation.guestFirstName} ${editingReservation.guestLastName}`}</p>
               <form onSubmit={handleResEditSubmit}>
-                <label className="block text-sm font-medium text-[#e8e0d5] mb-2">New checkout date</label>
-                <input type="date" min={editingReservation.checkInDate} value={resEditCheckOutDate} onChange={(e) => setResEditCheckOutDate(e.target.value)} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-2" />
-                <p className="text-[#e8e0d5]/50 text-xs mb-4">Payment adjustments (proration, extensions) will be handled when payment is enabled.</p>
+                <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Check-in date</label>
+                <input type="date" value={resEditCheckInDate} onChange={(e) => setResEditCheckInDate(e.target.value)} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-3" />
+                <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Check-out date</label>
+                <input type="date" min={resEditCheckInDate} value={resEditCheckOutDate} onChange={(e) => setResEditCheckOutDate(e.target.value)} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-2" />
+                <p className="text-[#e8e0d5]/50 text-xs mb-4">Check-out must be after check-in. Payment adjustments (proration, extensions) will be handled when payment is enabled.</p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setResEditModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
-                  <button type="submit" disabled={resEditSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                  <button type="submit" disabled={resEditSubmitting || !resEditCheckInDate || !resEditCheckOutDate || resEditCheckInDate >= resEditCheckOutDate} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
                     {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save
                   </button>
                 </div>
