@@ -3,9 +3,11 @@ import { getCaretakerContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { lookupMember } from "@/lib/salesforce";
+import { computeReservationTotalCents } from "@/lib/reservation-pricing";
 import {
   sendCaretakerCheckInWelcomeEmail,
   sendCaretakerGuestCheckInWelcomeEmail,
+  sendPaymentReceiptEmail,
   sendReservationModifiedEmail,
 } from "@/lib/sendgrid";
 
@@ -88,7 +90,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Reservation id required" }, { status: 400 });
   }
 
-  let body: { checkInDate?: string; checkOutDate?: string; checkIn?: boolean };
+  let body: {
+    checkInDate?: string;
+    checkOutDate?: string;
+    checkIn?: boolean;
+    paymentMethod?: string;
+    amountCents?: number;
+    recipientEmail?: string;
+    recipientDisplayName?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -97,7 +107,7 @@ export async function PATCH(
 
   const existing = await sql`
     SELECT id, site_id, camp_slug, check_in_date, check_out_date, nights, status,
-           reservation_type, member_number, member_display_name, guest_first_name, guest_email
+           reservation_type, member_contact_id, member_number, member_display_name, guest_first_name, guest_last_name, guest_email, guest_phone
     FROM camp_reservations
     WHERE id = ${id} AND camp_slug = ${caretaker.campSlug}
     LIMIT 1
@@ -107,12 +117,16 @@ export async function PATCH(
     site_id: string;
     check_in_date: string;
     check_out_date: string;
+    nights: number;
     status: string;
     reservation_type: string;
+    member_contact_id: string | null;
     member_number: string | null;
     member_display_name: string | null;
     guest_first_name: string | null;
+    guest_last_name: string | null;
     guest_email: string | null;
+    guest_phone: string | null;
   };
   const existingRow = existingArr[0] as ExistingRow | undefined;
   if (!existingRow) {
@@ -147,6 +161,9 @@ export async function PATCH(
   }
 
   const datesChanged = checkInCandidate !== null || checkOutCandidate !== null;
+  const today = new Date().toISOString().slice(0, 10);
+  const reservationCheckIn = toDateOnlyStr(existingRow.check_in_date);
+
   if (datesChanged) {
     const overlap = await sql`
       SELECT id FROM camp_reservations
@@ -163,13 +180,97 @@ export async function PATCH(
     const checkIn = new Date(newCheckIn);
     const checkOut = new Date(newCheckOut);
     const newNights = Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (24 * 60 * 60 * 1000)));
+    const oldNights = existingRow.nights ?? 1;
+
+    const siteRates = await sql`
+      SELECT member_rate_daily, non_member_rate_daily FROM camp_sites WHERE id = ${existingRow.site_id} LIMIT 1
+    `;
+    const rates = (Array.isArray(siteRates) ? siteRates : [])[0] as { member_rate_daily: number | null; non_member_rate_daily: number | null } | undefined;
+    const isMember = existingRow.reservation_type === "member";
+    const oldTotalCents = computeReservationTotalCents(
+      oldNights,
+      null,
+      isMember,
+      rates?.member_rate_daily ?? null,
+      rates?.non_member_rate_daily ?? null
+    );
+    const newTotalCents = computeReservationTotalCents(
+      newNights,
+      null,
+      isMember,
+      rates?.member_rate_daily ?? null,
+      rates?.non_member_rate_daily ?? null
+    );
+    const differenceCents = newTotalCents - oldTotalCents;
+
+    if (differenceCents > 0) {
+      const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
+      const cashAllowed = reservationCheckIn <= today;
+      if (!paymentMethod) {
+        return NextResponse.json(
+          {
+            error: cashAllowed
+              ? "Additional nights require payment. Pay with cash here or use card."
+              : "Additional nights require payment. Card only (cash allowed when check-in is today or in the past).",
+            amountDueCents: differenceCents,
+            requirePayment: true,
+          },
+          { status: 400 }
+        );
+      }
+      if (paymentMethod === "cash" && !cashAllowed) {
+        return NextResponse.json(
+          { error: "Cash only allowed when reservation check-in is today or in the past. Use card for this change." },
+          { status: 400 }
+        );
+      }
+      const amountCents = typeof body.amountCents === "number" ? body.amountCents : 0;
+      const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
+      const recipientDisplayName = typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest";
+      if (amountCents !== differenceCents || !recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+        return NextResponse.json(
+          { error: `Valid payment required: $${(differenceCents / 100).toFixed(2)} for additional nights`, amountDueCents: differenceCents },
+          { status: 400 }
+        );
+      }
+
+      await sql`
+        INSERT INTO camp_payments (
+          camp_slug, payment_type, method, amount_cents, reservation_id,
+          member_contact_id, member_number, member_email, recipient_display_name,
+          created_by_contact_id, created_at
+        )
+        VALUES (
+          ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${id},
+          ${existingRow.member_contact_id}, ${existingRow.member_number}, ${recipientEmail}, ${recipientDisplayName},
+          ${caretaker.contactId}, NOW()
+        )
+      `;
+      const receiptSent = await sendPaymentReceiptEmail(
+        recipientEmail,
+        caretaker.campName,
+        [{ label: "Additional nights (reservation extension)", amountCents }],
+        amountCents,
+        "cash",
+        today
+      ).catch((e) => {
+        console.error("[caretaker] payment receipt email failed:", e);
+        return false;
+      });
+      if (receiptSent) {
+        await sql`
+          UPDATE camp_payments SET receipt_sent_at = NOW()
+          WHERE id = (SELECT id FROM camp_payments WHERE reservation_id = ${id} AND method = 'cash' ORDER BY created_at DESC LIMIT 1)
+        `;
+      }
+    }
+
     await sql`
       UPDATE camp_reservations
       SET check_in_date = ${newCheckIn}, check_out_date = ${newCheckOut}, nights = ${newNights}, updated_at = NOW()
       WHERE id = ${id}
     `;
 
-    // Send "reservation modified" email (await so it completes before response)
     const siteRes = await sql`SELECT name FROM camp_sites WHERE id = ${existingRow.site_id} LIMIT 1`;
     const siteName = ((Array.isArray(siteRes) ? siteRes : []) as { name: string }[])[0]?.name ?? "Site";
     if (existingRow.reservation_type === "member" && existingRow.member_number) {

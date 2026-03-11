@@ -16,11 +16,13 @@ import {
   getDay,
 } from "date-fns";
 import { campUsesReservations } from "@/lib/reservation-camps";
+import { computeReservationTotalCents, formatCentsAsCurrency } from "@/lib/reservation-pricing";
 
 type LookupResult = {
   contactId: string;
   memberNumber: string;
   displayName: string;
+  email: string | null;
   isLdmaMember: boolean;
   maintenanceFeesDue: number | null;
   membershipDuesOwed: number | null;
@@ -65,6 +67,7 @@ type Reservation = {
   checkOutDate: string;
   nights: number;
   reservationType: string;
+  memberContactId?: string | null;
   memberNumber: string | null;
   memberDisplayName: string | null;
   guestFirstName: string | null;
@@ -305,6 +308,8 @@ export function CaretakerPortalContent({
   const [resEditCheckInDate, setResEditCheckInDate] = useState("");
   const [resEditCheckOutDate, setResEditCheckOutDate] = useState("");
   const [resEditSubmitting, setResEditSubmitting] = useState(false);
+  const [resEditMemberLookup, setResEditMemberLookup] = useState<LookupResult | null>(null);
+  const [resEditPaymentDueCents, setResEditPaymentDueCents] = useState<number | null>(null);
   const [cancellingReservation, setCancellingReservation] = useState<Reservation | null>(null);
   const [resCancelModalOpen, setResCancelModalOpen] = useState(false);
   const [resCancelSubmitting, setResCancelSubmitting] = useState(false);
@@ -314,6 +319,12 @@ export function CaretakerPortalContent({
   const [detailsReservation, setDetailsReservation] = useState<Reservation | null>(null);
   const [detailsMemberLookup, setDetailsMemberLookup] = useState<LookupResult | null>(null);
   const [detailsMemberLoading, setDetailsMemberLoading] = useState(false);
+  const [detailsPastDueMaintenanceCents, setDetailsPastDueMaintenanceCents] = useState<number>(0);
+  const [detailsPastDueMembershipCents, setDetailsPastDueMembershipCents] = useState<number>(0);
+  const [detailsPastDueSubmitting, setDetailsPastDueSubmitting] = useState(false);
+  const [resPastDueMaintenanceCents, setResPastDueMaintenanceCents] = useState<number>(0);
+  const [resPastDueMembershipCents, setResPastDueMembershipCents] = useState<number>(0);
+  const [resPastDueSubmitting, setResPastDueSubmitting] = useState(false);
 
   function loadCheckIns() {
     setListLoading(true);
@@ -407,6 +418,8 @@ export function CaretakerPortalContent({
         return;
       }
       setResMemberLookup(data);
+      setResPastDueMaintenanceCents(Math.round((data?.maintenanceFeesDue ?? 0) * 100));
+      setResPastDueMembershipCents(Math.round((data?.membershipDuesOwed ?? 0) * 100));
     } catch {
       setResError("Lookup failed");
       setResMemberLookup(null);
@@ -415,7 +428,25 @@ export function CaretakerPortalContent({
     }
   }
 
-  async function handleCreateReservation(e: React.FormEvent) {
+  const today = new Date().toISOString().slice(0, 10);
+  const resNights =
+    resCheckInDate && resCheckOutDate && resCheckInDate < resCheckOutDate
+      ? Math.max(1, Math.ceil((new Date(resCheckOutDate).getTime() - new Date(resCheckInDate).getTime()) / (24 * 60 * 60 * 1000)))
+      : 0;
+  const resSelectedSite = sites.find((s) => s.id === resSiteId);
+  const resTotalCents =
+    resNights > 0 && resSelectedSite
+      ? computeReservationTotalCents(
+          resNights,
+          null,
+          resType === "member",
+          resSelectedSite.memberRateDaily,
+          resSelectedSite.nonMemberRateDaily
+        )
+      : 0;
+  const resCheckInIsToday = resCheckInDate === today;
+
+  async function handleCreateReservationCash(e: React.FormEvent) {
     e.preventDefault();
     if (!resSiteId || !resCheckInDate || !resCheckOutDate) {
       setResError("Select site and dates");
@@ -426,11 +457,19 @@ export function CaretakerPortalContent({
         setResError("Look up member first");
         return;
       }
+      if (!resMemberLookup.email?.trim()) {
+        setResError("Member email is required for receipt; not on file. Use card payment or add email in Salesforce.");
+        return;
+      }
     } else {
       if (!resGuestFirstName.trim() || !resGuestLastName.trim() || !resGuestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resGuestEmail.trim())) {
         setResError("Enter guest first name, last name, and valid email");
         return;
       }
+    }
+    if (resTotalCents < 1) {
+      setResError("Invalid total");
+      return;
     }
     setResError(null);
     setResSubmitting(true);
@@ -440,6 +479,10 @@ export function CaretakerPortalContent({
         checkInDate: resCheckInDate,
         checkOutDate: resCheckOutDate,
         type: resType,
+        paymentMethod: "cash",
+        amountCents: resTotalCents,
+        recipientEmail: resType === "member" ? resMemberLookup!.email!.trim() : resGuestEmail.trim(),
+        recipientDisplayName: resType === "member" ? (resMemberLookup!.displayName || `#${resMemberLookup!.memberNumber}`) : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
       };
       if (resType === "member" && resMemberLookup) {
         body.memberContactId = resMemberLookup.contactId;
@@ -477,9 +520,87 @@ export function CaretakerPortalContent({
     }
   }
 
+  async function handleCreateReservationCard(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resSiteId || !resCheckInDate || !resCheckOutDate) {
+      setResError("Select site and dates");
+      return;
+    }
+    if (resType === "member") {
+      if (!resMemberLookup) {
+        setResError("Look up member first");
+        return;
+      }
+      if (!resMemberLookup.email?.trim()) {
+        setResError("Member email is required for receipt; not on file. Use cash (same-day only) or add email in Salesforce.");
+        return;
+      }
+    } else {
+      if (!resGuestFirstName.trim() || !resGuestLastName.trim() || !resGuestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resGuestEmail.trim())) {
+        setResError("Enter guest first name, last name, and valid email");
+        return;
+      }
+    }
+    if (resTotalCents < 1) {
+      setResError("Invalid total");
+      return;
+    }
+    setResError(null);
+    setResSubmitting(true);
+    try {
+      const checkoutBody: Record<string, unknown> = {
+        amountCents: resTotalCents,
+        paymentType: "reservation",
+        recipientEmail: resType === "member" ? (resMemberLookup?.email?.trim() || resGuestEmail.trim()) : resGuestEmail.trim(),
+        recipientDisplayName: resType === "member" ? (resMemberLookup?.displayName || `#${resMemberLookup?.memberNumber}`) : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
+        siteId: resSiteId,
+        checkInDate: resCheckInDate,
+        checkOutDate: resCheckOutDate,
+        nights: resNights,
+        reservationType: resType,
+      };
+      if (resType === "member" && resMemberLookup) {
+        checkoutBody.memberContactId = resMemberLookup.contactId;
+        checkoutBody.memberNumber = resMemberLookup.memberNumber;
+        checkoutBody.memberDisplayName = resMemberLookup.displayName;
+      } else {
+        checkoutBody.guestFirstName = resGuestFirstName.trim();
+        checkoutBody.guestLastName = resGuestLastName.trim();
+        checkoutBody.guestEmail = resGuestEmail.trim();
+        checkoutBody.guestPhone = resGuestPhone.trim() || undefined;
+      }
+      const res = await fetch("/api/members/caretaker/payments/checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checkoutBody),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResError(data.error ?? "Failed to start checkout");
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setResError("No checkout URL returned");
+    } catch {
+      setResError("Failed to start checkout");
+    } finally {
+      setResSubmitting(false);
+    }
+  }
+
+  function handleCreateReservation(e: React.FormEvent) {
+    e.preventDefault();
+    // Form submit from "Pay with cash" or "Pay with card" is handled by those buttons
+  }
+
   function openResDetailsModal(r: Reservation) {
     setDetailsReservation(r);
     setDetailsMemberLookup(null);
+    setDetailsPastDueMaintenanceCents(0);
+    setDetailsPastDueMembershipCents(0);
     setDetailsModalOpen(true);
     if (r.reservationType === "member" && r.memberNumber) {
       setDetailsMemberLoading(true);
@@ -489,7 +610,14 @@ export function CaretakerPortalContent({
         body: JSON.stringify({ memberNumber: r.memberNumber.trim() }),
       })
         .then((res) => res.ok ? res.json() : null)
-        .then((data) => setDetailsMemberLookup(data ?? null))
+        .then((data) => {
+          const lookup = data ?? null;
+          setDetailsMemberLookup(lookup);
+          if (lookup) {
+            setDetailsPastDueMaintenanceCents(Math.round((lookup.maintenanceFeesDue ?? 0) * 100));
+            setDetailsPastDueMembershipCents(Math.round((lookup.membershipDuesOwed ?? 0) * 100));
+          }
+        })
         .catch(() => setDetailsMemberLookup(null))
         .finally(() => setDetailsMemberLoading(false));
     }
@@ -499,29 +627,336 @@ export function CaretakerPortalContent({
     setEditingReservation(r);
     setResEditCheckInDate(toDateOnly(r.checkInDate));
     setResEditCheckOutDate(toDateOnly(r.checkOutDate));
+    setResEditPaymentDueCents(null);
+    setResEditMemberLookup(null);
     setResEditModalOpen(true);
+    if (r.reservationType === "member" && r.memberNumber) {
+      fetch("/api/members/caretaker/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberNumber: r.memberNumber.trim() }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setResEditMemberLookup(data ?? null))
+        .catch(() => setResEditMemberLookup(null));
+    }
   }
 
   async function handleResEditSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!editingReservation) return;
     setResEditSubmitting(true);
+    setResEditPaymentDueCents(null);
     try {
       const res = await fetch(`/api/members/caretaker/reservations/${editingReservation.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ checkInDate: resEditCheckInDate, checkOutDate: resEditCheckOutDate }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
+        if (data.requirePayment && typeof data.amountDueCents === "number") {
+          setResEditPaymentDueCents(data.amountDueCents);
+          return;
+        }
         alert(data.error ?? "Update failed");
         return;
       }
       setResEditModalOpen(false);
       setEditingReservation(null);
+      setResEditPaymentDueCents(null);
       loadReservations();
     } catch {
       alert("Update failed");
+    } finally {
+      setResEditSubmitting(false);
+    }
+  }
+
+  async function handleDetailsPayPastDueCash() {
+    if (!detailsReservation || detailsReservation.reservationType !== "member" || !detailsMemberLookup) return;
+    const totalCents = detailsPastDueMaintenanceCents + detailsPastDueMembershipCents;
+    if (totalCents < 1) {
+      alert("Enter amounts to pay");
+      return;
+    }
+    const recipientEmail = detailsMemberLookup.email?.trim();
+    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      alert("Member email required for receipt; not on file.");
+      return;
+    }
+    setDetailsPastDueSubmitting(true);
+    try {
+      const res = await fetch("/api/members/caretaker/payments/record-cash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentType: "past_due",
+          amountCents: totalCents,
+          maintenanceAmountCents: detailsPastDueMaintenanceCents,
+          membershipAmountCents: detailsPastDueMembershipCents,
+          memberContactId: detailsMemberLookup.contactId,
+          memberNumber: detailsMemberLookup.memberNumber,
+          recipientEmail,
+          recipientDisplayName: detailsMemberLookup.displayName || `#${detailsMemberLookup.memberNumber}`,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error ?? "Payment failed");
+        return;
+      }
+      setDetailsModalOpen(false);
+      setDetailsReservation(null);
+      setDetailsMemberLookup(null);
+      loadReservations();
+    } catch {
+      alert("Payment failed");
+    } finally {
+      setDetailsPastDueSubmitting(false);
+    }
+  }
+
+  async function handleResPayPastDueCash() {
+    if (!resMemberLookup) return;
+    const totalCents = resPastDueMaintenanceCents + resPastDueMembershipCents;
+    if (totalCents < 1) {
+      setResError("Enter amounts to pay");
+      return;
+    }
+    const recipientEmail = resMemberLookup.email?.trim();
+    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      setResError("Member email required for receipt; not on file.");
+      return;
+    }
+    setResPastDueSubmitting(true);
+    setResError(null);
+    try {
+      const res = await fetch("/api/members/caretaker/payments/record-cash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentType: "past_due",
+          amountCents: totalCents,
+          maintenanceAmountCents: resPastDueMaintenanceCents,
+          membershipAmountCents: resPastDueMembershipCents,
+          memberContactId: resMemberLookup.contactId,
+          memberNumber: resMemberLookup.memberNumber,
+          recipientEmail,
+          recipientDisplayName: resMemberLookup.displayName || `#${resMemberLookup.memberNumber}`,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setResError(data.error ?? "Payment failed");
+        return;
+      }
+      setResPastDueMaintenanceCents(0);
+      setResPastDueMembershipCents(0);
+      loadReservations();
+    } catch {
+      setResError("Payment failed");
+    } finally {
+      setResPastDueSubmitting(false);
+    }
+  }
+
+  async function handleResPayPastDueCard() {
+    if (!resMemberLookup) return;
+    const totalCents = resPastDueMaintenanceCents + resPastDueMembershipCents;
+    if (totalCents < 1) {
+      setResError("Enter amounts to pay");
+      return;
+    }
+    const recipientEmail = resMemberLookup.email?.trim();
+    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      setResError("Member email required for receipt; not on file.");
+      return;
+    }
+    setResPastDueSubmitting(true);
+    setResError(null);
+    try {
+      const res = await fetch("/api/members/caretaker/payments/checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amountCents: totalCents,
+          paymentType: "past_due",
+          recipientEmail,
+          recipientDisplayName: resMemberLookup.displayName || `#${resMemberLookup.memberNumber}`,
+          maintenanceAmountCents: resPastDueMaintenanceCents,
+          membershipAmountCents: resPastDueMembershipCents,
+          memberContactId: resMemberLookup.contactId,
+          memberNumber: resMemberLookup.memberNumber,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResError(data.error ?? "Checkout failed");
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setResError("Checkout failed");
+    } catch {
+      setResError("Checkout failed");
+    } finally {
+      setResPastDueSubmitting(false);
+    }
+  }
+
+  async function handleDetailsPayPastDueCard() {
+    if (!detailsReservation || detailsReservation.reservationType !== "member" || !detailsMemberLookup) return;
+    const totalCents = detailsPastDueMaintenanceCents + detailsPastDueMembershipCents;
+    if (totalCents < 1) {
+      alert("Enter amounts to pay");
+      return;
+    }
+    const recipientEmail = detailsMemberLookup.email?.trim();
+    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      alert("Member email required for receipt; not on file.");
+      return;
+    }
+    setDetailsPastDueSubmitting(true);
+    try {
+      const res = await fetch("/api/members/caretaker/payments/checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amountCents: totalCents,
+          paymentType: "past_due",
+          recipientEmail,
+          recipientDisplayName: detailsMemberLookup.displayName || `#${detailsMemberLookup.memberNumber}`,
+          maintenanceAmountCents: detailsPastDueMaintenanceCents,
+          membershipAmountCents: detailsPastDueMembershipCents,
+          memberContactId: detailsMemberLookup.contactId,
+          memberNumber: detailsMemberLookup.memberNumber,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "Checkout failed");
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      alert("Checkout failed");
+    } catch {
+      alert("Checkout failed");
+    } finally {
+      setDetailsPastDueSubmitting(false);
+    }
+  }
+
+  const resEditNights =
+    resEditCheckInDate && resEditCheckOutDate && resEditCheckInDate < resEditCheckOutDate
+      ? Math.max(1, Math.ceil((new Date(resEditCheckOutDate).getTime() - new Date(resEditCheckInDate).getTime()) / (24 * 60 * 60 * 1000)))
+      : 0;
+  const resEditCheckInIsTodayOrPast = editingReservation && toDateOnly(editingReservation.checkInDate) <= today;
+
+  async function handleResEditPayCash() {
+    if (!editingReservation || resEditPaymentDueCents == null || resEditPaymentDueCents < 1) return;
+    const recipientEmail =
+      editingReservation.reservationType === "member"
+        ? resEditMemberLookup?.email?.trim()
+        : editingReservation.guestEmail?.trim();
+    const recipientDisplayName =
+      editingReservation.reservationType === "member"
+        ? (resEditMemberLookup?.displayName || `#${editingReservation.memberNumber}`)
+        : `${editingReservation.guestFirstName ?? ""} ${editingReservation.guestLastName ?? ""}`.trim() || "Guest";
+    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      alert("Recipient email required for receipt. For members, ensure lookup has email on file.");
+      return;
+    }
+    setResEditSubmitting(true);
+    try {
+      const res = await fetch(`/api/members/caretaker/reservations/${editingReservation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          checkInDate: resEditCheckInDate,
+          checkOutDate: resEditCheckOutDate,
+          paymentMethod: "cash",
+          amountCents: resEditPaymentDueCents,
+          recipientEmail,
+          recipientDisplayName,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "Payment failed");
+        return;
+      }
+      setResEditModalOpen(false);
+      setEditingReservation(null);
+      setResEditPaymentDueCents(null);
+      loadReservations();
+    } catch {
+      alert("Payment failed");
+    } finally {
+      setResEditSubmitting(false);
+    }
+  }
+
+  async function handleResEditPayCard() {
+    if (!editingReservation || resEditPaymentDueCents == null || resEditPaymentDueCents < 1) return;
+    const recipientEmail =
+      editingReservation.reservationType === "member"
+        ? resEditMemberLookup?.email?.trim()
+        : editingReservation.guestEmail?.trim();
+    const recipientDisplayName =
+      editingReservation.reservationType === "member"
+        ? (resEditMemberLookup?.displayName || `#${editingReservation.memberNumber}`)
+        : `${editingReservation.guestFirstName ?? ""} ${editingReservation.guestLastName ?? ""}`.trim() || "Guest";
+    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      alert("Recipient email required for receipt. For members, ensure lookup has email on file.");
+      return;
+    }
+    setResEditSubmitting(true);
+    try {
+      const checkoutBody: Record<string, unknown> = {
+        amountCents: resEditPaymentDueCents,
+        paymentType: "reservation",
+        reservationId: editingReservation.id,
+        recipientEmail,
+        recipientDisplayName,
+        siteId: editingReservation.siteId,
+        checkInDate: resEditCheckInDate,
+        checkOutDate: resEditCheckOutDate,
+        nights: resEditNights,
+        reservationType: editingReservation.reservationType,
+      };
+      if (editingReservation.reservationType === "member") {
+        checkoutBody.memberContactId = editingReservation.memberContactId ?? "";
+        checkoutBody.memberNumber = editingReservation.memberNumber ?? "";
+        checkoutBody.memberDisplayName = editingReservation.memberDisplayName ?? "";
+      } else {
+        checkoutBody.guestFirstName = editingReservation.guestFirstName ?? "";
+        checkoutBody.guestLastName = editingReservation.guestLastName ?? "";
+        checkoutBody.guestEmail = editingReservation.guestEmail ?? "";
+        checkoutBody.guestPhone = editingReservation.guestPhone ?? undefined;
+      }
+      const res = await fetch("/api/members/caretaker/payments/checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checkoutBody),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "Checkout failed");
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      alert("Checkout failed");
+    } catch {
+      alert("Checkout failed");
     } finally {
       setResEditSubmitting(false);
     }
@@ -810,8 +1245,6 @@ export function CaretakerPortalContent({
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-
   // Reservation system UI (Burnt River)
   if (usesReservations) {
     return (
@@ -954,14 +1387,35 @@ export function CaretakerPortalContent({
                         </button>
                       </div>
                       {resMemberLookup && (
-                        <div className="text-sm">
+                        <div className="text-sm space-y-2">
                           <p className="text-[#e8e0d5]">✓ {resMemberLookup.displayName} (#{resMemberLookup.memberNumber})</p>
                           {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) || (resMemberLookup.membershipDuesOwed != null && resMemberLookup.membershipDuesOwed > 0) ? (
-                            <p className="text-amber-400/90 mt-1">
-                              {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) && `Maintenance past due: ${formatCurrency(resMemberLookup.maintenanceFeesDue)}`}
-                              {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) && (resMemberLookup.membershipDuesOwed != null && resMemberLookup.membershipDuesOwed > 0) && " · "}
-                              {(resMemberLookup.membershipDuesOwed != null && resMemberLookup.membershipDuesOwed > 0) && `Membership dues owed: ${formatCurrency(resMemberLookup.membershipDuesOwed)}`}
-                            </p>
+                            <>
+                              <p className="text-amber-400/90">
+                                {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) && `Maintenance past due: ${formatCurrency(resMemberLookup.maintenanceFeesDue)}`}
+                                {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) && (resMemberLookup.membershipDuesOwed != null && resMemberLookup.membershipDuesOwed > 0) && " · "}
+                                {(resMemberLookup.membershipDuesOwed != null && resMemberLookup.membershipDuesOwed > 0) && `Membership dues owed: ${formatCurrency(resMemberLookup.membershipDuesOwed)}`}
+                              </p>
+                              <div className="pt-2 border-t border-[#d4af37]/20 space-y-2">
+                                <p className="text-[#e8e0d5]/80 text-xs">Pay past due now (optional)</p>
+                                <div className="flex gap-2 items-center">
+                                  <label className="text-[#e8e0d5]/80 text-xs shrink-0">Maintenance $</label>
+                                  <input type="number" min={0} step={0.01} value={resPastDueMaintenanceCents / 100} onChange={(e) => setResPastDueMaintenanceCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-20 px-2 py-1 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
+                                  <label className="text-[#e8e0d5]/80 text-xs shrink-0">Membership $</label>
+                                  <input type="number" min={0} step={0.01} value={resPastDueMembershipCents / 100} onChange={(e) => setResPastDueMembershipCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-20 px-2 py-1 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
+                                </div>
+                                {resPastDueMaintenanceCents + resPastDueMembershipCents > 0 && (
+                                  <div className="flex gap-2">
+                                    <button type="button" onClick={handleResPayPastDueCash} disabled={resPastDueSubmitting} className="py-1.5 px-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded text-xs disabled:opacity-50 flex items-center gap-1">
+                                      {resPastDueSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Pay past due (cash)
+                                    </button>
+                                    <button type="button" onClick={handleResPayPastDueCard} disabled={resPastDueSubmitting} className="py-1.5 px-3 border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded text-xs disabled:opacity-50 flex items-center gap-1">
+                                      {resPastDueSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Pay past due (card)
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </>
                           ) : null}
                         </div>
                       )}
@@ -975,11 +1429,24 @@ export function CaretakerPortalContent({
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setCreateResModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
-                  <button type="submit" disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
-                    {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Create reservation
-                  </button>
+                {resTotalCents > 0 && (
+                  <div className="pt-2 border-t border-[#d4af37]/20">
+                    <p className="text-[#e8e0d5] font-medium">Total: {formatCentsAsCurrency(resTotalCents)}</p>
+                    <p className="text-[#e8e0d5]/60 text-xs mt-1">Payment in full required. Cash only when check-in is today.</p>
+                  </div>
+                )}
+                <div className="flex flex-col gap-2 pt-2">
+                  <div className="flex gap-2">
+                    {resCheckInIsToday && (
+                      <button type="button" onClick={handleCreateReservationCash} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
+                        {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with cash
+                      </button>
+                    )}
+                    <button type="button" onClick={handleCreateReservationCard} disabled={resSubmitting} className={resCheckInIsToday ? "flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2" : "flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2"}>
+                      {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with card
+                    </button>
+                  </div>
+                  <button type="button" onClick={() => setCreateResModalOpen(false)} className="py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
                 </div>
               </form>
             </div>
@@ -1027,6 +1494,30 @@ export function CaretakerPortalContent({
                             {detailsMemberLookup.membershipDuesOwed != null && detailsMemberLookup.membershipDuesOwed > 0 && (
                               <p className="text-[#e8e0d5]">Membership dues owed: <span className="text-amber-400">{formatCurrency(detailsMemberLookup.membershipDuesOwed)}</span></p>
                             )}
+                            <div className="pt-3 space-y-2">
+                              <p className="text-[#e8e0d5]/80 text-sm">Pay past due (optional)</p>
+                              <div className="flex gap-2 items-center">
+                                <label className="text-[#e8e0d5]/80 text-sm shrink-0">Maintenance $</label>
+                                <input type="number" min={0} step={0.01} value={detailsPastDueMaintenanceCents / 100} onChange={(e) => setDetailsPastDueMaintenanceCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-24 px-2 py-1.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
+                              </div>
+                              <div className="flex gap-2 items-center">
+                                <label className="text-[#e8e0d5]/80 text-sm shrink-0">Membership $</label>
+                                <input type="number" min={0} step={0.01} value={detailsPastDueMembershipCents / 100} onChange={(e) => setDetailsPastDueMembershipCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-24 px-2 py-1.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
+                              </div>
+                              {detailsPastDueMaintenanceCents + detailsPastDueMembershipCents > 0 && (
+                                <>
+                                  <p className="text-[#e8e0d5] text-sm">Total: <strong>{formatCentsAsCurrency(detailsPastDueMaintenanceCents + detailsPastDueMembershipCents)}</strong></p>
+                                  <div className="flex gap-2">
+                                    <button type="button" onClick={handleDetailsPayPastDueCash} disabled={detailsPastDueSubmitting} className="flex-1 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-1">
+                                      {detailsPastDueSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay cash
+                                    </button>
+                                    <button type="button" onClick={handleDetailsPayPastDueCard} disabled={detailsPastDueSubmitting} className="flex-1 py-2 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-1">
+                                      {detailsPastDueSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay card
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </>
                         ) : (
                           <p className="text-[#e8e0d5]/80">No past-due amounts</p>
@@ -1060,23 +1551,40 @@ export function CaretakerPortalContent({
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setResEditModalOpen(false)}>
             <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-[#f0d48f]">Edit reservation dates</h3>
-                <button type="button" onClick={() => setResEditModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+                <h3 className="font-semibold text-[#f0d48f]">{resEditPaymentDueCents != null ? "Pay for additional nights" : "Edit reservation dates"}</h3>
+                <button type="button" onClick={() => { setResEditModalOpen(false); setResEditPaymentDueCents(null); }} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
               </div>
               <p className="text-[#e8e0d5]/80 text-sm mb-4">{editingReservation.siteName} — {editingReservation.reservationType === "member" ? editingReservation.memberDisplayName : `${editingReservation.guestFirstName} ${editingReservation.guestLastName}`}</p>
-              <form onSubmit={handleResEditSubmit}>
-                <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Check-in date</label>
-                <DatePickerWithCalendar value={resEditCheckInDate} onChange={setResEditCheckInDate} min={today} id="edit-res-check-in" />
-                <label className="block text-sm font-medium text-[#e8e0d5] mb-2 mt-3">Check-out date</label>
-                <DatePickerWithCalendar value={resEditCheckOutDate} onChange={setResEditCheckOutDate} min={resEditCheckInDate || today} id="edit-res-check-out" />
-                <p className="text-[#e8e0d5]/50 text-xs mb-4 mt-2">Check-out must be after check-in. Payment adjustments (proration, extensions) will be handled when payment is enabled.</p>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setResEditModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
-                  <button type="submit" disabled={resEditSubmitting || !resEditCheckInDate || !resEditCheckOutDate || resEditCheckInDate >= resEditCheckOutDate} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
-                    {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save
-                  </button>
+              {resEditPaymentDueCents != null ? (
+                <div className="space-y-4">
+                  <p className="text-[#e8e0d5]">Additional amount due: <strong>{formatCentsAsCurrency(resEditPaymentDueCents)}</strong></p>
+                  <div className="flex gap-2">
+                    {resEditCheckInIsTodayOrPast && (
+                      <button type="button" onClick={handleResEditPayCash} disabled={resEditSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                        {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay cash
+                      </button>
+                    )}
+                    <button type="button" onClick={handleResEditPayCard} disabled={resEditSubmitting} className="flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2">
+                      {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay card
+                    </button>
+                  </div>
+                  <button type="button" onClick={() => setResEditPaymentDueCents(null)} className="w-full py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Back to dates</button>
                 </div>
-              </form>
+              ) : (
+                <form onSubmit={handleResEditSubmit}>
+                  <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Check-in date</label>
+                  <DatePickerWithCalendar value={resEditCheckInDate} onChange={setResEditCheckInDate} min={today} id="edit-res-check-in" />
+                  <label className="block text-sm font-medium text-[#e8e0d5] mb-2 mt-3">Check-out date</label>
+                  <DatePickerWithCalendar value={resEditCheckOutDate} onChange={setResEditCheckOutDate} min={resEditCheckInDate || today} id="edit-res-check-out" />
+                  <p className="text-[#e8e0d5]/50 text-xs mb-4 mt-2">Shortening the stay does not issue a refund. Extending requires paying the difference.</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setResEditModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
+                    <button type="submit" disabled={resEditSubmitting || !resEditCheckInDate || !resEditCheckOutDate || resEditCheckInDate >= resEditCheckOutDate} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                      {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}

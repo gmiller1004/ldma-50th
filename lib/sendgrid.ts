@@ -467,6 +467,115 @@ Lost Dutchman's Mining Association`;
   }
 }
 
+const RECEIPT_CC_EMAIL = "gricci@goldprospectors.org";
+
+export type PaymentReceiptLineItem = {
+  label: string;
+  amountCents: number;
+};
+
+/**
+ * Send a single payment receipt to the member and CC gricci@goldprospectors.org.
+ */
+export async function sendPaymentReceiptEmail(
+  to: string,
+  campName: string,
+  lineItems: PaymentReceiptLineItem[],
+  totalCents: number,
+  method: "cash" | "card",
+  paymentDate: string
+): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV] Payment receipt for ${to}: ${(totalCents / 100).toFixed(2)} ${method}`);
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping payment receipt email");
+    return false;
+  }
+
+  sgMail.setApiKey(apiKey);
+
+  const totalDollars = (totalCents / 100).toFixed(2);
+  const methodLabel = method === "card" ? "Card" : "Cash";
+  const linesText = lineItems.map((l) => `${l.label}: $${(l.amountCents / 100).toFixed(2)}`).join("\n");
+  const textContent = `Payment receipt — ${campName}
+
+Thank you for your payment.
+
+${linesText}
+Total: $${totalDollars}
+Payment method: ${methodLabel}
+Date: ${paymentDate}
+
+Lost Dutchman's Mining Association`;
+
+  const linesHtml = lineItems
+    .map(
+      (l) =>
+        `<tr><td style="padding: 8px 0; color: #e8e0d5;">${escapeHtml(l.label)}</td><td style="text-align: right; padding: 8px 0; color: #e8e0d5;">$${(l.amountCents / 100).toFixed(2)}</td></tr>`
+    )
+    .join("");
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #1a120b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #1a120b; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #2a1f14; border-radius: 8px; border: 1px solid #d4af3740; overflow: hidden;">
+          <tr>
+            <td style="padding: 32px 24px; text-align: center; border-bottom: 1px solid #d4af3720;">
+              <h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #f0d48f; letter-spacing: 0.05em;">LDMA</h1>
+              <p style="margin: 8px 0 0; font-size: 14px; color: #e8e0d5b3;">Payment receipt — ${escapeHtml(campName)}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 24px;">
+              <p style="margin: 0 0 16px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">Thank you for your payment.</p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 0 0 16px;">
+                ${linesHtml}
+              </table>
+              <p style="margin: 0 0 8px; font-size: 16px; color: #e8e0d5;"><strong>Total: $${totalDollars}</strong></p>
+              <p style="margin: 0 0 4px; font-size: 14px; color: #e8e0d5b3;">Payment method: ${escapeHtml(methodLabel)}</p>
+              <p style="margin: 0; font-size: 14px; color: #e8e0d5b3;">Date: ${escapeHtml(paymentDate)}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 24px; background-color: #1a120b; border-top: 1px solid #d4af3720;">
+              <p style="margin: 0; font-size: 12px; color: #e8e0d560;">Lost Dutchman's Mining Association &bull; 1976–2026</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+
+  try {
+    await sgMail.send({
+      to,
+      cc: RECEIPT_CC_EMAIL,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `Payment receipt — ${campName}`,
+      text: textContent,
+      html: htmlContent,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid payment receipt error:", e);
+    return false;
+  }
+}
+
 /**
  * Send email when a reservation is modified (dates changed).
  */

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCaretakerContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations } from "@/lib/reservation-camps";
+import { computeReservationTotalCents } from "@/lib/reservation-pricing";
 import { lookupMember } from "@/lib/salesforce";
-import { sendReservationConfirmationEmail } from "@/lib/sendgrid";
+import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
 
 type ReservationRow = {
   id: string;
@@ -137,6 +138,10 @@ export async function POST(request: NextRequest) {
     checkInDate?: string;
     checkOutDate?: string;
     type?: string;
+    paymentMethod?: string;
+    amountCents?: number;
+    recipientEmail?: string;
+    recipientDisplayName?: string;
     memberContactId?: string;
     memberNumber?: string;
     memberDisplayName?: string;
@@ -170,12 +175,51 @@ export async function POST(request: NextRequest) {
   const checkOut = new Date(checkOutDate);
   const nights = Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (24 * 60 * 60 * 1000)));
 
-  // Verify site belongs to this camp
-  const siteCheck = await sql`
-    SELECT id FROM camp_sites WHERE id = ${siteId} AND camp_slug = ${caretaker.campSlug} LIMIT 1
+  // Verify site belongs to this camp and get rates
+  const siteRows = await sql`
+    SELECT id, member_rate_daily, non_member_rate_daily FROM camp_sites WHERE id = ${siteId} AND camp_slug = ${caretaker.campSlug} LIMIT 1
   `;
-  if (!Array.isArray(siteCheck) || siteCheck.length === 0) {
+  const siteRow = (Array.isArray(siteRows) ? siteRows : [])[0] as { id: string; member_rate_daily: number | null; non_member_rate_daily: number | null } | undefined;
+  if (!siteRow) {
     return NextResponse.json({ error: "Site not found" }, { status: 404 });
+  }
+
+  // Payment required: cash only when check-in is today; otherwise frontend must use card (checkout-session).
+  const today = new Date().toISOString().slice(0, 10);
+  const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
+  if (!paymentMethod) {
+    return NextResponse.json(
+      { error: "Payment required. For same-day check-in you may pay cash; otherwise pay by card." },
+      { status: 400 }
+    );
+  }
+  if (checkInDate !== today) {
+    return NextResponse.json(
+      { error: "Cash payment is only allowed when check-in date is today. Use card for future check-in." },
+      { status: 400 }
+    );
+  }
+  const amountCents = typeof body.amountCents === "number" ? body.amountCents : 0;
+  const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
+  const recipientDisplayName = typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest";
+  if (amountCents < 1 || !recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+    return NextResponse.json(
+      { error: "Valid amount and recipient email required for cash payment" },
+      { status: 400 }
+    );
+  }
+  const expectedCents = computeReservationTotalCents(
+    nights,
+    null,
+    type === "member",
+    siteRow.member_rate_daily,
+    siteRow.non_member_rate_daily
+  );
+  if (amountCents !== expectedCents) {
+    return NextResponse.json(
+      { error: `Amount must be $${(expectedCents / 100).toFixed(2)} for this reservation` },
+      { status: 400 }
+    );
   }
 
   // Overlap check: no other non-cancelled reservation for this site in [checkInDate, checkOutDate)
@@ -217,23 +261,35 @@ export async function POST(request: NextRequest) {
     const row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
     if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
 
-    // Send confirmation email (fire-and-forget)
-    const siteRes = await sql`SELECT name FROM camp_sites WHERE id = ${siteId} LIMIT 1`;
-    const siteName = ((Array.isArray(siteRes) ? siteRes : []) as { name: string }[])[0]?.name ?? "Site";
-    lookupMember(memberNumber)
-      .then((m) => (m.valid && m.email?.trim() ? m.email.trim() : null))
-      .then((email) => {
-        if (!email) return;
-        return sendReservationConfirmationEmail(
-          email,
-          caretaker.campName,
-          siteName,
-          checkInDate,
-          checkOutDate,
-          memberDisplayName || `#${memberNumber}`
-        );
-      })
-      .catch((e) => console.error("[caretaker] reservation confirmation email failed:", e));
+    await sql`
+      INSERT INTO camp_payments (
+        camp_slug, payment_type, method, amount_cents, reservation_id,
+        member_contact_id, member_number, member_email, recipient_display_name,
+        created_by_contact_id, created_at
+      )
+      VALUES (
+        ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${row.id},
+        ${memberContactId}, ${memberNumber}, ${recipientEmail}, ${recipientDisplayName},
+        ${caretaker.contactId}, NOW()
+      )
+    `;
+    const receiptSent = await sendPaymentReceiptEmail(
+      recipientEmail,
+      caretaker.campName,
+      [{ label: "Camp reservation", amountCents }],
+      amountCents,
+      "cash",
+      today
+    ).catch((e) => {
+      console.error("[caretaker] payment receipt email failed:", e);
+      return false;
+    });
+    if (receiptSent) {
+      await sql`
+        UPDATE camp_payments SET receipt_sent_at = NOW()
+        WHERE id = (SELECT id FROM camp_payments WHERE reservation_id = ${row.id} AND method = 'cash' ORDER BY created_at DESC LIMIT 1)
+      `;
+    }
 
     return NextResponse.json(rowToJson(row), { status: 201 });
   }
@@ -268,17 +324,33 @@ export async function POST(request: NextRequest) {
   const row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
   if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
 
-  // Send confirmation email (fire-and-forget)
-  const siteRes = await sql`SELECT name FROM camp_sites WHERE id = ${siteId} LIMIT 1`;
-  const siteName = ((Array.isArray(siteRes) ? siteRes : []) as { name: string }[])[0]?.name ?? "Site";
-  sendReservationConfirmationEmail(
-    guestEmail,
+  await sql`
+    INSERT INTO camp_payments (
+      camp_slug, payment_type, method, amount_cents, reservation_id,
+      member_email, recipient_display_name, created_by_contact_id, created_at
+    )
+    VALUES (
+      ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${row.id},
+      ${recipientEmail}, ${recipientDisplayName}, ${caretaker.contactId}, NOW()
+    )
+  `;
+  const receiptSent = await sendPaymentReceiptEmail(
+    recipientEmail,
     caretaker.campName,
-    siteName,
-    checkInDate,
-    checkOutDate,
-    `${guestFirstName} ${guestLastName}`.trim() || "Guest"
-  ).catch((e) => console.error("[caretaker] reservation confirmation email failed:", e));
+    [{ label: "Camp reservation", amountCents }],
+    amountCents,
+    "cash",
+    today
+  ).catch((e) => {
+    console.error("[caretaker] payment receipt email failed:", e);
+    return false;
+  });
+  if (receiptSent) {
+    await sql`
+      UPDATE camp_payments SET receipt_sent_at = NOW()
+      WHERE id = (SELECT id FROM camp_payments WHERE reservation_id = ${row.id} AND method = 'cash' ORDER BY created_at DESC LIMIT 1)
+    `;
+  }
 
   return NextResponse.json(rowToJson(row), { status: 201 });
 }

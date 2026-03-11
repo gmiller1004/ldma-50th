@@ -5,7 +5,7 @@ import { lookupMember } from "@/lib/salesforce";
 /**
  * POST /api/members/caretaker/lookup
  * Body: { memberNumber: string }
- * Returns member info for caretaker to verify: name, number, isLdmaMember, maintenanceFeesDue, membershipDuesOwed, membershipBalance, contactId.
+ * Returns member info for caretaker to verify: name, number, email, isLdmaMember, maintenanceFeesDue, membershipDuesOwed, membershipBalance, contactId.
  */
 export async function POST(request: NextRequest) {
   const caretaker = await getCaretakerContext();
@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
     contactId: member.contactId,
     memberNumber,
     displayName,
+    email: member.email?.trim() || null,
     isLdmaMember: member.active === true,
     maintenanceFeesDue: member.duesOwed ?? null,
     membershipDuesOwed: member.membershipDuesOwed ?? null,

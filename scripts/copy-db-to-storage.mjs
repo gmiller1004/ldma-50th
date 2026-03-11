@@ -42,6 +42,7 @@ const COPY_ORDER = [
   "caretaker_guest_check_ins",
   "camp_sites",
   "camp_reservations",
+  "camp_payments",
   "oauth_state",
 ];
 
