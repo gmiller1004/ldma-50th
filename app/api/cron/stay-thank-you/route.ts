@@ -36,9 +36,8 @@ export async function GET(request: NextRequest) {
       const member = await lookupMember(stay.memberNumber);
       if (member.valid && member.email?.trim()) {
         email = member.email.trim();
-        if (member.firstName?.trim() || member.displayName?.trim()) {
-          recipientName = member.displayName?.trim() || member.firstName?.trim() || recipientName;
-        }
+        const fromLookup = [member.firstName, member.lastName].filter(Boolean).join(" ").trim();
+        if (fromLookup) recipientName = fromLookup;
       }
     }
 
