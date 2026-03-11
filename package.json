@@ -12,7 +12,8 @@
     "db:blog:init": "node --env-file=.env.local scripts/init-blog-db.mjs",
     "db:blog:seed-myldma": "node --env-file=.env.local scripts/seed-blog-from-myldma-sitemap.mjs",
     "generate:blog-redirects": "node scripts/generate-blog-redirects.mjs",
-    "db:migrate": "node --env-file=.env.local scripts/migrate-community.mjs"
+    "db:migrate": "node --env-file=.env.local scripts/migrate-community.mjs",
+    "db:seed:burnt-river-sites": "node --env-file=.env.local scripts/seed-burnt-river-sites.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

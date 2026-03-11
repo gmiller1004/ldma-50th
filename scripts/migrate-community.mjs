@@ -34,6 +34,8 @@ const migrations = [
   "migrate-oauth-state-pkce.sql",
   "migrate-claims.sql",
   "seed-stanton-claims.sql",
+  "migrate-camp-sites.sql",
+  "migrate-camp-reservations.sql",
 ];
 
 let fullSql = migrations

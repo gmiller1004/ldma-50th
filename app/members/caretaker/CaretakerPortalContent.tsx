@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Loader2, Calendar, User, UserPlus, X } from "lucide-react";
+import { Search, Loader2, Calendar, User, UserPlus, X, MapPin } from "lucide-react";
+import { campUsesReservations } from "@/lib/reservation-camps";
 
 type LookupResult = {
   contactId: string;
@@ -32,6 +33,32 @@ type GuestCheckIn = {
   checkInDate: string;
   checkOutDate: string;
   nights: number;
+};
+
+type Site = {
+  id: string;
+  name: string;
+  siteType: string;
+  sortOrder: number;
+  memberRateDaily: number | null;
+  nonMemberRateDaily: number | null;
+};
+
+type Reservation = {
+  id: string;
+  siteId: string;
+  siteName: string | null;
+  checkInDate: string;
+  checkOutDate: string;
+  nights: number;
+  reservationType: string;
+  memberNumber: string | null;
+  memberDisplayName: string | null;
+  guestFirstName: string | null;
+  guestLastName: string | null;
+  guestEmail: string | null;
+  status: string;
+  checkedInAt: string | null;
 };
 
 function formatCurrency(val: number | null | undefined): string {
@@ -83,6 +110,36 @@ export function CaretakerPortalContent({
   const [guestCancelModalOpen, setGuestCancelModalOpen] = useState(false);
   const [guestCancelSubmitting, setGuestCancelSubmitting] = useState(false);
 
+  // Reservation system (Burnt River)
+  const [sites, setSites] = useState<Site[]>([]);
+  const [activeReservations, setActiveReservations] = useState<Reservation[]>([]);
+  const [archivedReservations, setArchivedReservations] = useState<Reservation[]>([]);
+  const [reservationsLoading, setReservationsLoading] = useState(false);
+  const [createResModalOpen, setCreateResModalOpen] = useState(false);
+  const [resCheckInDate, setResCheckInDate] = useState("");
+  const [resCheckOutDate, setResCheckOutDate] = useState("");
+  const [resSiteId, setResSiteId] = useState("");
+  const [resType, setResType] = useState<"member" | "guest">("member");
+  const [resMemberNumber, setResMemberNumber] = useState("");
+  const [resMemberLookup, setResMemberLookup] = useState<LookupResult | null>(null);
+  const [resMemberLookupLoading, setResMemberLookupLoading] = useState(false);
+  const [resGuestFirstName, setResGuestFirstName] = useState("");
+  const [resGuestLastName, setResGuestLastName] = useState("");
+  const [resGuestEmail, setResGuestEmail] = useState("");
+  const [resGuestPhone, setResGuestPhone] = useState("");
+  const [resSubmitting, setResSubmitting] = useState(false);
+  const [resError, setResError] = useState<string | null>(null);
+  const [availableSiteIds, setAvailableSiteIds] = useState<string[]>([]);
+  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
+  const [resEditModalOpen, setResEditModalOpen] = useState(false);
+  const [resEditCheckOutDate, setResEditCheckOutDate] = useState("");
+  const [resEditSubmitting, setResEditSubmitting] = useState(false);
+  const [cancellingReservation, setCancellingReservation] = useState<Reservation | null>(null);
+  const [resCancelModalOpen, setResCancelModalOpen] = useState(false);
+  const [resCancelSubmitting, setResCancelSubmitting] = useState(false);
+  const [checkingInReservation, setCheckingInReservation] = useState<Reservation | null>(null);
+  const [resCheckInSubmitting, setResCheckInSubmitting] = useState(false);
+
   function loadCheckIns() {
     setListLoading(true);
     Promise.all([
@@ -104,6 +161,226 @@ export function CaretakerPortalContent({
   useEffect(() => {
     loadCheckIns();
   }, []);
+
+  const usesReservations = campUsesReservations(campSlug);
+
+  function loadSites() {
+    if (!usesReservations) return;
+    fetch("/api/members/caretaker/sites")
+      .then((r) => r.json())
+      .then((data) => setSites(data.sites ?? []))
+      .catch(() => setSites([]));
+  }
+
+  function loadReservations() {
+    if (!usesReservations) return;
+    setReservationsLoading(true);
+    Promise.all([
+      fetch("/api/members/caretaker/reservations?status=active").then((r) => r.json()),
+      fetch("/api/members/caretaker/reservations?status=archived").then((r) => r.json()),
+    ])
+      .then(([activeRes, archivedRes]) => {
+        setActiveReservations(activeRes.reservations ?? []);
+        setArchivedReservations(archivedRes.reservations ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setReservationsLoading(false));
+  }
+
+  useEffect(() => {
+    if (usesReservations) {
+      loadSites();
+      loadReservations();
+    }
+  }, [usesReservations]);
+
+  async function fetchAvailability() {
+    if (!resCheckInDate || !resCheckOutDate || resCheckInDate >= resCheckOutDate) {
+      setAvailableSiteIds([]);
+      return;
+    }
+    const r = await fetch(
+      `/api/members/caretaker/sites/availability?from=${encodeURIComponent(resCheckInDate)}&to=${encodeURIComponent(resCheckOutDate)}`
+    );
+    const data = await r.json();
+    setAvailableSiteIds(data.availableSiteIds ?? []);
+  }
+
+  useEffect(() => {
+    if (resCheckInDate && resCheckOutDate && resCheckInDate < resCheckOutDate) {
+      fetchAvailability();
+    } else {
+      setAvailableSiteIds([]);
+    }
+  }, [resCheckInDate, resCheckOutDate]);
+
+  async function handleReservationMemberLookup(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resMemberNumber.trim()) return;
+    setResMemberLookupLoading(true);
+    setResError(null);
+    try {
+      const res = await fetch("/api/members/caretaker/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberNumber: resMemberNumber.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResError(data.error ?? "Lookup failed");
+        setResMemberLookup(null);
+        return;
+      }
+      setResMemberLookup(data);
+    } catch {
+      setResError("Lookup failed");
+      setResMemberLookup(null);
+    } finally {
+      setResMemberLookupLoading(false);
+    }
+  }
+
+  async function handleCreateReservation(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resSiteId || !resCheckInDate || !resCheckOutDate) {
+      setResError("Select site and dates");
+      return;
+    }
+    if (resType === "member") {
+      if (!resMemberLookup) {
+        setResError("Look up member first");
+        return;
+      }
+    } else {
+      if (!resGuestFirstName.trim() || !resGuestLastName.trim() || !resGuestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resGuestEmail.trim())) {
+        setResError("Enter guest first name, last name, and valid email");
+        return;
+      }
+    }
+    setResError(null);
+    setResSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {
+        siteId: resSiteId,
+        checkInDate: resCheckInDate,
+        checkOutDate: resCheckOutDate,
+        type: resType,
+      };
+      if (resType === "member" && resMemberLookup) {
+        body.memberContactId = resMemberLookup.contactId;
+        body.memberNumber = resMemberLookup.memberNumber;
+        body.memberDisplayName = resMemberLookup.displayName;
+      } else {
+        body.guestFirstName = resGuestFirstName.trim();
+        body.guestLastName = resGuestLastName.trim();
+        body.guestEmail = resGuestEmail.trim();
+        body.guestPhone = resGuestPhone.trim() || undefined;
+      }
+      const res = await fetch("/api/members/caretaker/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResError(data.error ?? "Failed to create reservation");
+        return;
+      }
+      setCreateResModalOpen(false);
+      setResSiteId("");
+      setResMemberLookup(null);
+      setResMemberNumber("");
+      setResGuestFirstName("");
+      setResGuestLastName("");
+      setResGuestEmail("");
+      setResGuestPhone("");
+      loadReservations();
+    } catch {
+      setResError("Failed to create reservation");
+    } finally {
+      setResSubmitting(false);
+    }
+  }
+
+  function openResEditModal(r: Reservation) {
+    setEditingReservation(r);
+    setResEditCheckOutDate(r.checkOutDate);
+    setResEditModalOpen(true);
+  }
+
+  async function handleResEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingReservation) return;
+    setResEditSubmitting(true);
+    try {
+      const res = await fetch(`/api/members/caretaker/reservations/${editingReservation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checkOutDate: resEditCheckOutDate }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error ?? "Update failed");
+        return;
+      }
+      setResEditModalOpen(false);
+      setEditingReservation(null);
+      loadReservations();
+    } catch {
+      alert("Update failed");
+    } finally {
+      setResEditSubmitting(false);
+    }
+  }
+
+  function openResCancelModal(r: Reservation) {
+    setCancellingReservation(r);
+    setResCancelModalOpen(true);
+  }
+
+  async function handleResCancelConfirm() {
+    if (!cancellingReservation) return;
+    setResCancelSubmitting(true);
+    try {
+      const res = await fetch(`/api/members/caretaker/reservations/${cancellingReservation.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        setResError(data.error ?? "Cancel failed");
+        return;
+      }
+      setResCancelModalOpen(false);
+      setCancellingReservation(null);
+      setResError(null);
+      loadReservations();
+    } catch {
+      setResError("Cancel failed");
+    } finally {
+      setResCancelSubmitting(false);
+    }
+  }
+
+  async function handleResCheckIn(r: Reservation) {
+    setCheckingInReservation(r);
+    setResCheckInSubmitting(true);
+    try {
+      const res = await fetch(`/api/members/caretaker/reservations/${r.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checkIn: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error ?? "Check-in failed");
+        return;
+      }
+      setCheckingInReservation(null);
+      loadReservations();
+    } catch {
+      alert("Check-in failed");
+    } finally {
+      setResCheckInSubmitting(false);
+    }
+  }
 
   async function handleLookup(e: React.FormEvent) {
     e.preventDefault();
@@ -328,6 +605,213 @@ export function CaretakerPortalContent({
   }
 
   const today = new Date().toISOString().slice(0, 10);
+
+  // Reservation system UI (Burnt River)
+  if (usesReservations) {
+    return (
+      <div className="space-y-8">
+        <section className="p-4 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg">
+          <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
+            <MapPin className="w-5 h-5" />
+            Site reservations
+          </h2>
+          <p className="text-[#e8e0d5]/80 text-sm mb-3">
+            Create and manage site reservations. Only available sites for the chosen dates are shown.
+          </p>
+          <button
+            type="button"
+            onClick={() => { setResError(null); setCreateResModalOpen(true); }}
+            className="px-4 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f]"
+          >
+            Create reservation
+          </button>
+        </section>
+
+        <section>
+          <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Active reservations
+          </h2>
+          {reservationsLoading ? (
+            <p className="text-[#e8e0d5]/60">Loading…</p>
+          ) : activeReservations.length === 0 ? (
+            <p className="text-[#e8e0d5]/60">No active reservations.</p>
+          ) : (
+            <ul className="space-y-2">
+              {activeReservations.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg"
+                >
+                  <div>
+                    <span className="font-medium text-[#e8e0d5]">
+                      {r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}
+                    </span>
+                    <span className="text-[#e8e0d5]/60 ml-2">
+                      {r.checkInDate} – {r.checkOutDate} ({r.nights} night{r.nights !== 1 ? "s" : ""})
+                    </span>
+                    {r.checkedInAt ? (
+                      <span className="ml-2 px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm">Checked in</span>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!r.checkedInAt && (
+                      <button
+                        type="button"
+                        onClick={() => handleResCheckIn(r)}
+                        disabled={resCheckInSubmitting}
+                        className="px-3 py-1.5 text-sm bg-[#0f3d1e] text-[#6dd472] rounded hover:bg-[#0f3d1e]/80"
+                      >
+                        {resCheckInSubmitting && checkingInReservation?.id === r.id ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Check in
+                      </button>
+                    )}
+                    <button type="button" onClick={() => openResEditModal(r)} className="px-3 py-1.5 text-sm bg-[#d4af37]/20 text-[#d4af37] rounded hover:bg-[#d4af37]/30">
+                      Edit
+                    </button>
+                    <button type="button" onClick={() => openResCancelModal(r)} className="px-3 py-1.5 text-sm bg-red-950/50 text-red-300 rounded hover:bg-red-900/40 border border-red-800/50">
+                      Cancel
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <h2 className="font-semibold text-[#e8e0d5]/80 mb-3">Archived reservations</h2>
+          {reservationsLoading ? null : archivedReservations.length === 0 ? (
+            <p className="text-[#e8e0d5]/60">No archived reservations.</p>
+          ) : (
+            <ul className="space-y-2">
+              {archivedReservations.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/40 border border-[#d4af37]/10 rounded-lg text-[#e8e0d5]/80">
+                  <span>{r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}</span>
+                  <span className="text-sm">{r.checkInDate} – {r.checkOutDate}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Create reservation modal */}
+        {createResModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setCreateResModalOpen(false)}>
+            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-[#f0d48f]">Create reservation</h3>
+                <button type="button" onClick={() => setCreateResModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+              </div>
+              {resError && <p className="mb-3 text-red-400 text-sm">{resError}</p>}
+              <form onSubmit={handleCreateReservation} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Check-in date *</label>
+                  <input type="date" value={resCheckInDate} onChange={(e) => setResCheckInDate(e.target.value)} min={today} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Check-out date *</label>
+                  <input type="date" value={resCheckOutDate} onChange={(e) => setResCheckOutDate(e.target.value)} min={resCheckInDate || today} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Site *</label>
+                  <select value={resSiteId} onChange={(e) => setResSiteId(e.target.value)} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required>
+                    <option value="">Select site</option>
+                    {sites.filter((s) => availableSiteIds.includes(s.id)).map((s) => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.siteType})</option>
+                    ))}
+                  </select>
+                  {resCheckInDate && resCheckOutDate && resCheckInDate < resCheckOutDate && availableSiteIds.length === 0 && (
+                    <p className="text-amber-400 text-sm mt-1">No sites available for these dates.</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Reservation for</label>
+                  <div className="flex gap-4 mb-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="resType" checked={resType === "member"} onChange={() => { setResType("member"); setResError(null); }} />
+                      <span className="text-[#e8e0d5]">Member</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="resType" checked={resType === "guest"} onChange={() => { setResType("guest"); setResError(null); }} />
+                      <span className="text-[#e8e0d5]">Guest</span>
+                    </label>
+                  </div>
+                  {resType === "member" ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input type="text" value={resMemberNumber} onChange={(e) => setResMemberNumber(e.target.value)} placeholder="Member number" className="flex-1 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" />
+                        <button type="button" onClick={handleReservationMemberLookup} disabled={resMemberLookupLoading || !resMemberNumber.trim()} className="px-4 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center gap-2">
+                          {resMemberLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Look up
+                        </button>
+                      </div>
+                      {resMemberLookup && <p className="text-[#e8e0d5] text-sm">✓ {resMemberLookup.displayName} (#{resMemberLookup.memberNumber})</p>}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="text" value={resGuestFirstName} onChange={(e) => setResGuestFirstName(e.target.value)} placeholder="First name" className="px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required={resType === "guest"} />
+                      <input type="text" value={resGuestLastName} onChange={(e) => setResGuestLastName(e.target.value)} placeholder="Last name" className="px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required={resType === "guest"} />
+                      <input type="email" value={resGuestEmail} onChange={(e) => setResGuestEmail(e.target.value)} placeholder="Email" className="col-span-2 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required={resType === "guest"} />
+                      <input type="tel" value={resGuestPhone} onChange={(e) => setResGuestPhone(e.target.value)} placeholder="Phone (optional)" className="col-span-2 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => setCreateResModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
+                  <button type="submit" disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
+                    {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Create reservation
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit reservation modal */}
+        {resEditModalOpen && editingReservation && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setResEditModalOpen(false)}>
+            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-[#f0d48f]">Edit checkout date</h3>
+                <button type="button" onClick={() => setResEditModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+              </div>
+              <p className="text-[#e8e0d5]/80 text-sm mb-4">{editingReservation.siteName} — {editingReservation.reservationType === "member" ? editingReservation.memberDisplayName : `${editingReservation.guestFirstName} ${editingReservation.guestLastName}`}</p>
+              <form onSubmit={handleResEditSubmit}>
+                <label className="block text-sm font-medium text-[#e8e0d5] mb-2">New checkout date</label>
+                <input type="date" min={editingReservation.checkInDate} value={resEditCheckOutDate} onChange={(e) => setResEditCheckOutDate(e.target.value)} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-4" />
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setResEditModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
+                  <button type="submit" disabled={resEditSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                    {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Cancel reservation modal */}
+        {resCancelModalOpen && cancellingReservation && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null))}>
+            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-[#f0d48f]">Cancel reservation</h3>
+                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+              </div>
+              <p className="text-[#e8e0d5]/90 text-sm mb-4">
+                Cancel this reservation for {cancellingReservation.siteName} — {cancellingReservation.reservationType === "member" ? cancellingReservation.memberDisplayName : `${cancellingReservation.guestFirstName} ${cancellingReservation.guestLastName}`}?
+              </p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Keep</button>
+                <button type="button" onClick={handleResCancelConfirm} disabled={resCancelSubmitting} className="flex-1 py-2.5 bg-red-800/80 text-red-100 font-semibold rounded-lg hover:bg-red-700/80 disabled:opacity-50 flex items-center justify-center gap-2">
+                  {resCancelSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Yes, cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

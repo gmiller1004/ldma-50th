@@ -28,6 +28,9 @@
 /addendum/
 /LDMA Addendum*.pdf
 
+# camp site data (copy .template.csv to .csv and fill in; do not commit filled data)
+/data/camp-sites/burnt-river-sites.csv
+
 # debug
 npm-debug.log*
 yarn-debug.log*
