@@ -41,13 +41,15 @@ export async function GET(request: NextRequest) {
       AND check_in_date < ${to}
       AND check_out_date > ${from}
   `;
-  const occupiedIds = new Set((Array.isArray(occupied) ? occupied : []).map((r: { site_id: string }) => r.site_id));
+  const occupiedRows = (Array.isArray(occupied) ? occupied : []) as { site_id: string }[];
+  const occupiedIds = new Set(occupiedRows.map((r) => r.site_id));
 
   // All sites for this camp
   const allSites = await sql`
     SELECT id FROM camp_sites WHERE camp_slug = ${caretaker.campSlug} ORDER BY sort_order ASC, name ASC
   `;
-  const allIds = (Array.isArray(allSites) ? allSites : []).map((r: { id: string }) => r.id);
+  const allSitesRows = (Array.isArray(allSites) ? allSites : []) as { id: string }[];
+  const allIds = allSitesRows.map((r) => r.id);
   const availableIds = allIds.filter((id) => !occupiedIds.has(id));
 
   return NextResponse.json({ availableSiteIds: availableIds });
