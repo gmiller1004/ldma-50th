@@ -915,7 +915,18 @@ export function CaretakerPortalContent({
                           {resMemberLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Look up
                         </button>
                       </div>
-                      {resMemberLookup && <p className="text-[#e8e0d5] text-sm">✓ {resMemberLookup.displayName} (#{resMemberLookup.memberNumber})</p>}
+                      {resMemberLookup && (
+                        <div className="text-sm">
+                          <p className="text-[#e8e0d5]">✓ {resMemberLookup.displayName} (#{resMemberLookup.memberNumber})</p>
+                          {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) || (resMemberLookup.membershipDuesOwed != null && resMemberLookup.membershipDuesOwed > 0) ? (
+                            <p className="text-amber-400/90 mt-1">
+                              {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) && `Maintenance past due: ${formatCurrency(resMemberLookup.maintenanceFeesDue)}`}
+                              {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) && (resMemberLookup.membershipDuesOwed != null && resMemberLookup.membershipDuesOwed > 0) && " · "}
+                              {(resMemberLookup.membershipDuesOwed != null && resMemberLookup.membershipDuesOwed > 0) && `Membership dues owed: ${formatCurrency(resMemberLookup.membershipDuesOwed)}`}
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">

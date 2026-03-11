@@ -6,6 +6,7 @@ import { lookupMember } from "@/lib/salesforce";
 import {
   sendCaretakerCheckInWelcomeEmail,
   sendCaretakerGuestCheckInWelcomeEmail,
+  sendReservationModifiedEmail,
 } from "@/lib/sendgrid";
 
 type ReservationRow = {
@@ -158,37 +159,79 @@ export async function PATCH(
       SET check_in_date = ${newCheckIn}, check_out_date = ${newCheckOut}, nights = ${newNights}, updated_at = NOW()
       WHERE id = ${id}
     `;
+
+    // Send "reservation modified" email (await so it completes before response)
+    const siteRes = await sql`SELECT name FROM camp_sites WHERE id = ${existingRow.site_id} LIMIT 1`;
+    const siteName = ((Array.isArray(siteRes) ? siteRes : []) as { name: string }[])[0]?.name ?? "Site";
+    if (existingRow.reservation_type === "member" && existingRow.member_number) {
+      try {
+        const member = await lookupMember(existingRow.member_number);
+        const email = member.valid && member.email?.trim() ? member.email.trim() : null;
+        if (email) {
+          await sendReservationModifiedEmail(
+            email,
+            caretaker.campName,
+            siteName,
+            newCheckIn,
+            newCheckOut,
+            existingRow.member_display_name || `#${existingRow.member_number}`
+          );
+        }
+      } catch (e) {
+        console.error("[caretaker] reservation modified email failed:", e);
+      }
+    } else if (existingRow.reservation_type === "guest" && existingRow.guest_email) {
+      try {
+        await sendReservationModifiedEmail(
+          existingRow.guest_email,
+          caretaker.campName,
+          siteName,
+          newCheckIn,
+          newCheckOut,
+          existingRow.guest_first_name || "Guest"
+        );
+      } catch (e) {
+        console.error("[caretaker] reservation modified email failed:", e);
+      }
+    }
   }
 
   const setCheckIn = body.checkIn === true;
+  const emailCheckIn = datesChanged ? newCheckIn : existingRow.check_in_date;
+  const emailCheckOut = datesChanged ? newCheckOut : existingRow.check_out_date;
+
   if (setCheckIn) {
-    // Send welcome email (fire-and-forget); use current dates after any update above
-    const emailCheckIn = datesChanged ? newCheckIn : existingRow.check_in_date;
-    const emailCheckOut = datesChanged ? newCheckOut : existingRow.check_out_date;
+    // Send welcome email (await so it completes before response — avoids serverless killing the process)
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
     if (existingRow.reservation_type === "member" && existingRow.member_number) {
-      lookupMember(existingRow.member_number)
-        .then((m) => (m.valid && m.email?.trim() ? m.email.trim() : null))
-        .then((email) => {
-          if (!email) return;
-          return sendCaretakerCheckInWelcomeEmail(
+      try {
+        const member = await lookupMember(existingRow.member_number);
+        const email = member.valid && member.email?.trim() ? member.email.trim() : null;
+        if (email) {
+          await sendCaretakerCheckInWelcomeEmail(
             email,
             caretaker.campName,
             existingRow.member_display_name || `#${existingRow.member_number}`,
             emailCheckIn,
             emailCheckOut
           );
-        })
-        .catch((e) => console.error("[caretaker] reservation check-in welcome email failed:", e));
+        }
+      } catch (e) {
+        console.error("[caretaker] reservation check-in welcome email failed:", e);
+      }
     } else if (existingRow.reservation_type === "guest" && existingRow.guest_email) {
-      sendCaretakerGuestCheckInWelcomeEmail(
-        existingRow.guest_email,
-        caretaker.campName,
-        existingRow.guest_first_name || "Guest",
-        emailCheckIn,
-        emailCheckOut,
-        baseUrl
-      ).catch((e) => console.error("[caretaker] reservation check-in welcome email failed:", e));
+      try {
+        await sendCaretakerGuestCheckInWelcomeEmail(
+          existingRow.guest_email,
+          caretaker.campName,
+          existingRow.guest_first_name || "Guest",
+          emailCheckIn,
+          emailCheckOut,
+          baseUrl
+        );
+      } catch (e) {
+        console.error("[caretaker] reservation check-in welcome email failed:", e);
+      }
     }
   }
 
