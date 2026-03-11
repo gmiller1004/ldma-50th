@@ -70,6 +70,7 @@ type Reservation = {
   guestFirstName: string | null;
   guestLastName: string | null;
   guestEmail: string | null;
+  guestPhone: string | null;
   status: string;
   checkedInAt: string | null;
 };
@@ -309,6 +310,10 @@ export function CaretakerPortalContent({
   const [resCancelSubmitting, setResCancelSubmitting] = useState(false);
   const [checkingInReservation, setCheckingInReservation] = useState<Reservation | null>(null);
   const [resCheckInSubmitting, setResCheckInSubmitting] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [detailsReservation, setDetailsReservation] = useState<Reservation | null>(null);
+  const [detailsMemberLookup, setDetailsMemberLookup] = useState<LookupResult | null>(null);
+  const [detailsMemberLoading, setDetailsMemberLoading] = useState(false);
 
   function loadCheckIns() {
     setListLoading(true);
@@ -472,6 +477,24 @@ export function CaretakerPortalContent({
     }
   }
 
+  function openResDetailsModal(r: Reservation) {
+    setDetailsReservation(r);
+    setDetailsMemberLookup(null);
+    setDetailsModalOpen(true);
+    if (r.reservationType === "member" && r.memberNumber) {
+      setDetailsMemberLoading(true);
+      fetch("/api/members/caretaker/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberNumber: r.memberNumber.trim() }),
+      })
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => setDetailsMemberLookup(data ?? null))
+        .catch(() => setDetailsMemberLookup(null))
+        .finally(() => setDetailsMemberLoading(false));
+    }
+  }
+
   function openResEditModal(r: Reservation) {
     setEditingReservation(r);
     setResEditCheckInDate(toDateOnly(r.checkInDate));
@@ -539,13 +562,18 @@ export function CaretakerPortalContent({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ checkIn: true }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         alert(data.error ?? "Check-in failed");
         return;
       }
       setCheckingInReservation(null);
       loadReservations();
+      if (data.welcomeEmailSent === false) {
+        alert("Check-in recorded. No welcome email was sent (no email on file for this " + (r.reservationType === "member" ? "member" : "guest") + ").");
+      } else if (data.welcomeEmailSent === true) {
+        alert("Check-in recorded. Welcome email sent.");
+      }
     } catch {
       alert("Check-in failed");
     } finally {
@@ -835,6 +863,9 @@ export function CaretakerPortalContent({
                         {resCheckInSubmitting && checkingInReservation?.id === r.id ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Check in
                       </button>
                     )}
+                    <button type="button" onClick={() => openResDetailsModal(r)} className="px-3 py-1.5 text-sm bg-[#1a120b] text-[#e8e0d5] border border-[#d4af37]/40 rounded hover:bg-[#d4af37]/10">
+                      Details
+                    </button>
                     <button type="button" onClick={() => openResEditModal(r)} className="px-3 py-1.5 text-sm bg-[#d4af37]/20 text-[#d4af37] rounded hover:bg-[#d4af37]/30">
                       Edit
                     </button>
@@ -944,6 +975,75 @@ export function CaretakerPortalContent({
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Reservation details modal */}
+        {detailsModalOpen && detailsReservation && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setDetailsModalOpen(false)}>
+            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-[#f0d48f]">Reservation details</h3>
+                <button type="button" onClick={() => setDetailsModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="space-y-4 text-sm">
+                <div>
+                  <p className="text-[#e8e0d5]/60 mb-0.5">Site</p>
+                  <p className="text-[#e8e0d5] font-medium">{detailsReservation.siteName ?? "Site"}</p>
+                </div>
+                <div>
+                  <p className="text-[#e8e0d5]/60 mb-0.5">Dates</p>
+                  <ReservationDateRange checkInDate={detailsReservation.checkInDate} checkOutDate={detailsReservation.checkOutDate} nights={detailsReservation.nights} />
+                </div>
+                <div>
+                  <p className="text-[#e8e0d5]/60 mb-0.5">Status</p>
+                  <p className="text-[#e8e0d5]">{detailsReservation.checkedInAt ? "Checked in" : "Reserved"}</p>
+                </div>
+                {detailsReservation.reservationType === "member" ? (
+                  <>
+                    <div>
+                      <p className="text-[#e8e0d5]/60 mb-0.5">Member</p>
+                      <p className="text-[#e8e0d5] font-medium">{detailsReservation.memberDisplayName || `#${detailsReservation.memberNumber}`}</p>
+                      <p className="text-[#e8e0d5]/80">Member # {detailsReservation.memberNumber}</p>
+                    </div>
+                    {detailsMemberLoading ? (
+                      <p className="text-[#e8e0d5]/60">Loading member details…</p>
+                    ) : detailsMemberLookup ? (
+                      <div className="pt-2 border-t border-[#d4af37]/20 space-y-2">
+                        <p className="text-[#e8e0d5]/60 mb-1">Dues & contact</p>
+                        {(detailsMemberLookup.maintenanceFeesDue != null && detailsMemberLookup.maintenanceFeesDue > 0) || (detailsMemberLookup.membershipDuesOwed != null && detailsMemberLookup.membershipDuesOwed > 0) ? (
+                          <>
+                            {detailsMemberLookup.maintenanceFeesDue != null && detailsMemberLookup.maintenanceFeesDue > 0 && (
+                              <p className="text-[#e8e0d5]">Maintenance past due: <span className="text-amber-400">{formatCurrency(detailsMemberLookup.maintenanceFeesDue)}</span></p>
+                            )}
+                            {detailsMemberLookup.membershipDuesOwed != null && detailsMemberLookup.membershipDuesOwed > 0 && (
+                              <p className="text-[#e8e0d5]">Membership dues owed: <span className="text-amber-400">{formatCurrency(detailsMemberLookup.membershipDuesOwed)}</span></p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-[#e8e0d5]/80">No past-due amounts</p>
+                        )}
+                        <p className="text-[#e8e0d5]/80">Email & phone on file for this member</p>
+                      </div>
+                    ) : detailsReservation.memberNumber ? (
+                      <p className="text-[#e8e0d5]/60">Could not load member details.</p>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-[#e8e0d5]/60 mb-0.5">Guest</p>
+                    <p className="text-[#e8e0d5] font-medium">{detailsReservation.guestFirstName} {detailsReservation.guestLastName}</p>
+                    <p className="text-[#e8e0d5]">Email: {detailsReservation.guestEmail ?? "—"}</p>
+                    <p className="text-[#e8e0d5]">Phone: {detailsReservation.guestPhone ?? "—"}</p>
+                  </div>
+                )}
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button type="button" onClick={() => setDetailsModalOpen(false)} className="px-4 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f]">
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}

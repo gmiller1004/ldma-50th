@@ -197,31 +197,37 @@ export async function PATCH(
   }
 
   const setCheckIn = body.checkIn === true;
-  const emailCheckIn = datesChanged ? newCheckIn : existingRow.check_in_date;
-  const emailCheckOut = datesChanged ? newCheckOut : existingRow.check_out_date;
+  // Normalize to YYYY-MM-DD for email body (DB may return timestamp)
+  const toDateOnly = (s: string) => (/^\d{4}-\d{2}-\d{2}$/.test(s.slice(0, 10)) ? s.slice(0, 10) : s);
+  const emailCheckIn = toDateOnly(datesChanged ? newCheckIn : existingRow.check_in_date);
+  const emailCheckOut = toDateOnly(datesChanged ? newCheckOut : existingRow.check_out_date);
 
+  let welcomeEmailSent = false;
   if (setCheckIn) {
     // Send welcome email (await so it completes before response — avoids serverless killing the process)
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
     if (existingRow.reservation_type === "member" && existingRow.member_number) {
       try {
-        const member = await lookupMember(existingRow.member_number);
+        const member = await lookupMember(String(existingRow.member_number).trim());
         const email = member.valid && member.email?.trim() ? member.email.trim() : null;
         if (email) {
-          await sendCaretakerCheckInWelcomeEmail(
+          const sent = await sendCaretakerCheckInWelcomeEmail(
             email,
             caretaker.campName,
             existingRow.member_display_name || `#${existingRow.member_number}`,
             emailCheckIn,
             emailCheckOut
           );
+          welcomeEmailSent = sent;
+        } else {
+          console.warn("[caretaker] Check-in welcome email skipped: no email on file for member", existingRow.member_number);
         }
       } catch (e) {
         console.error("[caretaker] reservation check-in welcome email failed:", e);
       }
     } else if (existingRow.reservation_type === "guest" && existingRow.guest_email) {
       try {
-        await sendCaretakerGuestCheckInWelcomeEmail(
+        const sent = await sendCaretakerGuestCheckInWelcomeEmail(
           existingRow.guest_email,
           caretaker.campName,
           existingRow.guest_first_name || "Guest",
@@ -229,6 +235,7 @@ export async function PATCH(
           emailCheckOut,
           baseUrl
         );
+        welcomeEmailSent = sent;
       } catch (e) {
         console.error("[caretaker] reservation check-in welcome email failed:", e);
       }
@@ -251,8 +258,10 @@ export async function PATCH(
     FROM camp_reservations WHERE id = ${id} LIMIT 1
   `;
   const row = (Array.isArray(updated) ? updated : [])[0] as ReservationRow | undefined;
-  if (!row) return NextResponse.json({ ok: true, id });
-  return NextResponse.json(rowToJson(row));
+  if (!row) return NextResponse.json({ ok: true, id, welcomeEmailSent: setCheckIn ? welcomeEmailSent : undefined });
+  const payload = rowToJson(row) as Record<string, unknown>;
+  if (setCheckIn) payload.welcomeEmailSent = welcomeEmailSent;
+  return NextResponse.json(payload);
 }
 
 /**
