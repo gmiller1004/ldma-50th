@@ -16,7 +16,7 @@ Used to seed bookable sites for the reservation system. One CSV per camp.
 | Column                  | Required | Description |
 |-------------------------|----------|-------------|
 | `name`                  | Yes      | Display name (e.g. "Site 1", "RV-5", "Cabin A"). |
-| `site_type`             | Yes      | One of: `rv`, `tent`, `cabin`. Used for pricing and filtering. |
+| `site_type`             | Yes      | Stored as-is and shown in the caretaker UI. **Hookup vs dry** (for event participant reservations) is determined by keywords: if the value contains any of `hook`, `30 amp`, `50 amp`, `electric`, or `water hook` (case-insensitive), the site is treated as a **hookup** site; otherwise **dry**. Examples: use `30/50 amp` or `full hookup` for hookup sites; use `dry`, `tent`, or `rv or tent` for dry sites. |
 | `sort_order`            | Yes      | Number for display order (1, 2, 3, …). |
 | `member_rate_daily`     | No       | Daily rate for LDMA members (e.g. 25.00). Leave blank if using a default. |
 | `non_member_rate_daily` | No       | Daily rate for non-members/guests (e.g. 35.00). Leave blank if using a default. |

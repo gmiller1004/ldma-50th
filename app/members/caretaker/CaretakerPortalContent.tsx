@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, Loader2, Calendar, User, UserPlus, X, MapPin, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Loader2, Calendar, User, UserPlus, X, MapPin, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import {
   format,
   startOfMonth,
@@ -334,6 +334,7 @@ export function CaretakerPortalContent({
   const [resEventSiteType, setResEventSiteType] = useState<"" | "included_dry" | "upgrade_hookup">("");
   const [resViewMode, setResViewMode] = useState<"list" | "calendar">("list");
   const [resCalendarStart, setResCalendarStart] = useState(() => new Date().toISOString().slice(0, 10));
+  const [archivedReservationsExpanded, setArchivedReservationsExpanded] = useState(false);
 
   function loadCheckIns() {
     setListLoading(true);
@@ -1477,21 +1478,33 @@ export function CaretakerPortalContent({
         </section>
 
         <section>
-          <h2 className="font-semibold text-[#e8e0d5]/80 mb-3">Archived reservations</h2>
-          {reservationsLoading ? null : archivedReservations.length === 0 ? (
-            <p className="text-[#e8e0d5]/60">No archived reservations.</p>
-          ) : (
-            <ul className="space-y-2">
-              {archivedReservations.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/40 border border-[#d4af37]/10 rounded-lg text-[#e8e0d5]/80">
-                  <span>
-                    {r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}
-                    {r.eventProductHandle ? <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#d4af37]/20 text-[#f0d48f]">Event{r.eventSiteType === "upgrade_hookup" ? " (hookup)" : ""}</span> : null}
-                  </span>
-                  <span className="text-sm">{r.checkInDate} – {r.checkOutDate}</span>
-                </li>
-              ))}
-            </ul>
+          <button
+            type="button"
+            onClick={() => setArchivedReservationsExpanded((v) => !v)}
+            className="flex items-center gap-2 w-full text-left font-semibold text-[#e8e0d5]/80 mb-3 hover:text-[#e8e0d5]"
+          >
+            {archivedReservationsExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            Archived reservations
+            {!reservationsLoading && archivedReservations.length > 0 && (
+              <span className="text-sm font-normal text-[#e8e0d5]/60">({archivedReservations.length})</span>
+            )}
+          </button>
+          {archivedReservationsExpanded && (
+            reservationsLoading ? null : archivedReservations.length === 0 ? (
+              <p className="text-[#e8e0d5]/60">No archived reservations.</p>
+            ) : (
+              <ul className="space-y-2">
+                {archivedReservations.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/40 border border-[#d4af37]/10 rounded-lg text-[#e8e0d5]/80">
+                    <span>
+                      {r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}
+                      {r.eventProductHandle ? <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#d4af37]/20 text-[#f0d48f]">Event{r.eventSiteType === "upgrade_hookup" ? " (hookup)" : ""}</span> : null}
+                    </span>
+                    <span className="text-sm">{r.checkInDate} – {r.checkOutDate}</span>
+                  </li>
+                ))}
+              </ul>
+            )
           )}
         </section>
 

@@ -37,7 +37,7 @@ function parseCSV(content) {
   for (let i = 1; i < lines.length; i++) {
     const parts = lines[i].split(",");
     const name = (parts[0] || "").trim();
-    const site_type = (parts[1] || "").trim().toLowerCase() || "rv";
+    const site_type = (parts[1] || "").trim() || "rv";
     const sort_order = parseInt(parts[2], 10) || i;
     const member_rate_daily = parts[3] != null && parts[3].trim() !== "" ? parseFloat(parts[3].trim()) : null;
     const non_member_rate_daily = parts[4] != null && parts[4].trim() !== "" ? parseFloat(parts[4].trim()) : null;
@@ -45,7 +45,7 @@ function parseCSV(content) {
     if (!name) continue;
     rows.push({
       name,
-      site_type: ["rv", "tent", "cabin"].includes(site_type) ? site_type : "rv",
+      site_type,
       sort_order: Number.isNaN(sort_order) ? i : sort_order,
       member_rate_daily: Number.isNaN(member_rate_daily) ? null : member_rate_daily,
       non_member_rate_daily: Number.isNaN(non_member_rate_daily) ? null : non_member_rate_daily,
