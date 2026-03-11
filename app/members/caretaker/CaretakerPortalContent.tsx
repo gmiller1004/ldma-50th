@@ -17,6 +17,7 @@ import {
 } from "date-fns";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { computeReservationTotalCents, formatCentsAsCurrency } from "@/lib/reservation-pricing";
+import { ReservationCalendarView } from "@/app/members/caretaker/ReservationCalendarView";
 
 type LookupResult = {
   contactId: string;
@@ -325,6 +326,8 @@ export function CaretakerPortalContent({
   const [resPastDueMaintenanceCents, setResPastDueMaintenanceCents] = useState<number>(0);
   const [resPastDueMembershipCents, setResPastDueMembershipCents] = useState<number>(0);
   const [resPastDueSubmitting, setResPastDueSubmitting] = useState(false);
+  const [resViewMode, setResViewMode] = useState<"list" | "calendar">("list");
+  const [resCalendarStart, setResCalendarStart] = useState(() => new Date().toISOString().slice(0, 10));
 
   function loadCheckIns() {
     setListLoading(true);
@@ -1267,12 +1270,54 @@ export function CaretakerPortalContent({
         </section>
 
         <section>
-          <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Active reservations
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h2 className="font-semibold text-[#f0d48f] flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Active reservations
+            </h2>
+            <div className="flex rounded-lg border border-[#d4af37]/30 p-0.5 bg-[#0f0a06]/60">
+              <button
+                type="button"
+                onClick={() => setResViewMode("list")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${resViewMode === "list" ? "bg-[#d4af37] text-[#1a120b]" : "text-[#e8e0d5]/80 hover:text-[#e8e0d5]"}`}
+              >
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => setResViewMode("calendar")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${resViewMode === "calendar" ? "bg-[#d4af37] text-[#1a120b]" : "text-[#e8e0d5]/80 hover:text-[#e8e0d5]"}`}
+              >
+                Calendar
+              </button>
+            </div>
+          </div>
           {reservationsLoading ? (
             <p className="text-[#e8e0d5]/60">Loading…</p>
+          ) : resViewMode === "calendar" ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <label className="text-[#e8e0d5]/80 text-sm">Start date:</label>
+                <input
+                  type="date"
+                  value={resCalendarStart}
+                  onChange={(e) => setResCalendarStart(e.target.value.slice(0, 10))}
+                  className="px-2 py-1.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm"
+                />
+                <span className="text-[#e8e0d5]/50 text-sm">(45-day view)</span>
+              </div>
+              {sites.length === 0 ? (
+                <p className="text-[#e8e0d5]/60">No sites loaded.</p>
+              ) : (
+                <ReservationCalendarView
+                  reservations={activeReservations}
+                  sites={sites.map((s) => ({ id: s.id, name: s.name, siteType: s.siteType }))}
+                  onSelectReservation={(r) => openResDetailsModal(r as Reservation)}
+                  startDate={resCalendarStart}
+                  numDays={45}
+                />
+              )}
+            </>
           ) : activeReservations.length === 0 ? (
             <p className="text-[#e8e0d5]/60">No active reservations.</p>
           ) : (
