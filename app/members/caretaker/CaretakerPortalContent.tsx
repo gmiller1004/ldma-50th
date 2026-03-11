@@ -810,7 +810,10 @@ export function CaretakerPortalContent({
                     <span className="font-medium text-[#e8e0d5]">
                       {r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}
                     </span>
-                    <ReservationDateRange checkInDate={r.checkInDate} checkOutDate={r.checkOutDate} nights={r.nights} />
+                    <span className="inline-flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-[#d4af37]/70 shrink-0" aria-hidden />
+                      <ReservationDateRange checkInDate={r.checkInDate} checkOutDate={r.checkOutDate} nights={r.nights} />
+                    </span>
                     {r.checkedInAt ? (
                       <span className="ml-1 px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm">Checked in</span>
                     ) : null}
@@ -940,10 +943,10 @@ export function CaretakerPortalContent({
               <p className="text-[#e8e0d5]/80 text-sm mb-4">{editingReservation.siteName} — {editingReservation.reservationType === "member" ? editingReservation.memberDisplayName : `${editingReservation.guestFirstName} ${editingReservation.guestLastName}`}</p>
               <form onSubmit={handleResEditSubmit}>
                 <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Check-in date</label>
-                <input type="date" value={resEditCheckInDate} onChange={(e) => setResEditCheckInDate(e.target.value)} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-3" />
-                <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Check-out date</label>
-                <input type="date" min={resEditCheckInDate} value={resEditCheckOutDate} onChange={(e) => setResEditCheckOutDate(e.target.value)} className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-2" />
-                <p className="text-[#e8e0d5]/50 text-xs mb-4">Check-out must be after check-in. Payment adjustments (proration, extensions) will be handled when payment is enabled.</p>
+                <DatePickerWithCalendar value={resEditCheckInDate} onChange={setResEditCheckInDate} min={today} id="edit-res-check-in" />
+                <label className="block text-sm font-medium text-[#e8e0d5] mb-2 mt-3">Check-out date</label>
+                <DatePickerWithCalendar value={resEditCheckOutDate} onChange={setResEditCheckOutDate} min={resEditCheckInDate || today} id="edit-res-check-out" />
+                <p className="text-[#e8e0d5]/50 text-xs mb-4 mt-2">Check-out must be after check-in. Payment adjustments (proration, extensions) will be handled when payment is enabled.</p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setResEditModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
                   <button type="submit" disabled={resEditSubmitting || !resEditCheckInDate || !resEditCheckOutDate || resEditCheckInDate >= resEditCheckOutDate} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
