@@ -6,6 +6,7 @@ import { computeReservationTotalCents } from "@/lib/reservation-pricing";
 import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
 import { lookupMember } from "@/lib/salesforce";
 import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
+import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 
 type ReservationRow = {
   id: string;
@@ -261,6 +262,7 @@ export async function POST(request: NextRequest) {
       `;
       const row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
       if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
+      syncReservationToKlaviyo(row).catch((e) => console.error("[Klaviyo] sync after create:", e));
       return NextResponse.json(rowToJson(row), { status: 201 });
     }
     const guestFirstName = typeof body.guestFirstName === "string" ? body.guestFirstName.trim() : "";
@@ -291,6 +293,7 @@ export async function POST(request: NextRequest) {
     `;
     const row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
     if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
+    syncReservationToKlaviyo(row).catch((e) => console.error("[Klaviyo] sync after create:", e));
     return NextResponse.json(rowToJson(row), { status: 201 });
   }
 
@@ -369,6 +372,7 @@ export async function POST(request: NextRequest) {
     `;
     const row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
     if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
+    syncReservationToKlaviyo(row).catch((e) => console.error("[Klaviyo] sync after create:", e));
 
     await sql`
       INSERT INTO camp_payments (
@@ -432,6 +436,7 @@ export async function POST(request: NextRequest) {
   `;
   const row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
   if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
+  syncReservationToKlaviyo(row).catch((e) => console.error("[Klaviyo] sync after create:", e));
 
   await sql`
     INSERT INTO camp_payments (

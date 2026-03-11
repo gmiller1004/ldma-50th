@@ -10,6 +10,7 @@ import {
   sendPaymentReceiptEmail,
   sendReservationModifiedEmail,
 } from "@/lib/sendgrid";
+import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 
 type ReservationRow = {
   id: string;
@@ -367,6 +368,7 @@ export async function PATCH(
   `;
   const row = (Array.isArray(updated) ? updated : [])[0] as ReservationRow | undefined;
   if (!row) return NextResponse.json({ ok: true, id, welcomeEmailSent: setCheckIn ? welcomeEmailSent : undefined });
+  syncReservationToKlaviyo(row).catch((e) => console.error("[Klaviyo] sync after PATCH:", e));
   const payload = rowToJson(row) as Record<string, unknown>;
   if (setCheckIn) payload.welcomeEmailSent = welcomeEmailSent;
   return NextResponse.json(payload);
@@ -404,11 +406,25 @@ export async function DELETE(
   }
 
   const existing = await sql`
-    SELECT id FROM camp_reservations
+    SELECT id, camp_slug, check_out_date, reservation_type, member_number, member_display_name,
+           guest_email, guest_first_name, guest_last_name, status
+    FROM camp_reservations
     WHERE id = ${id} AND camp_slug = ${caretaker.campSlug}
     LIMIT 1
   `;
-  if (!Array.isArray(existing) || existing.length === 0) {
+  const existingRow = (Array.isArray(existing) ? existing : [])[0] as {
+    id: string;
+    camp_slug: string;
+    check_out_date: string;
+    reservation_type: string;
+    member_number: string | null;
+    member_display_name: string | null;
+    guest_email: string | null;
+    guest_first_name: string | null;
+    guest_last_name: string | null;
+    status: string;
+  } | undefined;
+  if (!existingRow) {
     return NextResponse.json({ error: "Reservation not found" }, { status: 404 });
   }
 
@@ -417,6 +433,10 @@ export async function DELETE(
     SET status = 'cancelled', updated_at = NOW()
     WHERE id = ${id}
   `;
+
+  syncReservationToKlaviyo({ ...existingRow, status: "cancelled" }).catch((e) =>
+    console.error("[Klaviyo] sync after cancel:", e)
+  );
 
   return NextResponse.json({ ok: true, cancelled: true });
 }

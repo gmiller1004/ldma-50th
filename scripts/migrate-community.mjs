@@ -38,6 +38,7 @@ const migrations = [
   "migrate-camp-reservations.sql",
   "migrate-camp-reservations-event.sql",
   "migrate-camp-payments.sql",
+  "migrate-camp-stay-thanks.sql",
 ];
 
 let fullSql = migrations

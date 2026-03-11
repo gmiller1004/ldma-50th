@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { sql, hasDb } from "@/lib/db";
 import { getCampBySlug } from "@/lib/directory-camps";
 import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
+import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 
 /**
  * POST /api/webhooks/stripe
@@ -153,6 +154,16 @@ export async function POST(request: NextRequest) {
       const row = (Array.isArray(inserted) ? inserted : [])[0] as { id: string } | undefined;
       if (row) reservationId = row.id;
     }
+  }
+
+  if (paymentType === "reservation" && reservationId && hasDb() && sql) {
+    const resRow = await sql`
+      SELECT camp_slug, check_out_date, reservation_type, member_number, member_display_name,
+             guest_email, guest_first_name, guest_last_name, status
+      FROM camp_reservations WHERE id = ${reservationId} LIMIT 1
+    `;
+    const row = (Array.isArray(resRow) ? resRow : [])[0] as Parameters<typeof syncReservationToKlaviyo>[0] | undefined;
+    if (row) syncReservationToKlaviyo(row).catch((e) => console.error("[webhook] Klaviyo sync:", e));
   }
 
   const memberContactId = metadata.member_contact_id ?? null;

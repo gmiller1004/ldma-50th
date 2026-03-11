@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/exclusive-offers-notify",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/stay-thank-you",
+      "schedule": "0 6 * * *"
     }
   ]
 }

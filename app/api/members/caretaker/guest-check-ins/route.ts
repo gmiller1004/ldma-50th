@@ -3,6 +3,7 @@ import { getCaretakerContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { getValidCampSlugs } from "@/lib/caretaker-camps";
 import { sendCaretakerGuestCheckInWelcomeEmail } from "@/lib/sendgrid";
+import { upsertCampStayProfile } from "@/lib/klaviyo-camp-stay";
 
 type GuestCheckInRow = {
   id: string;
@@ -170,6 +171,18 @@ export async function POST(request: NextRequest) {
     checkOutDateStr,
     baseUrl
   ).catch((e) => console.error("[caretaker] guest welcome email failed:", e));
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const stayStatus = checkOutDateStr >= todayStr ? "in_progress" : "completed";
+  upsertCampStayProfile({
+    email,
+    firstName,
+    lastName,
+    campSlug: caretaker.campSlug,
+    checkOutDate: checkOutDateStr,
+    status: stayStatus,
+    lastStayAs: "guest",
+  }).catch((e) => console.error("[caretaker] Klaviyo sync failed:", e));
 
   return NextResponse.json(rowToJson(row), { status: 201 });
 }

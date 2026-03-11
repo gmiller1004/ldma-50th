@@ -5,6 +5,7 @@ import { awardPointsForCaretakerCheckIn } from "@/lib/rewards";
 import { getValidCampSlugs } from "@/lib/caretaker-camps";
 import { lookupMember } from "@/lib/salesforce";
 import { sendCaretakerCheckInWelcomeEmail } from "@/lib/sendgrid";
+import { upsertCampStayProfile } from "@/lib/klaviyo-camp-stay";
 
 type CheckInRow = {
   id: string;
@@ -156,21 +157,32 @@ export async function POST(request: NextRequest) {
     console.error("[caretaker] award points failed:", e)
   );
 
-  // Send welcome email (fire-and-forget)
+  // Send welcome email and sync to Klaviyo (fire-and-forget)
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const stayStatus = checkOutDateStr >= todayStr ? "in_progress" : "completed";
   lookupMember(memberNumber)
-    .then((member) => {
+    .then(async (member) => {
       const email = member.valid && member.email && member.email.trim() ? member.email.trim() : null;
       if (!email) return;
       const displayName = memberDisplayName || `#${memberNumber}`;
-      return sendCaretakerCheckInWelcomeEmail(
+      await sendCaretakerCheckInWelcomeEmail(
         email,
         caretaker.campName,
         displayName,
         checkInDateStr,
         checkOutDateStr
       );
+      await upsertCampStayProfile({
+        email,
+        firstName: member.firstName ?? undefined,
+        lastName: member.lastName ?? undefined,
+        campSlug: caretaker.campSlug,
+        checkOutDate: checkOutDateStr,
+        status: stayStatus,
+        lastStayAs: "member",
+      });
     })
-    .catch((e) => console.error("[caretaker] welcome email lookup/send failed:", e));
+    .catch((e) => console.error("[caretaker] welcome email / Klaviyo sync failed:", e));
 
   return NextResponse.json(rowToJson(row), { status: 201 });
 }
