@@ -23,3 +23,15 @@ Used to seed bookable sites for the reservation system. One CSV per camp.
 | `notes`                 | No       | Optional notes (e.g. "Full hookup", "Near bathhouse"). |
 
 **Long-stay discount:** Apply **10% discount for stays of 30+ days** across the board (member and non-member). Handled in reservation/payment logic, not in the CSV.
+
+## Other camps (e.g. Vein Mountain)
+
+- **Vein Mountain:** CSV is `vein-mountain-sites.csv`. Seed with:
+  ```bash
+  npm run db:seed:vein-mountain-sites
+  ```
+- **Generic:** To seed any camp from a CSV in this folder:
+  ```bash
+  node --env-file=.env.local scripts/seed-camp-sites.mjs <camp_slug> <csv_filename>
+  ```
+  Example: `node --env-file=.env.local scripts/seed-camp-sites.mjs vein-mountain-north-carolina vein-mountain-sites.csv`

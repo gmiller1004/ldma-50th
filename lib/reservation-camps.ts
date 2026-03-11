@@ -5,8 +5,14 @@
 
 export const RESERVATION_PILOT_CAMP_SLUG = "burnt-river-oregon";
 
+/** Camp slugs that have site reservations enabled (caretaker portal: create/list reservations, site availability). */
+const CAMPS_WITH_RESERVATIONS = new Set([
+  "burnt-river-oregon",
+  "vein-mountain-north-carolina",
+]);
+
 export function campUsesReservations(campSlug: string): boolean {
-  return campSlug === RESERVATION_PILOT_CAMP_SLUG;
+  return CAMPS_WITH_RESERVATIONS.has(campSlug);
 }
 
 /** True if site_type indicates a hookup site (30/50 amp, full hookup, etc.). Used for event upgrade vs included dry. */

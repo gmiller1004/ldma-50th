@@ -1,45 +1,41 @@
 name,site_type,sort_order,member_rate_daily,non_member_rate_daily,notes
-Hookup Site 1,rv,1,18,40,30 and 50 amp + water
-Hookup Site 2,rv,2,18,40,30 and 50 amp + water
-Hookup Site 3,rv,3,18,40,30 and 50 amp + water
-Hookup Site 4,rv,4,18,40,30 and 50 amp + water
-Dry Site 1,rv or tent,5,6,15,Dry no hookups
-Dry Site 2,rv or tent,6,6,15,Dry no hookups
-Dry Site 3,rv or tent,7,6,15,Dry no hookups
-Dry Site 4,rv or tent,8,6,15,Dry no hookups
-Dry Site 5,rv or tent,9,6,15,Dry no hookups
-Dry Site 6,rv or tent,10,6,15,Dry no hookups
-Dry Site 7,rv or tent,11,6,15,Dry no hookups
-Dry Site 8,rv or tent,12,6,15,Dry no hookups
-Dry Site 9,rv or tent,13,6,15,Dry no hookups
-Dry Site 10,rv or tent,14,6,15,Dry no hookups
-Dry Site 11,rv or tent,15,6,15,Dry no hookups
-Dry Site 12,rv or tent,16,6,15,Dry no hookups
-Dry Site 13,rv or tent,17,6,15,Dry no hookups
-Dry Site 14,rv or tent,18,6,15,Dry no hookups
-Dry Site 15,rv or tent,19,6,15,Dry no hookups
-Dry Site 16,rv or tent,20,6,15,Dry no hookups
-Dry Site 17,rv or tent,21,6,15,Dry no hookups
-Dry Site 18,rv or tent,22,6,15,Dry no hookups
-Dry Site 19,rv or tent,23,6,15,Dry no hookups
-Dry Site 20,rv or tent,24,6,15,Dry no hookups
-Dry Site 21,rv or tent,25,6,15,Dry no hookups
-Dry Site 22,rv or tent,26,6,15,Dry no hookups
-Dry Site 23,rv or tent,27,6,15,Dry no hookups
-Dry Site 24,rv or tent,28,6,15,Dry no hookups
-Dry Site 25,rv or tent,29,6,15,Dry no hookups
-Dry Site 26,rv or tent,30,6,15,Dry no hookups
-Dry Site 27,rv or tent,31,6,15,Dry no hookups
-Dry Site 28,rv or tent,32,6,15,Dry no hookups
-Dry Site 29,rv or tent,33,6,15,Dry no hookups
-Dry Site 30,rv or tent,34,6,15,Dry no hookups
-Dry Site 31,rv or tent,35,6,15,Dry no hookups
-Dry Site 32,rv or tent,36,6,15,Dry no hookups
-Dry Site 33,rv or tent,37,6,15,Dry no hookups
-Dry Site 34,rv or tent,38,6,15,Dry no hookups
-Dry Site 35,rv or tent,39,6,15,Dry no hookups
-Dry Site 36,rv or tent,40,6,15,Dry no hookups
-Dry Site 37,rv or tent,41,6,15,Dry no hookups
-Dry Site 38,rv or tent,42,6,15,Dry no hookups
-Dry Site 39,rv or tent,43,6,15,Dry no hookups
-Dry Site 40,rv or tent,44,6,15,Dry no hookups
+Lower 2,30 amp,1,14,35,30 amp + water
+Lower 3,30 amp,2,14,35,30 amp + water
+Lower 4,30 amp,3,14,35,30 amp + water
+Lower 5,30 amp,4,14,35,30 amp + water
+Lower 6,30 amp,5,14,35,30 amp + water
+Lower 7,30 amp,6,14,35,30 amp + water
+Lower 8,30 amp,7,14,35,30 amp + water
+Lower 9,30 amp,8,14,35,30 amp + water
+Lower 10,30 amp,9,14,35,30 amp + water
+Lower 11,30 amp,10,14,35,30 amp + water
+Lower 12,30 amp,11,14,35,30 amp + water
+Lower 13,30 amp,12,14,35,30 amp + water
+Lower 14,dry,13,6,15,Dry no hookups
+Lower 15,dry,14,6,15,Dry no hookups
+Lower 16,dry,15,6,15,Dry no hookups
+Lower 17,dry,16,6,15,Dry no hookups
+Upper 1,dry,17,6,15,Dry no hookups
+Upper 2,dry,18,6,15,Dry no hookups
+Upper 3,dry,19,6,15,Dry no hookups
+Upper 4,dry,20,6,15,Dry no hookups
+Upper 5,dry,21,6,15,Dry no hookups
+Upper 6,dry,22,6,15,Dry no hookups
+Upper 7,dry,23,6,15,Dry no hookups
+Upper 8,dry,24,6,15,Dry no hookups
+Upper 9,dry,25,6,15,Dry no hookups
+Upper 10,dry,26,6,15,Dry no hookups
+Upper 11,dry,27,6,15,Dry no hookups
+Upper 12,dry,28,6,15,Dry no hookups
+Upper 13,dry,29,6,15,Dry no hookups
+Upper 14,dry,30,6,15,Dry no hookups
+Upper 15,dry,31,6,15,Dry no hookups
+Upper 16,dry,32,6,15,Dry no hookups
+Upper 17,dry,33,6,15,Dry no hookups
+Upper 18,dry,34,6,15,Dry no hookups
+Upper 19,dry,35,6,15,Dry no hookups
+Upper 20,dry,36,6,15,Dry no hookups
+Overflow 1,dry,37,6,15,Dry no hookups
+Overflow 2,dry,38,6,15,Dry no hookups
+Overflow 3,dry,39,6,15,Dry no hookups
+Overflow 4,dry,40,6,15,Dry no hookups
