@@ -195,6 +195,35 @@ export async function POST(request: NextRequest) {
         ];
   if (lineItems.length === 0) lineItems.push({ label: "Payment", amountCents });
 
+  let reservationDetails: { recipientName: string; checkInDate: string; checkOutDate: string; siteName?: string } | undefined;
+  if (paymentType === "reservation" && reservationId && hasDb() && sql) {
+    const resDetailRows = await sql`
+      SELECT r.check_in_date, r.check_out_date, r.reservation_type, r.member_display_name, r.guest_first_name, r.guest_last_name, r.site_id
+      FROM camp_reservations r WHERE r.id = ${reservationId} LIMIT 1
+    `;
+    const resDetail = (Array.isArray(resDetailRows) ? resDetailRows[0] : undefined) as
+      | { check_in_date: string; check_out_date: string; reservation_type: string; member_display_name: string | null; guest_first_name: string | null; guest_last_name: string | null; site_id: string }
+      | undefined;
+    if (resDetail) {
+      const recipientName =
+        resDetail.reservation_type === "member"
+          ? (resDetail.member_display_name?.trim() || "Member")
+          : [resDetail.guest_first_name, resDetail.guest_last_name].filter(Boolean).join(" ").trim() || "Guest";
+      let siteName: string | undefined;
+      if (resDetail.site_id) {
+        const siteRows = await sql`SELECT name FROM camp_sites WHERE id = ${resDetail.site_id} LIMIT 1`;
+        const siteRow = (Array.isArray(siteRows) ? siteRows[0] : undefined) as { name: string } | undefined;
+        siteName = siteRow?.name;
+      }
+      reservationDetails = {
+        recipientName: recipientDisplayName || recipientName,
+        checkInDate: resDetail.check_in_date,
+        checkOutDate: resDetail.check_out_date,
+        siteName,
+      };
+    }
+  }
+
   const paymentDate = new Date().toISOString().slice(0, 10);
   const receiptSent = await sendPaymentReceiptEmail(
     recipientEmail,
@@ -202,7 +231,8 @@ export async function POST(request: NextRequest) {
     lineItems as { label: string; amountCents: number }[],
     amountCents,
     "card",
-    paymentDate
+    paymentDate,
+    reservationDetails ?? null
   ).catch((e) => {
     console.error("[webhook] Receipt email failed:", e);
     return false;

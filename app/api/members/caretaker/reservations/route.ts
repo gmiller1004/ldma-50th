@@ -5,7 +5,7 @@ import { campUsesReservations, isHookupSiteType } from "@/lib/reservation-camps"
 import { computeReservationTotalCents } from "@/lib/reservation-pricing";
 import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
 import { lookupMember } from "@/lib/salesforce";
-import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
+import { sendPaymentReceiptEmail, sendReservationConfirmationEmail } from "@/lib/sendgrid";
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 
 type ReservationRow = {
@@ -121,6 +121,26 @@ export async function GET(request: NextRequest) {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function sendReservationConfirmation(
+  row: ReservationRow,
+  campName: string,
+  siteName: string
+): Promise<void> {
+  if (row.reservation_type === "guest") {
+    const email = row.guest_email?.trim();
+    if (email && EMAIL_REGEX.test(email)) {
+      const name = [row.guest_first_name, row.guest_last_name].filter(Boolean).join(" ").trim() || "Guest";
+      await sendReservationConfirmationEmail(email, campName, siteName, row.check_in_date, row.check_out_date, name);
+    }
+    return;
+  }
+  const member = await lookupMember(row.member_number ?? "");
+  if (member.valid && member.email?.trim()) {
+    const name = row.member_display_name?.trim() || [member.firstName, member.lastName].filter(Boolean).join(" ").trim() || "Member";
+    await sendReservationConfirmationEmail(member.email.trim(), campName, siteName, row.check_in_date, row.check_out_date, name);
+  }
+}
 
 /**
  * POST /api/members/caretaker/reservations
@@ -263,6 +283,11 @@ export async function POST(request: NextRequest) {
       const row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
       if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
       syncReservationToKlaviyo(row).catch((e) => console.error("[Klaviyo] sync after create:", e));
+      const siteNameRows = await sql`SELECT name FROM camp_sites WHERE id = ${row.site_id} LIMIT 1`;
+      const siteName = (Array.isArray(siteNameRows) ? siteNameRows[0] : undefined) as { name: string } | undefined;
+      sendReservationConfirmation(row, caretaker.campName, siteName?.name ?? "Site").catch((e) =>
+        console.error("[caretaker] reservation confirmation email failed:", e)
+      );
       return NextResponse.json(rowToJson(row), { status: 201 });
     }
     const guestFirstName = typeof body.guestFirstName === "string" ? body.guestFirstName.trim() : "";
@@ -294,6 +319,11 @@ export async function POST(request: NextRequest) {
     const row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
     if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
     syncReservationToKlaviyo(row).catch((e) => console.error("[Klaviyo] sync after create:", e));
+    const siteNameRows = await sql`SELECT name FROM camp_sites WHERE id = ${row.site_id} LIMIT 1`;
+    const siteName = (Array.isArray(siteNameRows) ? siteNameRows[0] : undefined) as { name: string } | undefined;
+    sendReservationConfirmation(row, caretaker.campName, siteName?.name ?? "Site").catch((e) =>
+      console.error("[caretaker] reservation confirmation email failed:", e)
+    );
     return NextResponse.json(rowToJson(row), { status: 201 });
   }
 
@@ -386,13 +416,22 @@ export async function POST(request: NextRequest) {
         ${caretaker.contactId}, NOW()
       )
     `;
+    const siteNameRows = await sql`SELECT name FROM camp_sites WHERE id = ${row.site_id} LIMIT 1`;
+    const siteNameForReceipt = (Array.isArray(siteNameRows) ? siteNameRows[0] : undefined) as { name: string } | undefined;
+    const reservationDetails = {
+      recipientName: row.member_display_name?.trim() || "Member",
+      checkInDate: row.check_in_date,
+      checkOutDate: row.check_out_date,
+      siteName: siteNameForReceipt?.name,
+    };
     const receiptSent = await sendPaymentReceiptEmail(
       recipientEmail,
       caretaker.campName,
       [{ label: "Camp reservation", amountCents }],
       amountCents,
       "cash",
-      today
+      today,
+      reservationDetails
     ).catch((e) => {
       console.error("[caretaker] payment receipt email failed:", e);
       return false;
@@ -403,7 +442,9 @@ export async function POST(request: NextRequest) {
         WHERE id = (SELECT id FROM camp_payments WHERE reservation_id = ${row.id} AND method = 'cash' ORDER BY created_at DESC LIMIT 1)
       `;
     }
-
+    sendReservationConfirmation(row, caretaker.campName, siteNameForReceipt?.name ?? "Site").catch((e) =>
+      console.error("[caretaker] reservation confirmation email failed:", e)
+    );
     return NextResponse.json(rowToJson(row), { status: 201 });
   }
 
@@ -448,13 +489,22 @@ export async function POST(request: NextRequest) {
       ${recipientEmail}, ${recipientDisplayName}, ${caretaker.contactId}, NOW()
     )
   `;
+  const siteNameRows = await sql`SELECT name FROM camp_sites WHERE id = ${row.site_id} LIMIT 1`;
+  const siteNameForReceipt = (Array.isArray(siteNameRows) ? siteNameRows[0] : undefined) as { name: string } | undefined;
+  const reservationDetails = {
+    recipientName: [row.guest_first_name, row.guest_last_name].filter(Boolean).join(" ").trim() || "Guest",
+    checkInDate: row.check_in_date,
+    checkOutDate: row.check_out_date,
+    siteName: siteNameForReceipt?.name,
+  };
   const receiptSent = await sendPaymentReceiptEmail(
     recipientEmail,
     caretaker.campName,
     [{ label: "Camp reservation", amountCents }],
     amountCents,
     "cash",
-    today
+    today,
+    reservationDetails
   ).catch((e) => {
     console.error("[caretaker] payment receipt email failed:", e);
     return false;
@@ -465,6 +515,8 @@ export async function POST(request: NextRequest) {
       WHERE id = (SELECT id FROM camp_payments WHERE reservation_id = ${row.id} AND method = 'cash' ORDER BY created_at DESC LIMIT 1)
     `;
   }
-
+  sendReservationConfirmation(row, caretaker.campName, siteNameForReceipt?.name ?? "Site").catch((e) =>
+    console.error("[caretaker] reservation confirmation email failed:", e)
+  );
   return NextResponse.json(rowToJson(row), { status: 201 });
 }

@@ -247,13 +247,22 @@ export async function PATCH(
           ${caretaker.contactId}, NOW()
         )
       `;
+      const siteResForReceipt = await sql`SELECT name FROM camp_sites WHERE id = ${existingRow.site_id} LIMIT 1`;
+      const siteNameForReceipt = ((Array.isArray(siteResForReceipt) ? siteResForReceipt : []) as { name: string }[])[0]?.name;
+      const reservationDetails = {
+        recipientName: recipientDisplayName || (existingRow.reservation_type === "member" ? (existingRow.member_display_name ?? "Member") : [existingRow.guest_first_name, existingRow.guest_last_name].filter(Boolean).join(" ").trim() || "Guest"),
+        checkInDate: newCheckIn,
+        checkOutDate: newCheckOut,
+        siteName: siteNameForReceipt,
+      };
       const receiptSent = await sendPaymentReceiptEmail(
         recipientEmail,
         caretaker.campName,
         [{ label: "Additional nights (reservation extension)", amountCents }],
         amountCents,
         "cash",
-        today
+        today,
+        reservationDetails
       ).catch((e) => {
         console.error("[caretaker] payment receipt email failed:", e);
         return false;

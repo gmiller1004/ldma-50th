@@ -474,8 +474,16 @@ export type PaymentReceiptLineItem = {
   amountCents: number;
 };
 
+export type PaymentReceiptReservationDetails = {
+  recipientName: string;
+  checkInDate: string;
+  checkOutDate: string;
+  siteName?: string;
+};
+
 /**
  * Send a single payment receipt to the member and CC gricci@goldprospectors.org.
+ * Optional reservationDetails: when present (e.g. camp reservation payment), shows name and dates in the email.
  */
 export async function sendPaymentReceiptEmail(
   to: string,
@@ -483,7 +491,8 @@ export async function sendPaymentReceiptEmail(
   lineItems: PaymentReceiptLineItem[],
   totalCents: number,
   method: "cash" | "card",
-  paymentDate: string
+  paymentDate: string,
+  reservationDetails?: PaymentReceiptReservationDetails | null
 ): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
   if (!apiKey) {
@@ -500,11 +509,19 @@ export async function sendPaymentReceiptEmail(
   const totalDollars = (totalCents / 100).toFixed(2);
   const methodLabel = method === "card" ? "Card" : "Cash";
   const linesText = lineItems.map((l) => `${l.label}: $${(l.amountCents / 100).toFixed(2)}`).join("\n");
+
+  const reservationBlurb =
+    reservationDetails &&
+    `Reservation: ${reservationDetails.recipientName}${reservationDetails.siteName ? ` — ${reservationDetails.siteName}` : ""}
+${reservationDetails.checkInDate} to ${reservationDetails.checkOutDate}
+
+`;
+
   const textContent = `Payment receipt — ${campName}
 
 Thank you for your payment.
 
-${linesText}
+${reservationBlurb ?? ""}${linesText}
 Total: $${totalDollars}
 Payment method: ${methodLabel}
 Date: ${paymentDate}
@@ -517,6 +534,10 @@ Lost Dutchman's Mining Association`;
         `<tr><td style="padding: 8px 0; color: #e8e0d5;">${escapeHtml(l.label)}</td><td style="text-align: right; padding: 8px 0; color: #e8e0d5;">$${(l.amountCents / 100).toFixed(2)}</td></tr>`
     )
     .join("");
+
+  const reservationHtml =
+    reservationDetails &&
+    `<p style="margin: 0 0 16px; font-size: 16px; color: #e8e0d5; line-height: 1.5;"><strong>Reservation</strong><br>${escapeHtml(reservationDetails.recipientName)}${reservationDetails.siteName ? ` — ${escapeHtml(reservationDetails.siteName)}` : ""}<br>${escapeHtml(reservationDetails.checkInDate)} to ${escapeHtml(reservationDetails.checkOutDate)}</p>`;
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -539,6 +560,7 @@ Lost Dutchman's Mining Association`;
           <tr>
             <td style="padding: 32px 24px;">
               <p style="margin: 0 0 16px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">Thank you for your payment.</p>
+              ${reservationHtml ?? ""}
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 0 0 16px;">
                 ${linesHtml}
               </table>

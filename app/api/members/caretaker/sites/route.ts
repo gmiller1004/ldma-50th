@@ -50,5 +50,5 @@ export async function GET(request: NextRequest) {
     ORDER BY sort_order ASC, name ASC
   `;
   const list = (Array.isArray(rows) ? rows : []) as SiteRow[];
-  return NextResponse.json({ sites: list.map(rowToJson) });
+  return NextResponse.json({ campSlug: caretaker.campSlug, sites: list.map(rowToJson) });
 }

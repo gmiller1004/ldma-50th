@@ -14,8 +14,15 @@ export function caretakerCampToSlug(picklistValue: string | null | undefined): s
   if (!picklistValue || typeof picklistValue !== "string") return null;
   const normalized = picklistValue.trim();
   if (!normalized) return null;
-  const slug = nameToSlug.get(normalized.toLowerCase());
+  const lower = normalized.toLowerCase();
+  let slug = nameToSlug.get(lower);
   if (slug) return slug;
+  // Try name before comma (e.g. "Vein Mountain, NC" -> "Vein Mountain")
+  const beforeComma = normalized.split(",")[0].trim().toLowerCase();
+  if (beforeComma) {
+    slug = nameToSlug.get(beforeComma);
+    if (slug) return slug;
+  }
   if (getValidCampSlugs().includes(normalized)) return normalized;
   return null;
 }
