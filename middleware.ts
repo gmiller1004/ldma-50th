@@ -54,6 +54,8 @@ export const config = {
     "/directory",
     "/directory/:path*",
     "/",
+    "/memberships",
+    "/memberships/:path*",
     "/shop",
     "/shop/:path*",
     "/members",
