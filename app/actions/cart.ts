@@ -16,6 +16,7 @@ import {
   addOrUpdateCustomer,
   addOrUpdateCart,
   isMailchimpConfigured,
+  shopifyGidToMailchimpId,
 } from "@/lib/mailchimp";
 
 const CART_ID_COOKIE = "shopify_cart_id";
@@ -23,13 +24,26 @@ const MAILCHIMP_EID_COOKIE = "mailchimp_eid";
 
 /** Sync current Shopify cart to Mailchimp E-commerce when we have mc_eid (known contact from email). Non-blocking; logs errors. */
 async function syncCartToMailchimp(cartId: string, mailchimpEid: string) {
-  if (!isMailchimpConfigured()) return;
+  if (!isMailchimpConfigured()) {
+    console.warn("[Mailchimp] cart sync skipped: missing MAILCHIMP_API_KEY or MAILCHIMP_STORE_ID");
+    return;
+  }
   const storeId = process.env.MAILCHIMP_STORE_ID!;
   try {
     const store = await getMailchimpStore(storeId);
-    if (!store?.list_id) return;
+    if (!store?.list_id) {
+      console.warn(
+        "[Mailchimp] cart sync skipped: store not found or no list_id (check MAILCHIMP_STORE_ID matches Mailchimp integration)"
+      );
+      return;
+    }
     const member = await getMemberByUniqueEmailId(store.list_id, mailchimpEid);
-    if (!member?.email_address) return;
+    if (!member?.email_address) {
+      console.warn(
+        "[Mailchimp] cart sync skipped: no audience member for mc_eid (unique_email_id lookup empty — contact may not be on the store's synced list)"
+      );
+      return;
+    }
     const email = member.email_address;
     const customerId = email;
     await addOrUpdateCustomer(storeId, customerId, {
@@ -37,13 +51,16 @@ async function syncCartToMailchimp(cartId: string, mailchimpEid: string) {
       opt_in_status: false,
     });
     const cart = await getCart(cartId);
-    if (!cart) return;
+    if (!cart) {
+      console.warn("[Mailchimp] cart sync skipped: getCart returned null for cartId");
+      return;
+    }
     const orderTotal = parseFloat(cart.cost.subtotalAmount.amount);
     const currencyCode = cart.cost.subtotalAmount.currencyCode ?? "USD";
     const lines = cart.lines.edges.map(({ node }) => ({
-      id: node.id,
-      product_id: node.merchandise.product.id,
-      product_variant_id: node.merchandise.id,
+      id: shopifyGidToMailchimpId(node.id),
+      product_id: shopifyGidToMailchimpId(node.merchandise.product.id),
+      product_variant_id: shopifyGidToMailchimpId(node.merchandise.id),
       quantity: node.quantity,
       price: parseFloat(node.cost.totalAmount.amount),
     }));
@@ -53,6 +70,7 @@ async function syncCartToMailchimp(cartId: string, mailchimpEid: string) {
       checkout_url: cart.checkoutUrl,
       lines,
     });
+    console.info("[Mailchimp] cart synced:", { lines: lines.length, orderTotal, currencyCode });
   } catch (err) {
     console.error("[Mailchimp] cart sync failed:", err);
   }

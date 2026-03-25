@@ -55,7 +55,8 @@ export async function getMailchimpStore(
       `/ecommerce/stores/${storeId}`
     );
     return store ?? null;
-  } catch {
+  } catch (e) {
+    console.warn("[Mailchimp] getMailchimpStore failed:", e);
     return null;
   }
 }
@@ -80,7 +81,8 @@ export async function getMemberByUniqueEmailId(
     );
     const member = data?.members?.[0] ?? null;
     return member ?? null;
-  } catch {
+  } catch (e) {
+    console.warn("[Mailchimp] getMemberByUniqueEmailId failed:", e);
     return null;
   }
 }
@@ -111,6 +113,16 @@ export type MailchimpCartLine = {
   price: number;
 };
 
+/**
+ * Mailchimp ecommerce data synced from Shopify uses numeric product/variant IDs, not Storefront GIDs
+ * (e.g. gid://shopify/ProductVariant/123 → "123"). Cart / line GIDs use an opaque final segment — use that as id.
+ */
+export function shopifyGidToMailchimpId(gid: string): string {
+  if (!gid) return gid;
+  const tail = gid.split("/").pop() ?? gid;
+  return tail;
+}
+
 /** Create or update a cart in the Mailchimp store. Uses Shopify cart id and product/variant ids. */
 export async function addOrUpdateCart(
   storeId: string,
@@ -125,8 +137,9 @@ export async function addOrUpdateCart(
 ): Promise<void> {
   const config = getConfig();
   if (!config || config.storeId !== storeId) return;
+  const mcCartId = shopifyGidToMailchimpId(cartId);
   const body = {
-    id: cartId,
+    id: mcCartId,
     customer: { id: customerId },
     currency_code: payload.currency_code,
     order_total: payload.order_total,
@@ -134,10 +147,14 @@ export async function addOrUpdateCart(
     lines: payload.lines,
   };
   try {
-    await mailchimpFetch(config, `/ecommerce/stores/${storeId}/carts/${encodeURIComponent(cartId)}`, {
-      method: "PATCH",
-      body: JSON.stringify(body),
-    });
+    await mailchimpFetch(
+      config,
+      `/ecommerce/stores/${storeId}/carts/${encodeURIComponent(mcCartId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }
+    );
   } catch (e) {
     const err = e as Error;
     if (err.message?.includes("404")) {
