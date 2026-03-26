@@ -918,6 +918,36 @@ function EventCard({
     CAMP_FILTERS.find((c) => c.id === campSlug)?.label ?? null;
   const dates = getEventDates(event);
   const cardTitle = getCardTitle(event.title);
+  const [isSmUp, setIsSmUp] = useState(false);
+  const [isTouchLikeInput, setIsTouchLikeInput] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const smQuery = window.matchMedia("(min-width: 640px)");
+    const touchQuery = window.matchMedia("(hover: none), (pointer: coarse)");
+    const update = () => {
+      setIsSmUp(smQuery.matches);
+      setIsTouchLikeInput(touchQuery.matches);
+    };
+    update();
+    smQuery.addEventListener("change", update);
+    touchQuery.addEventListener("change", update);
+    return () => {
+      smQuery.removeEventListener("change", update);
+      touchQuery.removeEventListener("change", update);
+    };
+  }, []);
+
+  // Landscape phones often hit sm breakpoint but still have no hover. Use tap-to-expand there.
+  const isTapExpandMode = isSmUp && isTouchLikeInput;
+
+  const handleCardClick = (e: React.MouseEvent<HTMLElement>) => {
+    if (!isTapExpandMode) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("button, a, input, select, textarea, label")) return;
+    setIsExpanded((v) => !v);
+  };
 
   return (
     <motion.article
@@ -925,6 +955,7 @@ function EventCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
+      onClick={handleCardClick}
     >
       {/* Image with overlay — default state: title + date over image */}
       <div className="relative aspect-[16/10] bg-[#0f3d1e]/30 overflow-hidden">
@@ -943,7 +974,13 @@ function EventCard({
         )}
         {/* Gradient overlay with date/title — hidden on mobile (panel always expanded); on sm+ shown until hover */}
         <div
-          className="absolute inset-x-0 bottom-0 pt-20 pb-4 px-4 transition-opacity duration-200 hidden sm:block sm:group-hover:opacity-0"
+          className={`absolute inset-x-0 bottom-0 pt-20 pb-4 px-4 transition-opacity duration-200 hidden sm:block ${
+            isTapExpandMode
+              ? isExpanded
+                ? "opacity-0"
+                : "opacity-100"
+              : "sm:group-hover:opacity-0"
+          }`}
           style={{
             background:
               "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 45%, transparent 100%)",
@@ -961,7 +998,15 @@ function EventCard({
       </div>
 
       {/* Full details panel — always expanded on mobile; slides down on hover for sm+ */}
-      <div className="max-h-80 sm:max-h-0 overflow-hidden transition-[max-height] duration-300 ease-out sm:group-hover:max-h-80 border-t border-[#d4af37]/20 sm:border-transparent sm:group-hover:border-[#d4af37]/20">
+      <div
+        className={`overflow-hidden transition-[max-height] duration-300 ease-out border-t ${
+          isTapExpandMode
+            ? isExpanded
+              ? "max-h-80 border-[#d4af37]/20"
+              : "max-h-0 border-transparent"
+            : "max-h-80 sm:max-h-0 border-[#d4af37]/20 sm:border-transparent sm:group-hover:max-h-80 sm:group-hover:border-[#d4af37]/20"
+        }`}
+      >
         <div className="flex flex-col p-5 bg-[#1a120b]/95">
           {dates.formatted && (
             <p className="flex items-center gap-1.5 text-[#e8e0d5]/80 text-sm mb-2">
