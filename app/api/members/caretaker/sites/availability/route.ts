@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCaretakerContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
-import { campUsesReservations } from "@/lib/reservation-camps";
+import { campUsesReservations, isNonBookableSiteName } from "@/lib/reservation-camps";
 
 /**
  * GET /api/members/caretaker/sites/availability?from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -46,10 +46,12 @@ export async function GET(request: NextRequest) {
 
   // All sites for this camp
   const allSites = await sql`
-    SELECT id FROM camp_sites WHERE camp_slug = ${caretaker.campSlug} ORDER BY sort_order ASC, name ASC
+    SELECT id, name FROM camp_sites WHERE camp_slug = ${caretaker.campSlug} ORDER BY sort_order ASC, name ASC
   `;
-  const allSitesRows = (Array.isArray(allSites) ? allSites : []) as { id: string }[];
-  const allIds = allSitesRows.map((r) => r.id);
+  const allSitesRows = (Array.isArray(allSites) ? allSites : []) as { id: string; name: string }[];
+  const allIds = allSitesRows
+    .filter((r) => !isNonBookableSiteName(caretaker.campSlug, r.name))
+    .map((r) => r.id);
   const availableIds = allIds.filter((id) => !occupiedIds.has(id));
 
   return NextResponse.json({ availableSiteIds: availableIds });

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getCaretakerContext } from "@/lib/caretaker-auth";
-import { campUsesReservations } from "@/lib/reservation-camps";
+import { campUsesReservations, isNonBookableSiteName } from "@/lib/reservation-camps";
+import { hasDb, sql } from "@/lib/db";
 
 /**
  * POST /api/members/caretaker/payments/checkout-session
@@ -19,6 +20,9 @@ export async function POST(request: NextRequest) {
   }
   if (!campUsesReservations(caretaker.campSlug)) {
     return NextResponse.json({ error: "Reservation system not available for this camp" }, { status: 403 });
+  }
+  if (!hasDb() || !sql) {
+    return NextResponse.json({ error: "Database not available" }, { status: 503 });
   }
 
   const secretKey = process.env.STRIPE_RESTRICTED_KEY || process.env.STRIPE_SECRET_KEY;
@@ -94,6 +98,19 @@ export async function POST(request: NextRequest) {
     if (!siteId || !checkInDate || !checkOutDate || nights < 1) {
       return NextResponse.json(
         { error: "Reservation payment requires siteId, checkInDate, checkOutDate, nights" },
+        { status: 400 }
+      );
+    }
+    const siteRows = await sql`
+      SELECT name FROM camp_sites WHERE id = ${siteId} AND camp_slug = ${caretaker.campSlug} LIMIT 1
+    `;
+    const site = (Array.isArray(siteRows) ? siteRows : [])[0] as { name: string } | undefined;
+    if (!site) {
+      return NextResponse.json({ error: "Site not found" }, { status: 404 });
+    }
+    if (isNonBookableSiteName(caretaker.campSlug, site.name)) {
+      return NextResponse.json(
+        { error: "This site is reserved for caretaker use and cannot be booked." },
         { status: 400 }
       );
     }

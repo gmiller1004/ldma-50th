@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCaretakerContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
-import { campUsesReservations, isHookupSiteType } from "@/lib/reservation-camps";
+import {
+  campUsesReservations,
+  isHookupSiteType,
+  isNonBookableSiteName,
+} from "@/lib/reservation-camps";
 import { computeReservationTotalCents } from "@/lib/reservation-pricing";
 import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
 import { lookupMember } from "@/lib/salesforce";
@@ -205,16 +209,23 @@ export async function POST(request: NextRequest) {
 
   // Verify site belongs to this camp and get rates + site_type (for event dry vs hookup)
   const siteRows = await sql`
-    SELECT id, site_type, member_rate_daily, non_member_rate_daily FROM camp_sites WHERE id = ${siteId} AND camp_slug = ${caretaker.campSlug} LIMIT 1
+    SELECT id, name, site_type, member_rate_daily, non_member_rate_daily FROM camp_sites WHERE id = ${siteId} AND camp_slug = ${caretaker.campSlug} LIMIT 1
   `;
   const siteRow = (Array.isArray(siteRows) ? siteRows : [])[0] as {
     id: string;
+    name: string;
     site_type: string;
     member_rate_daily: number | null;
     non_member_rate_daily: number | null;
   } | undefined;
   if (!siteRow) {
     return NextResponse.json({ error: "Site not found" }, { status: 404 });
+  }
+  if (isNonBookableSiteName(caretaker.campSlug, siteRow.name)) {
+    return NextResponse.json(
+      { error: "This site is reserved for caretaker use and cannot be booked." },
+      { status: 400 }
+    );
   }
 
   const eventProductHandle = typeof body.eventProductHandle === "string" ? body.eventProductHandle.trim() || null : null;

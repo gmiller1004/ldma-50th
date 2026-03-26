@@ -1,26 +1,26 @@
 name,site_type,sort_order,member_rate_daily,non_member_rate_daily,notes
-Lower 2,30 amp,1,14,35,30 amp + water
-Lower 3,30 amp,2,14,35,30 amp + water
-Lower 4,30 amp,3,14,35,30 amp + water
-Lower 5,30 amp,4,14,35,30 amp + water
-Lower 6,30 amp,5,14,35,30 amp + water
-Lower 7,30 amp,6,14,35,30 amp + water
-Lower 8,30 amp,7,14,35,30 amp + water
-Lower 9,30 amp,8,14,35,30 amp + water
-Lower 10,30 amp,9,14,35,30 amp + water
-Lower 11,30 amp,10,14,35,30 amp + water
-Lower 12,30 amp,11,14,35,30 amp + water
-Lower 13,30 amp,12,14,35,30 amp + water
+Lower 2,30 amp,1,12,35,30 amp + water
+Lower 3,30 amp,2,12,35,30 amp + water
+Lower 4,30 amp,3,12,35,30 amp + water
+Lower 5,30 amp,4,12,35,30 amp + water
+Lower 6,30 amp,5,12,35,30 amp + water
+Lower 7,30 amp,6,12,35,30 amp + water
+Lower 8,30 amp,7,12,35,30 amp + water
+Lower 9,30 amp,8,12,35,30 amp + water
+Lower 10,30 amp,9,12,35,30 amp + water
+Lower 11,30 amp,10,12,35,30 amp + water
+Lower 12,30 amp,11,12,35,30 amp + water
+Lower 13,30 amp,12,12,35,30 amp + water
 Lower 14,dry,13,6,15,Dry no hookups
 Lower 15,dry,14,6,15,Dry no hookups
 Lower 16,dry,15,6,15,Dry no hookups
 Lower 17,dry,16,6,15,Dry no hookups
-Upper 1,dry,17,6,15,Dry no hookups
-Upper 2,dry,18,6,15,Dry no hookups
-Upper 3,dry,19,6,15,Dry no hookups
-Upper 4,dry,20,6,15,Dry no hookups
-Upper 5,dry,21,6,15,Dry no hookups
-Upper 6,dry,22,6,15,Dry no hookups
+Upper 1,50 amp,17,14,45,50 amp + water
+Upper 2,30 amp,18,12,35,30 amp + water
+Upper 3,30 amp,19,12,35,30 amp + water
+Upper 4,30 amp,20,12,35,30 amp + water
+Upper 5,30 amp,21,12,35,30 amp + water
+Upper 6,30 amp,22,12,35,30 amp + water
 Upper 7,dry,23,6,15,Dry no hookups
 Upper 8,dry,24,6,15,Dry no hookups
 Upper 9,dry,25,6,15,Dry no hookups
