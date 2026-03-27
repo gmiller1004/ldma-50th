@@ -19,18 +19,113 @@ type EventDates = {
   formatted: string | null;
 };
 
-/** Extract dates from metafields (preferred) or tags. Tags: date:YYYY-MM-DD, date-end:YYYY-MM-DD */
+/** Build lookup for metafields: bare key (first wins) and `namespace.key`. */
+function buildEventMetaMap(
+  metafields: Array<{ namespace?: string; key: string; value?: string }>
+): Record<string, string> {
+  const metaMap: Record<string, string> = {};
+  for (const m of metafields) {
+    if (m?.key == null) continue;
+    const val = String(m.value ?? "").trim();
+    if (!val) continue;
+    const ns = m.namespace;
+    if (ns) metaMap[`${ns}.${m.key}`] = val;
+    if (metaMap[m.key] === undefined) metaMap[m.key] = val;
+  }
+  return metaMap;
+}
+
+/** Parse YYYY-MM-DD as a local calendar date (avoids UTC midnight shifting the day). */
+function parseDateOnlyLocal(str: string): Date | null {
+  const m = str.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10) - 1;
+  const d = parseInt(m[3], 10);
+  const dt = new Date(y, mo, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo || dt.getDate() !== d)
+    return null;
+  return dt;
+}
+
+function parseISODate(str: string): Date | null {
+  const trimmed = str.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    const local = parseDateOnlyLocal(trimmed);
+    if (local) return local;
+  }
+  const d = new Date(trimmed);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+const HANDLE_MONTH: Record<string, number> = {
+  jan: 0,
+  feb: 1,
+  mar: 2,
+  apr: 3,
+  may: 4,
+  jun: 5,
+  jul: 6,
+  aug: 7,
+  sep: 8,
+  oct: 9,
+  nov: 10,
+  dec: 11,
+};
+
+function monthFromHandleToken(tok: string): number | undefined {
+  const x = tok.toLowerCase().replace(/[^a-z]/g, "");
+  if (x.startsWith("sept")) return 8;
+  const three = x.slice(0, 3);
+  return HANDLE_MONTH[three];
+}
+
+/** e.g. handle `...-sept-30-oct-3` or embedded `2026-09-30-2026-10-03` */
+function parseDatesFromHandle(
+  handle: string,
+  title: string
+): { startDate: Date; endDate: Date } | null {
+  const isoPair = handle.match(/\b(20\d{2}-\d{2}-\d{2})\b.*\b(20\d{2}-\d{2}-\d{2})\b/);
+  if (isoPair) {
+    const s = parseDateOnlyLocal(isoPair[1]);
+    const e = parseDateOnlyLocal(isoPair[2]);
+    if (s && e) return { startDate: s, endDate: e };
+  }
+  const re =
+    /(?:^|-)(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)-(\d{1,2})-(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)-(\d{1,2})(?=-|$)/i;
+  const m = handle.match(re);
+  if (!m) return null;
+  const mo1 = monthFromHandleToken(m[1]);
+  const d1 = parseInt(m[2], 10);
+  const mo2 = monthFromHandleToken(m[3]);
+  const d2 = parseInt(m[4], 10);
+  if (mo1 === undefined || mo2 === undefined) return null;
+  const yearMatch =
+    title.match(/\b(20\d{2})\b/) ?? handle.match(/\b(20\d{2})\b/);
+  const year = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+  const startDate = new Date(year, mo1, d1);
+  const endDate = new Date(year, mo2, d2);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return null;
+  if (endDate < startDate) return null;
+  return { startDate, endDate };
+}
+
+/** Extract dates from metafields (preferred), tags, title, or product handle. Tags: date:YYYY-MM-DD, date-end:YYYY-MM-DD */
 function getEventDates(product: EventProduct): EventDates {
   const result: EventDates = { startDate: null, endDate: null, formatted: null };
 
-  const metafields = product.metafields ?? [];
-  const metaMap: Record<string, string> = {};
-  for (const m of metafields) {
-    if (m?.key != null) metaMap[m.key] = m.value ?? "";
-  }
+  const metaMap = buildEventMetaMap(product.metafields ?? []);
 
-  let startStr = metaMap["start_date"] ?? metaMap["start_date_iso"];
-  let endStr = metaMap["end_date"] ?? metaMap["end_date_iso"];
+  let startStr =
+    metaMap["event.start_date"] ??
+    metaMap["custom.start_date"] ??
+    metaMap["start_date"] ??
+    metaMap["start_date_iso"];
+  let endStr =
+    metaMap["event.end_date"] ??
+    metaMap["custom.end_date"] ??
+    metaMap["end_date"] ??
+    metaMap["end_date_iso"];
 
   if (!startStr) {
     const tags = product.tags ?? [];
@@ -53,30 +148,30 @@ function getEventDates(product: EventProduct): EventDates {
     }
   }
 
-  // Fallback: try to parse "March 16-22" or "March 16 – 22" from title
-  if (!startStr && product.title) {
+  let startDate = startStr ? parseISODate(startStr) : null;
+  let endDate = endStr ? parseISODate(endStr) : null;
+
+  if (!startDate && product.title) {
     const parsed = parseDateRangeFromTitle(product.title);
     if (parsed) {
-      result.startDate = parsed.startDate;
-      result.endDate = parsed.endDate;
-      result.formatted = formatDateRange(parsed.startDate, parsed.endDate);
-      return result;
+      startDate = parsed.startDate;
+      endDate = parsed.endDate;
     }
   }
 
-  const startDate = startStr ? parseISODate(startStr) : null;
-  const endDate = endStr ? parseISODate(endStr) : null;
+  if (!startDate && product.handle) {
+    const fromHandle = parseDatesFromHandle(product.handle, product.title);
+    if (fromHandle) {
+      startDate = fromHandle.startDate;
+      endDate = fromHandle.endDate;
+    }
+  }
 
   result.startDate = startDate;
   result.endDate = endDate;
   result.formatted = formatDateRange(startDate, endDate);
 
   return result;
-}
-
-function parseISODate(str: string): Date | null {
-  const d = new Date(str);
-  return isNaN(d.getTime()) ? null : d;
 }
 
 /** Try to parse "March 16-22" or "Mar 16 – 22, 2026" from title. Year from title or current year. */

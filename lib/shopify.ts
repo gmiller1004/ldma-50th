@@ -110,7 +110,7 @@ export type EventProduct = {
   handle: string;
   descriptionHtml?: string;
   tags: string[];
-  metafields?: Array<{ key: string; value: string }>;
+  metafields?: Array<{ namespace?: string; key: string; value: string }>;
   featuredImage: EventProductImage | null;
   images?: {
     edges: Array<{ node: EventProductImage }>;
@@ -314,8 +314,11 @@ const EVENT_PRODUCT_FRAGMENT = `
     tags
     metafields(identifiers: [
       { namespace: "event", key: "start_date" },
-      { namespace: "event", key: "end_date" }
+      { namespace: "event", key: "end_date" },
+      { namespace: "custom", key: "start_date" },
+      { namespace: "custom", key: "end_date" }
     ]) {
+      namespace
       key
       value
     }
