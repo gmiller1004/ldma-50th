@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Calendar, Info, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { ShareButton } from "@/components/ShareButton";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { EVENT_TYPES, CAMP_FILTERS, PRICE_LEVEL_METAFIELD } from "@/lib/events-config";
 import type { EventProduct, EventVariant } from "@/lib/shopify";
@@ -631,6 +632,17 @@ export function EventsPageContent({
           )}
         </div>
       </section>
+
+      <NewsletterSignup
+        variant="banner"
+        id="events-email-signup"
+        analyticsSource="events"
+        title="Get email updates on LDMA events"
+        description="Sign up to hear when we announce new Dirt Fests, detector days, and camp events — plus heads-up when registration opens so you don't miss a spot."
+        successTitle="You're on the list"
+        successMessage="Watch your inbox for new events and registration news from LDMA."
+        submitLabel="Notify me"
+      />
 
       {/* Filters */}
       <section className="py-8 border-b border-[#d4af37]/10">

@@ -61,9 +61,9 @@ export function trackVipUpsellMaybeLater(): void {
   trackEvent("vip_upsell_maybe_later");
 }
 
-/** Newsletter signup */
-export function trackNewsletterSignup(): void {
-  trackEvent("newsletter_signup");
+/** Newsletter signup (optional `source` e.g. events, home for GA4 breakdown) */
+export function trackNewsletterSignup(source?: string): void {
+  trackEvent("newsletter_signup", source ? { signup_source: source } : undefined);
 }
 
 /** Contact form submit */
