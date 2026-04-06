@@ -3,6 +3,14 @@ import { NextResponse } from "next/server";
 const KLAVIYO_API_URL = "https://a.klaviyo.com/api/profile-subscription-bulk-create-jobs/";
 const KLAVIYO_REVISION = "2024-05-15";
 
+const SIGNUP_SOURCES = new Set(["home", "events"]);
+
+function normalizeSignupSource(raw: unknown): string {
+  if (typeof raw !== "string") return "home";
+  const s = raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  return SIGNUP_SOURCES.has(s) ? s : "home";
+}
+
 export async function POST(req: Request) {
   const apiKey = process.env.KLAVIYO_PRIVATE_API_KEY;
   const listId = process.env.KLAVIYO_LIST_ID;
@@ -18,6 +26,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const signupSource = normalizeSignupSource(body.signup_source);
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json(
@@ -45,6 +54,9 @@ export async function POST(req: Request) {
                 type: "profile",
                 attributes: {
                   email,
+                  properties: {
+                    signup_source: signupSource,
+                  },
                   subscriptions: {
                     email: {
                       marketing: {
