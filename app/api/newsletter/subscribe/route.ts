@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
-const KLAVIYO_API_URL = "https://a.klaviyo.com/api/profile-subscription-bulk-create-jobs/";
+const KLAVIYO_BASE = "https://a.klaviyo.com/api";
+const KLAVIYO_SUBSCRIBE_URL = `${KLAVIYO_BASE}/profile-subscription-bulk-create-jobs/`;
+const KLAVIYO_PROFILE_IMPORT_URL = `${KLAVIYO_BASE}/profile-import`;
 const KLAVIYO_REVISION = "2024-05-15";
 
 const SIGNUP_SOURCES = new Set(["home", "events"]);
@@ -9,6 +11,42 @@ function normalizeSignupSource(raw: unknown): string {
   if (typeof raw !== "string") return "home";
   const s = raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
   return SIGNUP_SOURCES.has(s) ? s : "home";
+}
+
+/** Bulk subscribe does not allow profile `properties`; use profile-import to set custom fields. */
+async function setKlaviyoSignupSource(
+  apiKey: string,
+  email: string,
+  signupSource: string
+): Promise<void> {
+  const res = await fetch(KLAVIYO_PROFILE_IMPORT_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Klaviyo-API-Key ${apiKey}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      revision: KLAVIYO_REVISION,
+    },
+    body: JSON.stringify({
+      data: {
+        type: "profile",
+        attributes: {
+          email,
+          properties: {
+            signup_source: signupSource,
+          },
+        },
+      },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(
+      "[newsletter] Klaviyo profile-import (signup_source) error:",
+      res.status,
+      text
+    );
+  }
 }
 
 export async function POST(req: Request) {
@@ -54,9 +92,6 @@ export async function POST(req: Request) {
                 type: "profile",
                 attributes: {
                   email,
-                  properties: {
-                    signup_source: signupSource,
-                  },
                   subscriptions: {
                     email: {
                       marketing: {
@@ -84,7 +119,7 @@ export async function POST(req: Request) {
       };
     }
 
-    const res = await fetch(KLAVIYO_API_URL, {
+    const res = await fetch(KLAVIYO_SUBSCRIBE_URL, {
       method: "POST",
       headers: {
         Authorization: `Klaviyo-API-Key ${apiKey}`,
@@ -109,6 +144,8 @@ export async function POST(req: Request) {
         { status: 502 }
       );
     }
+
+    await setKlaviyoSignupSource(apiKey, email, signupSource);
 
     return NextResponse.json({ success: true });
   } catch (err) {
