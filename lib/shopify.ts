@@ -179,6 +179,16 @@ export type ShopProductVariant = {
   price: { amount: string; currencyCode: string };
   compareAtPrice: { amount: string; currencyCode: string } | null;
   selectedOptions: Array<{ name: string; value: string }>;
+  /** Linked product image (same URL as one of product.images when set in Shopify admin). */
+  image: EventProductImage | null;
+  /** Subscription plans that apply to this variant (when using subscriptions). */
+  sellingPlanAllocations?: {
+    edges: Array<{
+      node: {
+        sellingPlan: { id: string; name: string };
+      };
+    }>;
+  };
 };
 
 export type ShopProduct = {
@@ -253,6 +263,22 @@ const SHOP_PRODUCT_FRAGMENT = `
           price { amount currencyCode }
           compareAtPrice { amount currencyCode }
           selectedOptions { name value }
+          image {
+            url
+            altText
+            width
+            height
+          }
+          sellingPlanAllocations(first: 10) {
+            edges {
+              node {
+                sellingPlan {
+                  id
+                  name
+                }
+              }
+            }
+          }
         }
       }
     }

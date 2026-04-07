@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Repeat } from "lucide-react";
@@ -37,6 +37,37 @@ function findVariantByOptions(
       return v;
   }
   return variants[0] ?? null;
+}
+
+/**
+ * When one option changes, the naive { ...prev, [name]: value } pair may not
+ * exist as a variant. Prefer a variant that keeps other options unchanged;
+ * otherwise pick the first variant that matches the changed option.
+ */
+function resolveVariantOnOptionChange(
+  product: ShopProduct,
+  previous: Record<string, string>,
+  changedOptionName: string,
+  newValue: string
+): ShopProductVariant | null {
+  const variants = getVariants(product);
+  const matching = variants.filter(
+    (v) =>
+      v.selectedOptions?.find((o) => o.name === changedOptionName)?.value ===
+      newValue
+  );
+  if (matching.length === 0) return null;
+  const exact = matching.find((v) =>
+    (v.selectedOptions ?? []).every((o) => {
+      if (o.name === changedOptionName) return o.value === newValue;
+      return previous[o.name] === o.value;
+    })
+  );
+  return exact ?? matching[0] ?? null;
+}
+
+function imageUrlsMatch(a: string, b: string): boolean {
+  return a.split("?")[0] === b.split("?")[0];
 }
 
 type ProductVariantSelectorProps = {
@@ -133,8 +164,12 @@ function ProductVariantSelector({
           <select
             value={selectedOptions[opt.name] ?? opt.values[0]}
             onChange={(e) => {
-              const next = { ...selectedOptions, [opt.name]: e.target.value };
-              const v = findVariantByOptions(product, next);
+              const v = resolveVariantOnOptionChange(
+                product,
+                selectedOptions,
+                opt.name,
+                e.target.value
+              );
               if (v) onSelect(v.id);
             }}
             className="w-full px-3 py-2 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] text-sm focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50"
@@ -180,7 +215,8 @@ export function ProductPageTemplate({
   }, [product.featuredImage, product.images]);
 
   const currentVariant = variants.find((v) => v.id === currentVariantId) ?? variants[0];
-  const sellingPlans = useMemo(() => {
+
+  const sellingPlansFromProduct = useMemo(() => {
     const plans: Array<{ id: string; name: string }> = [];
     for (const e of product.sellingPlanGroups?.edges ?? []) {
       for (const sp of e.node.sellingPlans?.edges ?? []) {
@@ -189,10 +225,41 @@ export function ProductPageTemplate({
     }
     return plans;
   }, [product.sellingPlanGroups]);
-  const isSubscription = sellingPlans.length > 0;
-  const [selectedSellingPlanId, setSelectedSellingPlanId] = useState(
-    sellingPlans[0]?.id ?? ""
-  );
+
+  /** Prefer per-variant allocations so the subscription dropdown matches the selected variant. */
+  const sellingPlansForVariant = useMemo(() => {
+    const v = currentVariant;
+    const edges = v?.sellingPlanAllocations?.edges;
+    if (edges && edges.length > 0) {
+      const from = edges
+        .map((e) => e.node?.sellingPlan)
+        .filter((x): x is { id: string; name: string } => !!x?.id);
+      if (from.length > 0) return from;
+    }
+    return sellingPlansFromProduct;
+  }, [currentVariant, sellingPlansFromProduct]);
+
+  const isSubscription = sellingPlansFromProduct.length > 0;
+  const [selectedSellingPlanId, setSelectedSellingPlanId] = useState("");
+
+  useEffect(() => {
+    const plans = sellingPlansForVariant;
+    if (plans.length === 0) {
+      setSelectedSellingPlanId("");
+      return;
+    }
+    setSelectedSellingPlanId((prev) =>
+      prev && plans.some((p) => p.id === prev) ? prev : plans[0]!.id
+    );
+  }, [currentVariantId, sellingPlansForVariant]);
+
+  useEffect(() => {
+    const v = variants.find((x) => x.id === currentVariantId);
+    const url = v?.image?.url;
+    if (!url) return;
+    const idx = images.findIndex((img) => imageUrlsMatch(img.url, url));
+    if (idx >= 0) setImageIndex(idx);
+  }, [currentVariantId, variants, images]);
   const priceDisplay = currentVariant
     ? `$${parseFloat(currentVariant.price.amount).toFixed(2)}`
     : variants[0]
@@ -306,7 +373,7 @@ export function ProductPageTemplate({
                 onChange={(e) => setSelectedSellingPlanId(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] text-sm focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50"
               >
-                {sellingPlans.map((plan) => (
+                {sellingPlansForVariant.map((plan) => (
                   <option key={plan.id} value={plan.id}>
                     {plan.name}
                   </option>
