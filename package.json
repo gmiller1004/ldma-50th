@@ -14,7 +14,9 @@
     "generate:blog-redirects": "node scripts/generate-blog-redirects.mjs",
     "db:migrate": "node --env-file=.env.local scripts/migrate-community.mjs",
     "db:seed:burnt-river-sites": "node --env-file=.env.local scripts/seed-burnt-river-sites.mjs",
-    "db:seed:vein-mountain-sites": "node --env-file=.env.local scripts/seed-camp-sites.mjs vein-mountain-north-carolina vein-mountain-sites.csv"
+    "db:seed:vein-mountain-sites": "node --env-file=.env.local scripts/seed-camp-sites.mjs vein-mountain-north-carolina vein-mountain-sites.csv",
+    "addendum:pdf": "node scripts/addendum-to-pdf.mjs",
+    "generate:knowledge-embeddings": "node --env-file=.env.local scripts/generate-knowledge-embeddings.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -40,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "pg": "^8.19.0",
+    "puppeteer": "^24.39.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -1005,3 +1005,94 @@ Questions? Call us at ${phone}.`;
     return false;
   }
 }
+
+const CHAT_TRANSCRIPT_BCC_DEFAULT =
+  "gmiller@goldprospectors.org,gricci@goldprospectors.org";
+
+function escapeHtmlChat(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Send LDMA Assistant chat transcript to the visitor; BCC team addresses. */
+export async function sendChatTranscriptEmail(
+  to: string,
+  messages: Array<{ role: string; content: string }>
+): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  const bccRaw =
+    process.env.CHAT_TRANSCRIPT_BCC || CHAT_TRANSCRIPT_BCC_DEFAULT;
+  const bcc = bccRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[DEV] Chat transcript to", to, messages.length, "messages");
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping chat transcript email");
+    return false;
+  }
+
+  sgMail.setApiKey(apiKey);
+
+  const textLines = messages.map((m) => {
+    const label = m.role === "user" ? "You" : "LDMA Assistant";
+    return `${label}:\n${m.content}\n`;
+  });
+  const textContent = `Your LDMA Assistant conversation\n\n${textLines.join("\n---\n\n")}\n\n—\nLost Dutchman's Mining Association • myldma.com`;
+
+  const htmlBody = messages
+    .map((m) => {
+      const label = m.role === "user" ? "You" : "LDMA Assistant";
+      const bg = m.role === "user" ? "#2a1f14" : "#1a120b";
+      return `<div style="margin-bottom:16px;padding:12px 14px;border-radius:8px;background:${bg};border:1px solid #d4af3730;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#d4af37;margin-bottom:8px;">${label}</div><div style="color:#e8e0d5;font-size:15px;line-height:1.5;white-space:pre-wrap;">${escapeHtmlChat(m.content)}</div></div>`;
+    })
+    .join("");
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#1a120b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#1a120b;padding:24px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" style="max-width:560px;background:#2a1f14;border-radius:12px;border:1px solid #d4af3740;overflow:hidden;">
+        <tr><td style="padding:20px 20px 8px;text-align:center;border-bottom:1px solid #d4af3720;">
+          <p style="margin:0;font-size:18px;font-weight:600;color:#f0d48f;">Your LDMA Assistant conversation</p>
+          <p style="margin:8px 0 0;font-size:13px;color:#e8e0d580;">Lost Dutchman's Mining Association</p>
+        </td></tr>
+        <tr><td style="padding:20px;">${htmlBody}</td></tr>
+        <tr><td style="padding:16px 20px;background:#1a120b;border-top:1px solid #d4af3720;">
+          <p style="margin:0;font-size:12px;color:#e8e0d560;">myldma.com &bull; 888-465-3717</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+  try {
+    await sgMail.send({
+      to,
+      bcc: bcc.length > 0 ? bcc : undefined,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: "Your LDMA Assistant conversation",
+      text: textContent,
+      html: htmlContent,
+      trackingSettings: {
+        clickTracking: { enable: false },
+        openTracking: { enable: false },
+      },
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid chat transcript error:", e);
+    return false;
+  }
+}

@@ -5,6 +5,7 @@ import { VipUpsellProvider } from "@/context/VipUpsellContext";
 import { CartDrawer } from "@/components/CartDrawer";
 import { VipUpsellModal } from "@/components/VipUpsellModal";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { ChatWidgetGate } from "@/components/ChatWidgetGate";
 
 // Never use Shopify store URL for site base (canonical, og:url, etc.)
 const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
@@ -65,6 +66,7 @@ export default function RootLayout({
             {children}
             <CartDrawer />
             <VipUpsellModal />
+            <ChatWidgetGate />
           </VipUpsellProvider>
         </CartProvider>
       </body>

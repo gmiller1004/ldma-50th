@@ -9,7 +9,7 @@ const devStore = new Map<
   { payload: string; expires: number }
 >();
 
-function getRedis(): Redis | null {
+export function getRedis(): Redis | null {
   // Support multiple env naming conventions (Upstash Redis, Vercel KV, LDMAStorage)
   const url =
     process.env.UPSTASH_REDIS_REST_URL ||
