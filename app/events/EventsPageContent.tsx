@@ -8,6 +8,7 @@ import { MapPin, Calendar, Info, X, ChevronLeft, ChevronRight } from "lucide-rea
 import { ShareButton } from "@/components/ShareButton";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
+import { EventsExitIntentSignup } from "@/components/EventsExitIntentSignup";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { EVENT_TYPES, CAMP_FILTERS, PRICE_LEVEL_METAFIELD } from "@/lib/events-config";
 import type { EventProduct, EventVariant } from "@/lib/shopify";
@@ -744,6 +745,11 @@ export function EventsPageContent({
           </AnimatePresence>
         </div>
       </section>
+
+      <EventsExitIntentSignup
+        isMemberLoggedIn={isMemberLoggedIn}
+        blockTriggers={detailEvent !== null}
+      />
     </>
   );
 }
