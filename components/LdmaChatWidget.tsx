@@ -370,14 +370,17 @@ export function LdmaChatWidget() {
         )}
       </AnimatePresence>
 
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-4 right-4 z-[101] flex h-14 w-14 items-center justify-center rounded-full border border-[#d4af37]/40 bg-[#1a120b] text-[#d4af37] shadow-lg hover:bg-[#d4af37]/10 transition-colors"
-        aria-label={open ? "Close LDMA Assistant" : "Open LDMA Assistant"}
-      >
-        {open ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
-      </button>
+      {/* Launcher only when closed — when open, a fixed z-[101] button overlaps the footer Send control */}
+      {!open && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="fixed bottom-4 right-4 z-[101] flex h-14 w-14 items-center justify-center rounded-full border border-[#d4af37]/40 bg-[#1a120b] text-[#d4af37] shadow-lg hover:bg-[#d4af37]/10 transition-colors"
+          aria-label="Open LDMA Assistant"
+        >
+          <MessageSquare className="h-6 w-6" />
+        </button>
+      )}
     </>
   );
 }
