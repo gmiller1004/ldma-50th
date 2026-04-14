@@ -8,7 +8,6 @@ import { getCart } from "@/lib/shopify";
 import {
   isMembershipProduct,
   getMembershipKeyFromTitle,
-  isMembershipProductKey,
 } from "@/lib/membership-config";
 import type { MembershipProductKey } from "@/lib/membership-config";
 import {
@@ -16,9 +15,20 @@ import {
   membershipKeysFromQuoteLineItems,
 } from "@/lib/membership-flow-discounts";
 import {
+  buildMembershipModalEventProperties,
+  formatQuoteLineItemsSummary,
+  quotePermalinkLinesForMembership,
+} from "@/lib/klaviyo-membership-modal-payload";
+import { MEMBERSHIP_METRICS } from "@/lib/klaviyo-membership-constants";
+import {
   buildShopifyCartPermalink,
   gidToNumericId,
 } from "@/lib/shopify-cart-permalink";
+
+export { MEMBERSHIP_METRICS } from "@/lib/klaviyo-membership-constants";
+export {
+  formatQuoteLineItemsSummary,
+} from "@/lib/klaviyo-membership-modal-payload";
 
 const KLAVIYO_BASE = "https://a.klaviyo.com/api";
 /** Align with camp stay / events patterns */
@@ -26,28 +36,6 @@ const KLAVIYO_REVISION = "2024-02-15";
 
 /** HttpOnly cookie set when user saves a quote — server cart actions read this to sync cart to Klaviyo. */
 export const MEMBERSHIP_QUOTE_EMAIL_COOKIE = "membership_quote_email";
-
-export const MEMBERSHIP_METRICS = {
-  cartUpdated: "Membership Cart Updated",
-  quoteSaved: "Membership Quote Saved",
-  /** Fired when user reaches the summary step (best “drop-off” capture). */
-  configurationViewed: "Membership Configuration Viewed",
-  /** Fired once when user completes the modal (“Go to Cart”) — best trigger for nurture (not noisy). */
-  configurationFinalized: "Membership Configuration Finalized",
-} as const;
-
-/** Plain-text block for email templates (`{{ event.line_items_summary }}`). */
-export function formatQuoteLineItemsSummary(
-  line_items: Array<{ title: string; price: string }>,
-  total: number,
-  currency: string
-): string {
-  const rows = line_items.map(
-    (l) => `• ${l.title} — $${parseFloat(l.price).toFixed(2)}`
-  );
-  rows.push(`Total: ${total.toFixed(2)} ${currency}`);
-  return rows.join("\n");
-}
 
 /** Plain-text for cart-based events (quantity + line totals). */
 export function formatCartLineItemsSummary(
@@ -133,48 +121,25 @@ function membershipCartPermalinkLinesFromCart(
 function cartPermalinkFromQuoteLineItems(
   line_items: Array<{ variant_id?: string; key?: string; title?: string }>
 ): string {
-  const lines = quotePermalinkLines(line_items).map(({ variantId, quantity }) => ({
-    variantId,
-    quantity,
-  }));
+  const lines = quotePermalinkLinesForMembership(line_items).map(
+    ({ variantId, quantity }) => ({
+      variantId,
+      quantity,
+    })
+  );
   return buildShopifyCartPermalink(lines);
 }
 
 function cartPermalinkFromQuoteLineItemsNoDiscount(
   line_items: Array<{ variant_id?: string; key?: string; title?: string }>
 ): string {
-  const lines = quotePermalinkLines(line_items).map(({ variantId, quantity }) => ({
-    variantId,
-    quantity,
-  }));
+  const lines = quotePermalinkLinesForMembership(line_items).map(
+    ({ variantId, quantity }) => ({
+      variantId,
+      quantity,
+    })
+  );
   return buildShopifyCartPermalink(lines, "");
-}
-
-function quotePermalinkLines(
-  line_items: Array<{ variant_id?: string; key?: string; title?: string }>
-): Array<{
-  variantId: string;
-  quantity: number;
-  membershipKey: MembershipProductKey | null;
-}> {
-  return line_items
-    .filter(
-      (l): l is { variant_id: string; key?: string; title?: string } =>
-        Boolean(l.variant_id?.trim())
-    )
-    .map((l) => {
-      let membershipKey: MembershipProductKey | null = null;
-      if (l.key && isMembershipProductKey(l.key)) {
-        membershipKey = l.key;
-      } else if (l.title) {
-        membershipKey = getMembershipKeyFromTitle(l.title);
-      }
-      return {
-        variantId: l.variant_id,
-        quantity: 1,
-        membershipKey,
-      };
-    });
 }
 
 /**
@@ -325,7 +290,7 @@ export async function trackMembershipQuoteSaved(
   );
   const quoteKeys = membershipKeysFromQuoteLineItems(properties.line_items);
   const flowDiscountProps = buildFlowDiscountKlaviyoProps(
-    quotePermalinkLines(properties.line_items),
+    quotePermalinkLinesForMembership(properties.line_items),
     quoteKeys
   );
 
@@ -367,38 +332,20 @@ export async function trackMembershipConfigurationFinalized(
   if (!apiKey) return false;
 
   const normalized = email.trim().toLowerCase();
-  const line_items_summary = formatQuoteLineItemsSummary(
-    properties.line_items.map((l) => ({ title: l.title, price: l.price })),
-    properties.subtotal,
-    properties.currency
-  );
-  const cart_permalink = cartPermalinkFromQuoteLineItems(properties.line_items);
-  const cart_permalink_no_discount = cartPermalinkFromQuoteLineItemsNoDiscount(
-    properties.line_items
-  );
-  const quoteKeysFinal = membershipKeysFromQuoteLineItems(properties.line_items);
-  const flowDiscountPropsFinal = buildFlowDiscountKlaviyoProps(
-    quotePermalinkLines(properties.line_items),
-    quoteKeysFinal
-  );
+  const payload = buildMembershipModalEventProperties({
+    choices: properties.choices,
+    line_items: properties.line_items,
+    subtotal: properties.subtotal,
+    currency: properties.currency,
+    checkout_url: properties.checkout_url,
+    source: "membership_modal_go_to_cart",
+  });
 
   return createMembershipEvent(apiKey, {
     email: normalized,
     metricName: MEMBERSHIP_METRICS.configurationFinalized,
     uniqueId: `${normalized}-config-final-${Date.now()}`,
-    properties: {
-      choices: properties.choices,
-      line_items: properties.line_items,
-      subtotal: properties.subtotal,
-      currency: properties.currency,
-      checkout_url: properties.checkout_url,
-      cart_permalink,
-      cart_permalink_no_discount,
-      ...flowDiscountPropsFinal,
-      line_items_summary,
-      $value: properties.subtotal,
-      source: "membership_modal_go_to_cart",
-    },
+    properties: payload,
   });
 }
 
@@ -425,37 +372,19 @@ export async function trackMembershipConfigurationViewed(
   if (!apiKey) return false;
 
   const normalized = email.trim().toLowerCase();
-  const line_items_summary = formatQuoteLineItemsSummary(
-    properties.line_items.map((l) => ({ title: l.title, price: l.price })),
-    properties.subtotal,
-    properties.currency
-  );
-  const cart_permalink = cartPermalinkFromQuoteLineItems(properties.line_items);
-  const cart_permalink_no_discount = cartPermalinkFromQuoteLineItemsNoDiscount(
-    properties.line_items
-  );
-  const quoteKeysViewed = membershipKeysFromQuoteLineItems(properties.line_items);
-  const flowDiscountPropsViewed = buildFlowDiscountKlaviyoProps(
-    quotePermalinkLines(properties.line_items),
-    quoteKeysViewed
-  );
+  const payload = buildMembershipModalEventProperties({
+    choices: properties.choices,
+    line_items: properties.line_items,
+    subtotal: properties.subtotal,
+    currency: properties.currency,
+    checkout_url: properties.checkout_url,
+    source: "membership_modal_summary_view",
+  });
 
   return createMembershipEvent(apiKey, {
     email: normalized,
     metricName: MEMBERSHIP_METRICS.configurationViewed,
     uniqueId: `${normalized}-config-view-${Date.now()}`,
-    properties: {
-      choices: properties.choices,
-      line_items: properties.line_items,
-      subtotal: properties.subtotal,
-      currency: properties.currency,
-      checkout_url: properties.checkout_url,
-      cart_permalink,
-      cart_permalink_no_discount,
-      ...flowDiscountPropsViewed,
-      line_items_summary,
-      $value: properties.subtotal,
-      source: "membership_modal_summary_view",
-    },
+    properties: payload,
   });
 }

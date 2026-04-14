@@ -14,11 +14,12 @@ import {
   Radio,
   BookOpen,
 } from "lucide-react";
+import { getMembershipProductsForFlow } from "@/app/actions/membership";
+import { buildMembershipModalEventProperties } from "@/lib/klaviyo-membership-modal-payload";
 import {
-  getMembershipProductsForFlow,
-  emitMembershipConfigurationFinalized,
-  emitMembershipConfigurationViewedIfKnown,
-} from "@/app/actions/membership";
+  MEMBERSHIP_METRICS,
+  trackMembershipMetricOnsite,
+} from "@/lib/klaviyo-membership-browser";
 import {
   addMembershipToCart,
   clearCart,
@@ -90,8 +91,6 @@ export function MembershipCustomizationModal({
   const [stepIndex, setStepIndex] = useState(0);
   const [choices, setChoices] = useState<Record<string, StepStatus>>({});
   const [adding, setAdding] = useState(false);
-  /** Set when user successfully uses “Email me this quote” — used if cookie isn’t round-tripped yet. */
-  const [quoteEmailForKlaviyo, setQuoteEmailForKlaviyo] = useState<string | null>(null);
   const { refreshCart, openDrawer } = useCart();
   /** Variant IDs we've added to the cart in the background (so we can remove on Skip). */
   const addedInBackgroundRef = useRef<Set<string>>(new Set());
@@ -102,7 +101,6 @@ export function MembershipCustomizationModal({
     setError(null);
     setStepIndex(0);
     setChoices({});
-    setQuoteEmailForKlaviyo(null);
     addedInBackgroundRef.current = new Set();
     getMembershipProductsForFlow()
       .then((list) => {
@@ -184,8 +182,7 @@ export function MembershipCustomizationModal({
         } | null;
       };
       const fresh = cartData.cart;
-      await emitMembershipConfigurationFinalized({
-        email: quoteEmailForKlaviyo ?? undefined,
+      const finalizedProps = buildMembershipModalEventProperties({
         choices,
         line_items: selected.map((p) => ({
           key: p.key,
@@ -196,7 +193,12 @@ export function MembershipCustomizationModal({
         subtotal: total,
         currency: fresh?.cost?.subtotalAmount?.currencyCode ?? "USD",
         checkout_url: fresh?.checkoutUrl ?? "",
+        source: "membership_modal_go_to_cart",
       });
+      trackMembershipMetricOnsite(
+        MEMBERSHIP_METRICS.configurationFinalized,
+        finalizedProps
+      );
       onClose();
       openDrawer();
     } catch {
@@ -298,9 +300,6 @@ export function MembershipCustomizationModal({
                       products={products}
                       choices={choices}
                       onBack={handleBack}
-                      onQuoteEmailSaved={(email) =>
-                        setQuoteEmailForKlaviyo(email.trim().toLowerCase())
-                      }
                     />
                   ) : current.key === "lifetime" ? (
                     <StepLifetime
@@ -372,12 +371,10 @@ function StepSummary({
   products,
   choices,
   onBack,
-  onQuoteEmailSaved,
 }: {
   products: MembershipProductInfo[];
   choices: Record<string, StepStatus>;
   onBack: () => void;
-  onQuoteEmailSaved?: (email: string) => void;
 }) {
   const { cart } = useCart();
   const hasFiredViewedRef = useRef(false);
@@ -390,12 +387,11 @@ function StepSummary({
   const selected = products.filter((p) => choices[p.key] === "add");
   const total = selected.reduce((sum, p) => sum + parseFloat(p.price), 0);
 
-  // If they already saved a quote previously (cookie exists), fire a single “viewed summary” event
-  // for drop-off remarketing. This will no-op on the server if the cookie isn't present.
+  // Onsite Klaviyo: associates with profile when visitor came from a Klaviyo email (no form email required).
   useEffect(() => {
     if (hasFiredViewedRef.current) return;
     hasFiredViewedRef.current = true;
-    emitMembershipConfigurationViewedIfKnown({
+    const viewedProps = buildMembershipModalEventProperties({
       choices,
       line_items: selected.map((p) => ({
         key: p.key,
@@ -406,7 +402,12 @@ function StepSummary({
       subtotal: total,
       currency: cart?.cost.subtotalAmount.currencyCode ?? "USD",
       checkout_url: cart?.checkoutUrl ?? "",
-    }).catch(() => {});
+      source: "membership_modal_summary_view",
+    });
+    trackMembershipMetricOnsite(
+      MEMBERSHIP_METRICS.configurationViewed,
+      viewedProps
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -444,7 +445,6 @@ function StepSummary({
         return;
       }
       setQuoteStatus("success");
-      onQuoteEmailSaved?.(trimmed);
     } catch {
       setQuoteStatus("error");
       setQuoteError("Network error. Please try again.");
