@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>LDMA — Your membership selection</title>
+  <!--
+    KLAVIYO FLOW (Configuration Viewed — Day 1)
+    -------------------------------------------
+    1. Flow trigger: Metric "Membership Configuration Viewed" (custom metric from this app).
+    2. Flow filter (recommended): Only profiles with a known email (event always has email).
+    3. Add time delay: 1 day after the triggering event.
+    4. Email: paste this HTML into a "Text block" in editor mode, or use "Import HTML" if your plan supports it.
+       Prefer Klaviyo's "Code" email and paste the <body> table into the content region, or use drag-and-drop
+       blocks and copy href / text from below.
+    5. CTA link: event.cart_permalink (this is what works in Klaviyo for the Shopify cart URL).
+       event.cart_permalink_no_discount is also emitted if you need a link without ?discount=.
+    6. Preview text: set in Klaviyo "Preview text" field (see subject/preview copy in repo or your brief).
+    7. Static site links + header logo use https://myldma.com/... — same paths as app (Navbar: 50th-logo.png).
+
+    Event properties available from this app:
+      event.cart_permalink              — primary cart permalink (may include ?discount= from env)
+      event.cart_permalink_no_discount  — same line items, no discount query string
+      event.cart_permalink_with_flow_discounts — cart URL with nurture discount codes (see Day 3 template)
+      event.flow_discount_codes         — comma-separated codes used in cart_permalink_with_flow_discounts
+      event.discount_offer_*            — booleans for companion / paydirt / minelab (Klaviyo if/endif)
+      event.checkout_url                — Storefront checkout URL (optional secondary)
+      event.line_items_summary          — plain text, line breaks OK (use white-space: pre-line)
+      event.subtotal, event.currency, event.choices, event.line_items
+  -->
+</head>
+<body style="margin:0; padding:0; background-color:#F5F6F0; font-family: Arial, Helvetica, sans-serif; color:#1C2526;">
+  <!-- Preheader (hidden): duplicate in Klaviyo "Preview text" for clients that hide preheader -->
+  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">
+    What LDMA membership includes, plus your saved cart—ready when you are.
+  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6F0;">
+    <tr>
+      <td align="center" style="padding:24px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background-color:#FFFFFF; border-radius:12px; overflow:hidden; border:1px solid #E0DCC8;">
+          <tr>
+            <td style="padding:24px 28px 20px; text-align:center; border-bottom:1px solid #EEE9DC;">
+              <a href="https://myldma.com/" style="text-decoration:none; display:inline-block;">
+                <img
+                  src="https://myldma.com/images/global/50th-logo.png"
+                  width="280"
+                  alt="Lost Dutchman's Mining Association"
+                  style="max-width:280px; width:100%; height:auto; border:0; display:block; margin:0 auto;"
+                >
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 28px 8px; text-align:left;">
+              <p style="margin:0 0 20px; font-size:18px; line-height:1.55; color:#1C2526;">
+                Hi {{ first_name|default:'there' }},
+              </p>
+              <p style="margin:0 0 16px; font-size:18px; line-height:1.55; color:#1C2526;">
+                Yesterday you explored <strong>your LDMA membership bundle</strong> in our configurator. If life got in the way before checkout, no problem—your picks are still easy to finish.
+              </p>
+              <p style="margin:0 0 20px; font-size:18px; line-height:1.55; color:#1C2526;">
+                Maybe you were curious about add-ons before you had the full picture of membership. Here&rsquo;s the short version of <strong>why prospectors and families choose the Lost Dutchman&rsquo;s Mining Association</strong>—founded by George &ldquo;Buzzard&rdquo; Massie, with more than fifty years of history on the goldfields.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 20px; text-align:left;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6F0; border-radius:10px; border:1px solid #E0DCC8;">
+                <tr>
+                  <td style="padding:20px 22px;">
+                    <p style="margin:0 0 14px; font-size:16px; font-weight:bold; color:#1C2526;">What you get as an LDMA member</p>
+                    <ul style="margin:0; padding:0 0 0 20px; font-size:16px; line-height:1.6; color:#333333;">
+                      <li style="margin:0 0 10px;"><strong>Private LDMA campgrounds</strong> on gold-bearing ground—pitch a tent, bring the family, and spend real time on member claims.</li>
+                      <li style="margin:0 0 10px;"><strong>Prospecting and access</strong> structured around real mining tradition, with a nationwide community behind you.</li>
+                      <li style="margin:0 0 10px;"><strong>Events and camaraderie</strong>—from camp gatherings to DirtFest and other member happenings.</li>
+                      <li style="margin:0;"><strong>Optional add-ons</strong> (like the ones in your cart) can stack value on top of core membership, depending on the bundle you choose.</li>
+                    </ul>
+                    <p style="margin:16px 0 0; font-size:15px; line-height:1.55; color:#333333;">
+                      Dig deeper on our site:
+                      <a href="https://myldma.com/memberships" style="color:#B8860B; font-weight:bold;">Membership overview</a>
+                      &nbsp;·&nbsp;
+                      <a href="https://myldma.com/campgrounds" style="color:#B8860B;">Campgrounds</a>
+                      &nbsp;·&nbsp;
+                      <a href="https://myldma.com/events" style="color:#B8860B;">Events</a>
+                      &nbsp;·&nbsp;
+                      <a href="https://myldma.com/faq" style="color:#B8860B;">FAQ</a>
+                      &nbsp;·&nbsp;
+                      <a href="https://myldma.com/50-years" style="color:#B8860B;">50 years of LDMA</a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 28px 8px; text-align:left;">
+              <p style="margin:0 0 20px; font-size:18px; line-height:1.55; color:#1C2526;">
+                When you&rsquo;re ready, tap below to open <strong>the same cart lineup</strong> you built and pick up right where you left off.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 20px; text-align:center;">
+              <a href="{{ event.cart_permalink }}" style="display:inline-block; background-color:#B8860B; color:#FFFFFF; font-size:18px; font-weight:bold; padding:16px 32px; text-decoration:none; border-radius:8px;">
+                Open my membership cart
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 24px; text-align:left;">
+              <p style="margin:0 0 10px; font-size:14px; line-height:1.45; color:#555555;">
+                Button not working? Copy and paste this link into your browser:<br>
+                <a href="{{ event.cart_permalink }}" style="color:#B8860B; word-break:break-all;">{{ event.cart_permalink }}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 8px; text-align:left;">
+              <p style="margin:0 0 8px; font-size:15px; font-weight:bold; color:#1C2526;">Your selection</p>
+              <p style="margin:0; font-size:15px; line-height:1.6; color:#333333; white-space:pre-line;">{{ event.line_items_summary }}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 28px 28px; text-align:left;">
+              <p style="margin:0 0 12px; font-size:16px; line-height:1.55; color:#1C2526;">
+                Questions? Email <a href="mailto:info@myldma.com" style="color:#B8860B;">info@myldma.com</a> or call <a href="tel:+18884653717" style="color:#B8860B;">(888) 465-3717</a>.
+              </p>
+              <p style="margin:0; font-size:16px; line-height:1.55; color:#1C2526;">
+                Keep digging,<br>
+                <span style="color:#B8860B; font-weight:bold;">The LDMA Crew</span>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 24px; text-align:center; font-size:12px; line-height:1.5; color:#666666; border-top:1px solid #EEE9DC;">
+              <p style="margin:0 0 8px;">
+                Lost Dutchman&rsquo;s Mining Association<br>
+                43105 Business Park Drive, Temecula, CA 92590
+              </p>
+              <p style="margin:0;">
+                <a href="{% unsubscribe_link %}" style="color:#B8860B;">Unsubscribe</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

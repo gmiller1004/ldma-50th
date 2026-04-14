@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 /**
  * Convert addendum HTML to a single long PDF (one continuous page).
- * Strategy: inject a print stylesheet that defines one tall page with no margins,
- * then use preferCSSPageSize so Chromium uses that. Set viewport to match page size
- * so layout is full width and height matches.
+ *
+ * Do NOT use a provisional @page with a huge height (e.g. 100000px): Chromium may emit that
+ * height in the PDF MediaBox (75000pt) even if a later @page rule tries to override—Illustrator
+ * then shows a document ~63000–75000px tall.
+ *
+ * Measure in screen mode (no print @page). Generate with explicit page.pdf width/height and
+ * preferCSSPageSize: false so the PDF page box matches content.
  *
  * Usage: node scripts/addendum-to-pdf.mjs [html-file] [pdf-file]
- * Default: addendum/LDMA-Addendum-Revised-2.html -> addendum/LDMA-Addendum-Revised-2.pdf
+ * Default: addendum/LDMA-Addendum-Revised-3.html -> addendum/LDMA-Addendum-Revised-3.pdf
  */
 import { existsSync } from "fs";
 import { fileURLToPath } from "url";
@@ -15,7 +19,7 @@ import { dirname, resolve } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 
-const htmlPath = resolve(projectRoot, process.argv[2] || "addendum/LDMA-Addendum-Revised-2.html");
+const htmlPath = resolve(projectRoot, process.argv[2] || "addendum/LDMA-Addendum-Revised-3.html");
 const pdfPath = resolve(projectRoot, process.argv[3] || htmlPath.replace(/\.html$/i, ".pdf"));
 
 if (!existsSync(htmlPath)) {
@@ -38,7 +42,6 @@ async function main() {
   try {
     const page = await browser.newPage();
 
-    // Initial viewport: full print width, short height so we can measure content
     await page.setViewport({
       width: PRINT_WIDTH_PX,
       height: 800,
@@ -48,52 +51,74 @@ async function main() {
     const fileUrl = `file://${htmlPath.replace(/\\/g, "/")}`;
     await page.goto(fileUrl, { waitUntil: "networkidle0" });
 
-    // Switch to print media before measuring
-    await page.emulateMediaType("print");
-
-    // Full document height; use bottom of last element so revision date line is never cut
-    const contentHeightPx = await page.evaluate(() => {
-      const bodyPaddingPx = 96; // 0.5in top + 0.5in bottom
-      const scrollHeight = document.body.scrollHeight + bodyPaddingPx;
-      const last = document.body.lastElementChild;
-      if (!last) return scrollHeight;
-      const rect = last.getBoundingClientRect();
-      const bottomOfLastPx = rect.bottom + window.scrollY;
-      const bottomPaddingPx = bodyPaddingPx / 2;
-      const extraForMarginPx = 72; // last element margin + revision line so it stays on page 1
-      return Math.ceil(Math.max(scrollHeight, bottomOfLastPx + bottomPaddingPx + extraForMarginPx));
-    });
-
-    // Measured height + 1.5in buffer so contract revision date stays on one page
-    const contentInches = contentHeightPx / 96;
-    const heightInches = Math.min(Math.ceil((contentInches + 1.5) * 10) / 10, 96);
-    const heightPx = Math.round(heightInches * 96);
-
-    console.log("Content height: %d px (~%s in), PDF page height: %s in", contentHeightPx, (contentHeightPx / 96).toFixed(1), heightInches);
-
-    // Inject print CSS: one tall page, no margins, full-width layout, and disable all page breaks
+    // Measure in screen mode: same body padding as the HTML default (0.5in), no @page / print
+    // pagination affecting scrollHeight.
+    await page.emulateMediaType("screen");
     await page.addStyleTag({
       content: `
-        @media print {
-          @page { size: ${PRINT_WIDTH_PX}px ${heightPx}px; margin: 0 !important; }
-          html, body { width: ${PRINT_WIDTH_PX}px !important; max-width: none !important; min-height: 100%; margin: 0 !important; padding: 0.5in !important; box-sizing: border-box; }
-          *, *::before, *::after { page-break-after: auto !important; page-break-before: auto !important; page-break-inside: auto !important; }
+        body {
+          width: ${PRINT_WIDTH_PX}px !important;
+          max-width: none !important;
+          margin: 0 auto !important;
+          box-sizing: border-box;
         }
       `,
     });
 
-    // Set viewport to exact PDF dimensions so layout matches 1:1 (fixes narrow column)
+    const contentHeightPx = await page.evaluate(() => {
+      const scroll = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+      const last = document.body.lastElementChild;
+      if (!last) return Math.ceil(scroll);
+      const bottom = last.getBoundingClientRect().bottom + window.scrollY;
+      return Math.ceil(Math.max(scroll, bottom + 48));
+    });
+
+    const BUFFER_PX = Math.round(1.5 * 96);
+    const heightPx = Math.min(Math.ceil(contentHeightPx + BUFFER_PX), 96 * 96);
+
+    console.log(
+      "Content height: %d px (~%s in), PDF page height: %s in (%d px)",
+      contentHeightPx,
+      (contentHeightPx / 96).toFixed(2),
+      (heightPx / 96).toFixed(2),
+      heightPx
+    );
+
+    // Print layout for output: one @page only, matching measured height (no giant placeholder).
+    await page.emulateMediaType("print");
+    await page.addStyleTag({
+      content: `
+        @media print {
+          @page { size: ${PRINT_WIDTH_PX}px ${heightPx}px; margin: 0 !important; }
+          html, body {
+            width: ${PRINT_WIDTH_PX}px !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0.5in !important;
+            box-sizing: border-box;
+          }
+          *, *::before, *::after {
+            page-break-after: auto !important;
+            page-break-before: auto !important;
+            page-break-inside: auto !important;
+          }
+        }
+      `,
+    });
+
     await page.setViewport({
       width: PRINT_WIDTH_PX,
-      height: Math.round(heightInches * 96),
+      height: heightPx,
       deviceScaleFactor: 1,
     });
 
-    // Use CSS page size so Chromium uses our @page; no JS width/height so layout isn't reinterpreted
+    // Explicit paper size forces PDF MediaBox; avoids Chromium keeping a prior huge @page size.
     await page.pdf({
       path: pdfPath,
       printBackground: true,
-      preferCSSPageSize: true,
+      preferCSSPageSize: false,
+      width: `${PRINT_WIDTH_PX}px`,
+      height: `${heightPx}px`,
       margin: { top: "0", right: "0", bottom: "0", left: "0" },
     });
 

@@ -11,69 +11,21 @@ import {
 import { cookies } from "next/headers";
 import { isLdmaLifetimeProduct, isMembershipProduct } from "@/lib/membership-config";
 import {
-  getMailchimpStore,
-  getMemberByUniqueEmailId,
-  addOrUpdateCustomer,
-  addOrUpdateCart,
-  isMailchimpConfigured,
-  shopifyGidToMailchimpId,
-} from "@/lib/mailchimp";
+  MEMBERSHIP_QUOTE_EMAIL_COOKIE,
+  syncMembershipCartToKlaviyo,
+} from "@/lib/klaviyo-membership-events";
 
 const CART_ID_COOKIE = "shopify_cart_id";
-const MAILCHIMP_EID_COOKIE = "mailchimp_eid";
 
-/** Sync current Shopify cart to Mailchimp E-commerce when we have mc_eid (known contact from email). Non-blocking; logs errors. */
-async function syncCartToMailchimp(cartId: string, mailchimpEid: string) {
-  if (!isMailchimpConfigured()) {
-    console.warn("[Mailchimp] cart sync skipped: missing MAILCHIMP_API_KEY or MAILCHIMP_STORE_ID");
-    return;
-  }
-  const storeId = process.env.MAILCHIMP_STORE_ID!;
-  try {
-    const store = await getMailchimpStore(storeId);
-    if (!store?.list_id) {
-      console.warn(
-        "[Mailchimp] cart sync skipped: store not found or no list_id (check MAILCHIMP_STORE_ID matches Mailchimp integration)"
-      );
-      return;
-    }
-    const member = await getMemberByUniqueEmailId(store.list_id, mailchimpEid);
-    if (!member?.email_address) {
-      console.warn(
-        "[Mailchimp] cart sync skipped: no audience member for mc_eid (unique_email_id lookup empty — contact may not be on the store's synced list)"
-      );
-      return;
-    }
-    const email = member.email_address;
-    const customerId = email;
-    await addOrUpdateCustomer(storeId, customerId, {
-      email_address: email,
-      opt_in_status: false,
-    });
-    const cart = await getCart(cartId);
-    if (!cart) {
-      console.warn("[Mailchimp] cart sync skipped: getCart returned null for cartId");
-      return;
-    }
-    const orderTotal = parseFloat(cart.cost.subtotalAmount.amount);
-    const currencyCode = cart.cost.subtotalAmount.currencyCode ?? "USD";
-    const lines = cart.lines.edges.map(({ node }) => ({
-      id: shopifyGidToMailchimpId(node.id),
-      product_id: shopifyGidToMailchimpId(node.merchandise.product.id),
-      product_variant_id: shopifyGidToMailchimpId(node.merchandise.id),
-      quantity: node.quantity,
-      price: parseFloat(node.cost.totalAmount.amount),
-    }));
-    await addOrUpdateCart(storeId, cartId, customerId, {
-      currency_code: currencyCode,
-      order_total: orderTotal,
-      checkout_url: cart.checkoutUrl,
-      lines,
-    });
-    console.info("[Mailchimp] cart synced:", { lines: lines.length, orderTotal, currencyCode });
-  } catch (err) {
-    console.error("[Mailchimp] cart sync failed:", err);
-  }
+/** When user has saved a membership quote, sync Shopify cart to Klaviyo for remarketing. */
+async function maybeSyncMembershipCartToKlaviyo(cartId: string | undefined) {
+  if (!cartId) return;
+  const cookieStore = await cookies();
+  const email = cookieStore.get(MEMBERSHIP_QUOTE_EMAIL_COOKIE)?.value?.trim().toLowerCase();
+  if (!email) return;
+  syncMembershipCartToKlaviyo(email, cartId).catch((e) =>
+    console.error("[Klaviyo] membership cart sync failed:", e)
+  );
 }
 
 /** True if the error means the cart ID is invalid (expired, completed, or deleted). */
@@ -89,7 +41,6 @@ export async function addToCart(
 ) {
   const cookieStore = await cookies();
   let existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
-  const mailchimpEid = cookieStore.get(MAILCHIMP_EID_COOKIE)?.value;
   const line = {
     merchandiseId: variantId,
     quantity: Math.max(1, Math.min(100, quantity)),
@@ -133,9 +84,7 @@ export async function addToCart(
     }
   }
 
-  if (cartId && mailchimpEid) {
-    syncCartToMailchimp(cartId, mailchimpEid).catch(() => {});
-  }
+  await maybeSyncMembershipCartToKlaviyo(cartId);
   return { checkoutUrl };
 }
 
@@ -144,7 +93,6 @@ export async function addMembershipToCart(variantIds: string[]) {
   if (variantIds.length === 0) throw new Error("No variants to add");
   const cookieStore = await cookies();
   let existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
-  const mailchimpEid = cookieStore.get(MAILCHIMP_EID_COOKIE)?.value;
   const lines = variantIds.map((id) => ({ merchandiseId: id, quantity: 1 }));
 
   let cartId: string | undefined;
@@ -155,9 +103,7 @@ export async function addMembershipToCart(variantIds: string[]) {
       const result = await addLinesToExistingCart(existingCartId, lines);
       checkoutUrl = result.checkoutUrl;
       cartId = existingCartId;
-      if (cartId && mailchimpEid) {
-        syncCartToMailchimp(cartId, mailchimpEid).catch(() => {});
-      }
+      await maybeSyncMembershipCartToKlaviyo(cartId);
       return { checkoutUrl };
     }
   } catch {
@@ -174,9 +120,7 @@ export async function addMembershipToCart(variantIds: string[]) {
       sameSite: "lax",
     });
   }
-  if (cartId && mailchimpEid) {
-    syncCartToMailchimp(cartId, mailchimpEid).catch(() => {});
-  }
+  await maybeSyncMembershipCartToKlaviyo(cartId);
   return { checkoutUrl };
 }
 
@@ -194,6 +138,7 @@ export async function updateCartLineQuantity(lineId: string, quantity: number) {
   if (!cartId) throw new Error("No cart");
   if (quantity < 1) throw new Error("Quantity must be at least 1");
   await cartLinesUpdate(cartId, [{ id: lineId, quantity }]);
+  await maybeSyncMembershipCartToKlaviyo(cartId);
 }
 
 export async function removeCartLine(lineId: string) {
@@ -214,11 +159,13 @@ export async function removeCartLine(lineId: string) {
       .map((e) => e.node.id);
     if (membershipLineIds.length > 0) {
       await cartLinesRemove(cartId, membershipLineIds);
+      await maybeSyncMembershipCartToKlaviyo(cartId);
       return;
     }
   }
 
   await cartLinesRemove(cartId, [lineId]);
+  await maybeSyncMembershipCartToKlaviyo(cartId);
 }
 
 /** Remove the cart line that has the given variant (by variant GID). No-op if not found or no cart. */
@@ -231,6 +178,7 @@ export async function removeCartLineByVariantId(variantId: string) {
   const line = cart.lines.edges.find((e) => e.node.merchandise.id === variantId)?.node;
   if (!line) return;
   await cartLinesRemove(cartId, [line.id]);
+  await maybeSyncMembershipCartToKlaviyo(cartId);
 }
 
 /** Remove all lines from the current cart. No-op if no cart. Used when user exits membership quiz without finishing. */

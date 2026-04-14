@@ -14,7 +14,11 @@ import {
   Radio,
   BookOpen,
 } from "lucide-react";
-import { getMembershipProductsForFlow } from "@/app/actions/membership";
+import {
+  getMembershipProductsForFlow,
+  emitMembershipConfigurationFinalized,
+  emitMembershipConfigurationViewedIfKnown,
+} from "@/app/actions/membership";
 import {
   addMembershipToCart,
   clearCart,
@@ -86,6 +90,8 @@ export function MembershipCustomizationModal({
   const [stepIndex, setStepIndex] = useState(0);
   const [choices, setChoices] = useState<Record<string, StepStatus>>({});
   const [adding, setAdding] = useState(false);
+  /** Set when user successfully uses “Email me this quote” — used if cookie isn’t round-tripped yet. */
+  const [quoteEmailForKlaviyo, setQuoteEmailForKlaviyo] = useState<string | null>(null);
   const { refreshCart, openDrawer } = useCart();
   /** Variant IDs we've added to the cart in the background (so we can remove on Skip). */
   const addedInBackgroundRef = useRef<Set<string>>(new Set());
@@ -96,13 +102,14 @@ export function MembershipCustomizationModal({
     setError(null);
     setStepIndex(0);
     setChoices({});
+    setQuoteEmailForKlaviyo(null);
     addedInBackgroundRef.current = new Set();
     getMembershipProductsForFlow()
       .then((list) => {
         setProducts(list);
         if (list.length > 0) {
           setChoices({ [list[0].key]: "add" });
-          // Add membership to cart in background so Mailchimp can track; don't refresh UI.
+          // Add membership to cart in background (Klaviyo sync when quote email cookie is set); don't refresh UI.
           addMembershipToCart([list[0].variantId])
             .then(() => {
               addedInBackgroundRef.current.add(list[0].variantId);
@@ -164,9 +171,32 @@ export function MembershipCustomizationModal({
   const handleFinish = async () => {
     setAdding(true);
     try {
+      const selected = products.filter((p) => choices[p.key] === "add");
+      const total = selected.reduce((sum, p) => sum + parseFloat(p.price), 0);
       trackMembershipQuizComplete();
       trackAddToCart("membership");
       await refreshCart();
+      const cartRes = await fetch("/api/cart");
+      const cartData = (await cartRes.json()) as {
+        cart?: {
+          checkoutUrl?: string;
+          cost?: { subtotalAmount?: { currencyCode?: string } };
+        } | null;
+      };
+      const fresh = cartData.cart;
+      await emitMembershipConfigurationFinalized({
+        email: quoteEmailForKlaviyo ?? undefined,
+        choices,
+        line_items: selected.map((p) => ({
+          key: p.key,
+          title: p.title,
+          price: p.price,
+          variant_id: p.variantId,
+        })),
+        subtotal: total,
+        currency: fresh?.cost?.subtotalAmount?.currencyCode ?? "USD",
+        checkout_url: fresh?.checkoutUrl ?? "",
+      });
       onClose();
       openDrawer();
     } catch {
@@ -268,6 +298,9 @@ export function MembershipCustomizationModal({
                       products={products}
                       choices={choices}
                       onBack={handleBack}
+                      onQuoteEmailSaved={(email) =>
+                        setQuoteEmailForKlaviyo(email.trim().toLowerCase())
+                      }
                     />
                   ) : current.key === "lifetime" ? (
                     <StepLifetime
@@ -339,13 +372,85 @@ function StepSummary({
   products,
   choices,
   onBack,
+  onQuoteEmailSaved,
 }: {
   products: MembershipProductInfo[];
   choices: Record<string, StepStatus>;
   onBack: () => void;
+  onQuoteEmailSaved?: (email: string) => void;
 }) {
+  const { cart } = useCart();
+  const hasFiredViewedRef = useRef(false);
+  const [quoteEmail, setQuoteEmail] = useState("");
+  const [quoteStatus, setQuoteStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
   const selected = products.filter((p) => choices[p.key] === "add");
   const total = selected.reduce((sum, p) => sum + parseFloat(p.price), 0);
+
+  // If they already saved a quote previously (cookie exists), fire a single “viewed summary” event
+  // for drop-off remarketing. This will no-op on the server if the cookie isn't present.
+  useEffect(() => {
+    if (hasFiredViewedRef.current) return;
+    hasFiredViewedRef.current = true;
+    emitMembershipConfigurationViewedIfKnown({
+      choices,
+      line_items: selected.map((p) => ({
+        key: p.key,
+        title: p.title,
+        price: p.price,
+        variant_id: p.variantId,
+      })),
+      subtotal: total,
+      currency: cart?.cost.subtotalAmount.currencyCode ?? "USD",
+      checkout_url: cart?.checkoutUrl ?? "",
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSaveQuote = async () => {
+    const trimmed = quoteEmail.trim().toLowerCase();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setQuoteError("Please enter a valid email address.");
+      setQuoteStatus("error");
+      return;
+    }
+    setQuoteStatus("loading");
+    setQuoteError(null);
+    try {
+      const res = await fetch("/api/membership/save-quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: trimmed,
+          checkout_url: cart?.checkoutUrl ?? "",
+          subtotal: total,
+          currency: cart?.cost.subtotalAmount.currencyCode ?? "USD",
+          choices,
+          line_items: selected.map((p) => ({
+            key: p.key,
+            title: p.title,
+            price: p.price,
+            variant_id: p.variantId,
+          })),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setQuoteStatus("error");
+        setQuoteError(data.error || "Could not save. Try again.");
+        return;
+      }
+      setQuoteStatus("success");
+      onQuoteEmailSaved?.(trimmed);
+    } catch {
+      setQuoteStatus("error");
+      setQuoteError("Network error. Please try again.");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h3 className="font-serif text-xl font-semibold text-[#f0d48f]">
@@ -374,6 +479,51 @@ function StepSummary({
           ${total.toFixed(2)}
         </span>
       </div>
+
+      <div className="pt-4 border-t border-[#d4af37]/20 mt-4 space-y-3">
+        <p className="text-[#e8e0d5]/80 text-sm">
+          Want a copy of this quote? Enter your email and we&apos;ll save it so you
+          can receive membership reminders.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="email"
+            value={quoteEmail}
+            onChange={(e) => setQuoteEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+            disabled={quoteStatus === "loading" || quoteStatus === "success"}
+            className="flex-1 min-w-0 px-3 py-2.5 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] placeholder-[#e8e0d5]/45 text-sm focus:outline-none focus:ring-2 focus:ring-[#d4af37]/40 disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={handleSaveQuote}
+            disabled={quoteStatus === "loading" || quoteStatus === "success"}
+            className="shrink-0 px-4 py-2.5 rounded-lg border border-[#d4af37]/50 text-[#d4af37] text-sm font-medium hover:bg-[#d4af37]/10 disabled:opacity-60 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-2"
+          >
+            {quoteStatus === "loading" ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving…
+              </>
+            ) : quoteStatus === "success" ? (
+              "Saved"
+            ) : (
+              "Email me this quote"
+            )}
+          </button>
+        </div>
+        {quoteError && (
+          <p className="text-red-400/90 text-sm">{quoteError}</p>
+        )}
+        {quoteStatus === "success" && (
+          <p className="text-[#6dd472]/90 text-sm">
+            Saved. You may receive follow-up about your selection. Continue to
+            checkout when you&apos;re ready.
+          </p>
+        )}
+      </div>
+
       <button
         onClick={onBack}
         className="flex items-center gap-1 mt-6 text-[#e8e0d5]/60 hover:text-[#d4af37] text-sm transition-colors"

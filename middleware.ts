@@ -10,26 +10,6 @@ function requiresAuth(pathname: string): boolean {
   );
 }
 
-const MAILCHIMP_COOKIE_OPTIONS = {
-  path: "/",
-  maxAge: 60 * 60 * 24 * 7,
-  sameSite: "lax" as const,
-};
-
-function setMailchimpCookies(
-  response: NextResponse,
-  request: NextRequest
-): void {
-  const mcEid = request.nextUrl.searchParams.get("mc_eid");
-  if (mcEid) {
-    response.cookies.set("mailchimp_eid", mcEid, MAILCHIMP_COOKIE_OPTIONS);
-    const mcCid = request.nextUrl.searchParams.get("mc_cid");
-    if (mcCid) {
-      response.cookies.set("mailchimp_cid", mcCid, MAILCHIMP_COOKIE_OPTIONS);
-    }
-  }
-}
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -38,15 +18,11 @@ export function middleware(request: NextRequest) {
     if (!sessionCookie?.value) {
       const loginUrl = new URL("/members/login", request.url);
       loginUrl.searchParams.set("redirect", pathname);
-      const redirect = NextResponse.redirect(loginUrl);
-      setMailchimpCookies(redirect, request);
-      return redirect;
+      return NextResponse.redirect(loginUrl);
     }
   }
 
-  const res = NextResponse.next();
-  setMailchimpCookies(res, request);
-  return res;
+  return NextResponse.next();
 }
 
 export const config = {
@@ -61,6 +37,8 @@ export const config = {
     "/members",
     "/members/:path*",
     "/about-events",
+    "/events",
+    "/events/:path*",
     "/customize",
     "/customize/:path*",
   ],

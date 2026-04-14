@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>LDMA — Your membership cart + savings</title>
+  <!--
+    KLAVIYO FLOW (Configuration Viewed — Day 3, with targeted discounts)
+    -----------------------------------------------------------------------
+    1. Trigger: same metric as Day 1 — "Membership Configuration Viewed".
+    2. Time delay: 3 days after the triggering event (after Day 1 email at +1 day, or standalone +3d).
+    3. CTA URL: event.cart_permalink_with_flow_discounts
+       — Appends ?discount= with only the codes that match items in their cart snapshot
+       (companion299, doublethegold, monsteraddon — order fixed in code).
+       Paydirt: if paydirt is in the cart, the app sets that line’s quantity to at least 2 in this URL
+       only (for doublethegold); cart_permalink / line_items_summary still reflect the real cart.
+    4. Conditionals: event.discount_offer_companion, discount_offer_paydirt, discount_offer_minelab (booleans).
+       If booleans don’t evaluate in Klaviyo, compare explicitly (see Klaviyo template docs).
+    5. Staleness: copy reflects the cart at the time they viewed the summary (trigger snapshot).
+
+    New / relevant event properties (from app):
+      event.cart_permalink_with_flow_discounts — use for primary button + fallback link
+      event.flow_discount_codes — comma-separated list of codes applied to the URL
+      event.discount_offer_companion / _paydirt / _minelab — for conditional blocks in the body below
+      event.line_items_summary, event.cart_permalink, event.subtotal, event.currency
+  -->
+</head>
+<body style="margin:0; padding:0; background-color:#F5F6F0; font-family: Arial, Helvetica, sans-serif; color:#1C2526;">
+  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">
+    Your LDMA membership cart—open it when you’re ready.
+  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6F0;">
+    <tr>
+      <td align="center" style="padding:24px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background-color:#FFFFFF; border-radius:12px; overflow:hidden; border:1px solid #E0DCC8;">
+          <tr>
+            <td style="padding:24px 28px 20px; text-align:center; border-bottom:1px solid #EEE9DC;">
+              <a href="https://myldma.com/" style="text-decoration:none; display:inline-block;">
+                <img
+                  src="https://myldma.com/images/global/50th-logo.png"
+                  width="280"
+                  alt="Lost Dutchman's Mining Association"
+                  style="max-width:280px; width:100%; height:auto; border:0; display:block; margin:0 auto;"
+                >
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 28px 8px; text-align:left;">
+              <p style="margin:0 0 20px; font-size:18px; line-height:1.55; color:#1C2526;">
+                Hi {{ first_name|default:'there' }},
+              </p>
+              <p style="margin:0 0 16px; font-size:18px; line-height:1.55; color:#1C2526;">
+                A few days ago you started <strong>your LDMA membership cart</strong> in our configurator. We&rsquo;re checking in to help you pick up right where you left off.
+              </p>
+              {% if event.flow_discount_codes %}
+              <p style="margin:0 0 20px; font-size:18px; line-height:1.55; color:#1C2526;">
+                Here&rsquo;s <strong>what we&rsquo;re extending on your bundle</strong>. The button below opens <strong>your</strong> cart with those savings on your link.
+              </p>
+              {% else %}
+              <p style="margin:0 0 20px; font-size:18px; line-height:1.55; color:#1C2526;">
+                When you&rsquo;re ready, the button below takes you straight back to <strong>your</strong> cart—same lineup you built.
+              </p>
+              {% endif %}
+            </td>
+          </tr>
+
+          {% if event.flow_discount_codes %}
+          <tr>
+            <td style="padding:0 28px 20px; text-align:left;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6F0; border-radius:10px; border:1px solid #E0DCC8;">
+                <tr>
+                  <td style="padding:20px 22px;">
+                    <p style="margin:0 0 14px; font-size:16px; font-weight:bold; color:#1C2526;">What we&rsquo;re including on your bundle</p>
+
+                    {% if event.discount_offer_companion %}
+                    <p style="margin:0 0 14px; font-size:15px; line-height:1.6; color:#333333;">
+                      <strong>Your Companion and Transferability Add On</strong> — <strong>$301 off</strong> at checkout with code <strong>companion299</strong> (already part of your link below).
+                    </p>
+                    {% endif %}
+
+                    {% if event.discount_offer_paydirt %}
+                    <p style="margin:0 0 14px; font-size:15px; line-height:1.6; color:#333333;">
+                      <strong>Your Gold Paydirt Can Add On</strong> — code <strong>doublethegold</strong> adds a second paydirt can with <strong>50% off the Paydirt add-on</strong>; the discount applies to both cans in this offer, so you effectively get one free. You&rsquo;ll see it itemized when you open your cart and at checkout.
+                    </p>
+                    {% endif %}
+
+                    {% if event.discount_offer_minelab %}
+                    <p style="margin:0 0 0; font-size:15px; line-height:1.6; color:#333333;">
+                      <strong>Your Minelab Gold Monster 1000 Add On</strong> — <strong>$350 off</strong> at checkout with code <strong>monsteraddon</strong> (already part of your link below).
+                    </p>
+                    {% endif %}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          {% endif %}
+
+          <tr>
+            <td style="padding:8px 28px 8px; text-align:left;">
+              <p style="margin:0 0 20px; font-size:18px; line-height:1.55; color:#1C2526;">
+                {% if event.flow_discount_codes %}
+                When you&rsquo;re ready, open <strong>your</strong> cart here:
+                {% else %}
+                Open <strong>your</strong> membership cart here:
+                {% endif %}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 20px; text-align:center;">
+              <a href="{{ event.cart_permalink_with_flow_discounts }}" style="display:inline-block; background-color:#B8860B; color:#FFFFFF; font-size:18px; font-weight:bold; padding:16px 32px; text-decoration:none; border-radius:8px;">
+                Open my membership cart
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 24px; text-align:left;">
+              <p style="margin:0 0 10px; font-size:14px; line-height:1.45; color:#555555;">
+                Button not working? Copy and paste this link into your browser:<br>
+                <a href="{{ event.cart_permalink_with_flow_discounts }}" style="color:#B8860B; word-break:break-all;">{{ event.cart_permalink_with_flow_discounts }}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 8px; text-align:left;">
+              <p style="margin:0 0 8px; font-size:15px; font-weight:bold; color:#1C2526;">Your selection</p>
+              <p style="margin:0 0 12px; font-size:13px; line-height:1.5; color:#666666;">
+                Amounts below reflect what you chose in the configurator. Your discounts and final line pricing will show in your cart and at checkout.
+              </p>
+              <p style="margin:0; font-size:15px; line-height:1.6; color:#333333; white-space:pre-line;">{{ event.line_items_summary }}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 28px 28px; text-align:left;">
+              <p style="margin:0 0 12px; font-size:16px; line-height:1.55; color:#1C2526;">
+                Questions? Email <a href="mailto:info@myldma.com" style="color:#B8860B;">info@myldma.com</a> or call <a href="tel:+18884653717" style="color:#B8860B;">(888) 465-3717</a>.
+              </p>
+              <p style="margin:0; font-size:16px; line-height:1.55; color:#1C2526;">
+                Keep digging,<br>
+                <span style="color:#B8860B; font-weight:bold;">The LDMA Crew</span>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 24px; text-align:center; font-size:12px; line-height:1.5; color:#666666; border-top:1px solid #EEE9DC;">
+              <p style="margin:0 0 8px;">
+                Lost Dutchman&rsquo;s Mining Association<br>
+                43105 Business Park Drive, Temecula, CA 92590
+              </p>
+              <p style="margin:0;">
+                <a href="{% unsubscribe_link %}" style="color:#B8860B;">Unsubscribe</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

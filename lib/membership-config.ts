@@ -17,6 +17,10 @@ export const MEMBERSHIP_PRODUCT_KEYS = [
 
 export type MembershipProductKey = (typeof MEMBERSHIP_PRODUCT_KEYS)[number];
 
+export function isMembershipProductKey(s: string): s is MembershipProductKey {
+  return (MEMBERSHIP_PRODUCT_KEYS as readonly string[]).includes(s);
+}
+
 /** Map product title to our key (for matching Shopify products) */
 export function getMembershipKeyFromTitle(title: string): MembershipProductKey | null {
   const lower = title.toLowerCase();

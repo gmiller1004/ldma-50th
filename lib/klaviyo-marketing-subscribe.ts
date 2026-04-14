@@ -8,7 +8,11 @@ const KLAVIYO_SUBSCRIBE_URL = `${KLAVIYO_BASE}/profile-subscription-bulk-create-
 const KLAVIYO_PROFILE_IMPORT_URL = `${KLAVIYO_BASE}/profile-import`;
 const KLAVIYO_REVISION = "2024-05-15";
 
-export type KlaviyoMarketingSignupSource = "home" | "events" | "chat";
+export type KlaviyoMarketingSignupSource =
+  | "home"
+  | "events"
+  | "chat"
+  | "membership_quote";
 
 async function setKlaviyoSignupSource(
   apiKey: string,
