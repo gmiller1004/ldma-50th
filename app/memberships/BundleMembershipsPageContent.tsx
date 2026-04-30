@@ -331,6 +331,55 @@ export function BundleMembershipsPageContent() {
         </div>
       </section>
 
+      <section className="py-14 md:py-18">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid lg:grid-cols-[1.15fr_0.85fr] gap-8">
+          <div className="rounded-2xl border border-[#d4af37]/20 bg-[#1a120b]/65 p-6 md:p-7">
+            <p className="text-[#d4af37] text-xs uppercase tracking-[0.16em]">About LDMA Membership</p>
+            <h3 className="mt-2 font-serif text-3xl text-[#f0d48f] font-bold">Built for real trips and real family use</h3>
+            <p className="mt-4 text-[#e8e0d5]/86 text-sm leading-relaxed">
+              LDMA membership is designed around how families actually travel: weekend trips, long stays, and repeat
+              camp visits where you keep learning the ground. Instead of piecing everything together one expense at a time,
+              members get a complete prospecting lifestyle with private camp access, community support, and tools that make
+              each trip easier to plan.
+            </p>
+            <p className="mt-4 text-[#e8e0d5]/82 text-sm leading-relaxed">
+              The detector bundles take that same membership and add your machine plus legacy-focused add-ons in one move,
+              so you can spend more time prospecting and less time piecing together separate purchases.
+            </p>
+            <a
+              href="/campgrounds"
+              className="mt-5 inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-[#d4af37] text-[#1a120b] font-semibold hover:bg-[#f0d48f] transition-colors"
+            >
+              Explore LDMA campgrounds
+            </a>
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-xl border border-[#d4af37]/20 bg-[#1a120b]/60 p-4">
+              <p className="text-[#d4af37] font-semibold text-sm">Member camping rates</p>
+              <p className="mt-1 text-[#e8e0d5]/82 text-sm">
+                Typical member rates are about <strong>$6/night dry</strong> and <strong>$12/night full hookups</strong>
+                (varies by camp), helping frequent trips stay affordable.
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#d4af37]/20 bg-[#1a120b]/60 p-4">
+              <p className="text-[#d4af37] font-semibold text-sm">Event access and discounts</p>
+              <p className="mt-1 text-[#e8e0d5]/82 text-sm">
+                Membership includes access to LDMA community events and can include member pricing advantages on select
+                event registrations when available.
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#d4af37]/20 bg-[#1a120b]/60 p-4">
+              <p className="text-[#d4af37] font-semibold text-sm">Equipment discounts and partner perks</p>
+              <p className="mt-1 text-[#e8e0d5]/82 text-sm">
+                Members get access to equipment-focused offers and partner promotions, helping reduce the cost of building
+                and upgrading your prospecting setup.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="py-14 md:py-18 bg-[#0f3d1e]/30 border-y border-[#d4af37]/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-10">
           <div>
