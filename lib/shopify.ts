@@ -71,6 +71,7 @@ export type ShopifyProduct = {
   id: string;
   title: string;
   handle: string;
+  tags?: string[];
   options: ProductOption[];
   variants: {
     edges: Array<{ node: ProductVariant }>;
@@ -138,6 +139,7 @@ const PRODUCT_FRAGMENT = `
     id
     title
     handle
+    tags
     featuredImage {
       url
       altText
@@ -498,6 +500,39 @@ export async function getMembershipCollectionProducts(): Promise<MembershipProdu
     return map;
   } catch {
     return {};
+  }
+}
+
+/** Fetch all products in the membership collection (unmapped). */
+export async function getMembershipCollectionProductList(): Promise<ShopifyProduct[]> {
+  try {
+    const result = await shopifyFetch<{
+      collection: {
+        products: {
+          edges: Array<{ node: ShopifyProduct }>;
+        };
+      } | null;
+    }>({
+      query: `
+        ${PRODUCT_FRAGMENT}
+        query GetMembershipProductsList($handle: String!) {
+          collection(handle: $handle) {
+            products(first: 100) {
+              edges {
+                node {
+                  ...ProductFields
+                }
+              }
+            }
+          }
+        }
+      `,
+      variables: { handle: MEMBERSHIP_COLLECTION_HANDLE },
+    });
+
+    return result?.collection?.products?.edges?.map((e) => e.node) ?? [];
+  } catch {
+    return [];
   }
 }
 

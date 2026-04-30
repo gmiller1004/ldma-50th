@@ -4,7 +4,7 @@
  * Source: Public copy from this Next.js app (same content as myldma.com).
  * Update chunks when you change marketing pages, pricing, or camp details.
  *
- * Last content sync: 2026-03-27
+ * Last content sync: 2026-04-30
  */
 
 export type KnowledgeChunk = {
@@ -19,7 +19,7 @@ export type KnowledgeChunk = {
   content: string;
 };
 
-export const LDMA_KNOWLEDGE_VERSION = "2026-03-27";
+export const LDMA_KNOWLEDGE_VERSION = "2026-04-30";
 
 export const LDMA_KNOWLEDGE_CHUNKS: KnowledgeChunk[] = [
   {
@@ -49,6 +49,31 @@ export const LDMA_KNOWLEDGE_CHUNKS: KnowledgeChunk[] = [
     title: "Membership overview and pricing (site copy)",
     source: "/memberships",
     content: `LDMA offers Lifetime membership. As shown on the Memberships page: promotional pricing has been $2,000 (compared to a regular price of $3,750) during the 50th Anniversary celebration — always confirm current price on /memberships or by phone. Benefits highlighted on the site include: access to all 12 private campgrounds; gold prospecting on patented claims; family-inclusive membership (spouse and children under 18); up to 4 guests per visit; stays up to 6 months per visit; camping from about $6/night dry and about $12/night for full hookups (rates vary by camp); paydirt bag, gold pans, and scoops; membership card, badges, and decals; 30-day refund window; no prospecting experience required; community of 6,500+; optional GPAA integration for additional acreage; companion add-on for family; equipment discounts and partner events (e.g. Minelab, Garrett). For exact fees, payment plans, and add-ons, use /memberships or call 888-465-3717.`,
+  },
+  {
+    id: "membership-bundle-offer-2026",
+    topics: [
+      "membership bundles",
+      "detector bundle",
+      "gm1000",
+      "gm2000",
+      "garrett 24k",
+      "bundle price",
+      "gpaa lifetime",
+      "companion",
+      "transferability",
+      "pre-paid transfer",
+    ],
+    title: "2026 detector bundle membership offer",
+    source: "/memberships",
+    content: `The current 2026 promotional Memberships page can present detector bundles instead of the prior single Lifetime + add-ons flow. Bundle pricing is $3,500 (Minelab GM1000 or Garrett GoldMaster 24k) and $4,000 (Minelab GM2000). Each bundle includes LDMA Lifetime, GPAA Lifetime, Companion, Transferability, and Pre-Paid Transfer. The page highlights combined retail comparisons around $10,409-$11,498 depending on detector and estimated savings around $6,900-$7,500. Detector retail references used on the page are GM1000 $999, Garrett 24k $910, GM2000 $1,999.`,
+  },
+  {
+    id: "membership-route-switching",
+    topics: ["memberships route", "legacy membership", "bundle toggle", "env var", "launch toggle"],
+    title: "Membership route toggle (legacy vs bundle)",
+    source: "/memberships",
+    content: `The /memberships route supports two experiences: a legacy memberships page and a newer bundle-focused page. The app can be toggled by environment variable NEXT_PUBLIC_MEMBERSHIP_EXPERIENCE. Setting it to legacy shows the older membership page; setting to bundle (or leaving unset in current code defaults) shows the detector-bundle page. This allows temporary bundle promotions and easy rollback to the old experience when a promotion ends.`,
   },
   {
     id: "membership-benefits-list",

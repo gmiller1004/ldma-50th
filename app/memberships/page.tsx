@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { MembershipsPageContent } from "./MembershipsPageContent";
+import { MembershipsPageContent as LegacyMembershipsPageContent } from "./MembershipsPageContent";
+import { BundleMembershipsPageContent } from "./BundleMembershipsPageContent";
 
 export const metadata: Metadata = {
   title: "Membership | LDMA 50th Anniversary",
@@ -10,11 +11,14 @@ export const metadata: Metadata = {
 };
 
 export default function MembershipsPage() {
+  const membershipExperience = process.env.NEXT_PUBLIC_MEMBERSHIP_EXPERIENCE ?? "bundle";
+  const showBundleExperience = membershipExperience !== "legacy";
+
   return (
     <>
       <Navbar />
       <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
-        <MembershipsPageContent />
+        {showBundleExperience ? <BundleMembershipsPageContent /> : <LegacyMembershipsPageContent />}
       </main>
       <Footer />
     </>
