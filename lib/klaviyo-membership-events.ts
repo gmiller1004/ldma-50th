@@ -11,6 +11,11 @@ import {
 } from "@/lib/membership-config";
 import type { MembershipProductKey } from "@/lib/membership-config";
 import {
+  getMembershipBundleKeyFromTitle,
+  isMembershipBundleTitle,
+  type MembershipBundleKey,
+} from "@/lib/membership-bundle-config";
+import {
   buildFlowDiscountKlaviyoProps,
   membershipKeysFromQuoteLineItems,
 } from "@/lib/membership-flow-discounts";
@@ -62,7 +67,8 @@ export function isKlaviyoMembershipEventsConfigured(): boolean {
 
 function cartHasMembershipLines(cart: CartData): boolean {
   return cart.lines.edges.some((e) =>
-    isMembershipProduct(e.node.merchandise.product.title)
+    isMembershipProduct(e.node.merchandise.product.title) ||
+    isMembershipBundleTitle(e.node.merchandise.product.title)
   );
 }
 
@@ -74,21 +80,25 @@ type LineSummary = {
   variant_id: string;
   /** Funnel key when derivable from product title (for flow discounts). */
   membership_key: MembershipProductKey | null;
+  /** Bundle key for detector bundle remarketing. */
+  bundle_key: MembershipBundleKey | null;
 };
 
 function summarizeCartLines(cart: CartData): { lines: LineSummary[]; value: number } {
   let value = 0;
   const lines: LineSummary[] = [];
   for (const { node } of cart.lines.edges) {
-    if (!isMembershipProduct(node.merchandise.product.title)) continue;
+    const title = node.merchandise.product.title;
+    if (!isMembershipProduct(title) && !isMembershipBundleTitle(title)) continue;
     const lineTotal = parseFloat(node.cost.totalAmount.amount);
     value += lineTotal;
     lines.push({
-      title: node.merchandise.product.title,
+      title,
       quantity: node.quantity,
       line_total: lineTotal,
       variant_id: gidToNumericId(node.merchandise.id),
-      membership_key: getMembershipKeyFromTitle(node.merchandise.product.title),
+      membership_key: getMembershipKeyFromTitle(title),
+      bundle_key: getMembershipBundleKeyFromTitle(title),
     });
   }
   return { lines, value };
@@ -107,11 +117,12 @@ function membershipCartPermalinkLinesFromCart(
     membershipKey: MembershipProductKey | null;
   }> = [];
   for (const { node } of cart.lines.edges) {
-    if (!isMembershipProduct(node.merchandise.product.title)) continue;
+    const title = node.merchandise.product.title;
+    if (!isMembershipProduct(title) && !isMembershipBundleTitle(title)) continue;
     lines.push({
       variantId: node.merchandise.id,
       quantity: node.quantity,
-      membershipKey: getMembershipKeyFromTitle(node.merchandise.product.title),
+      membershipKey: getMembershipKeyFromTitle(title),
     });
   }
   return lines;
@@ -174,6 +185,17 @@ export async function syncMembershipCartToKlaviyo(
     permalinkLines,
     membershipKeysFromCart
   );
+  const bundleKeys = Array.from(
+    new Set(
+      lines
+        .map((l) => l.bundle_key)
+        .filter((k): k is MembershipBundleKey => k !== null)
+    )
+  );
+  const bundleTitles = Array.from(
+    new Set(lines.filter((l) => l.bundle_key !== null).map((l) => l.title))
+  );
+  const primaryBundleKey = bundleKeys[0] ?? null;
 
   await createMembershipEvent(apiKey, {
     email: email.trim().toLowerCase(),
@@ -191,6 +213,10 @@ export async function syncMembershipCartToKlaviyo(
       line_items: lines,
       line_count: lines.length,
       line_items_summary,
+      bundle_keys: bundleKeys,
+      bundle_titles: bundleTitles,
+      bundle_interest: bundleKeys.length > 0,
+      primary_bundle_key: primaryBundleKey,
       source: "shopify_headless_cart",
     },
   });

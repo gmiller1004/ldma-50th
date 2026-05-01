@@ -22,6 +22,10 @@ export function getMembershipBundleKeyFromTitle(
   return null;
 }
 
+export function isMembershipBundleTitle(title: string): boolean {
+  return getMembershipBundleKeyFromTitle(title) !== null;
+}
+
 export function getMembershipBundleKeyFromHandle(
   handle: string
 ): MembershipBundleKey | null {

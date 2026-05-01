@@ -8,6 +8,7 @@ import { getBundleMembershipProducts, type MembershipBundleProductInfo } from "@
 import { addMembershipToCart } from "@/app/actions/cart";
 import { useCart } from "@/context/CartContext";
 import { trackAddToCart } from "@/lib/analytics";
+import { MEMBERSHIP_METRICS, trackMembershipMetricOnsite } from "@/lib/klaviyo-membership-browser";
 
 const BUNDLE_CONTENT: Record<
   string,
@@ -212,6 +213,17 @@ export function BundleMembershipsPageContent() {
   async function handleChooseBundle(product: MembershipBundleProductInfo) {
     setAddingKey(product.key);
     setError(null);
+    trackMembershipMetricOnsite(MEMBERSHIP_METRICS.bundleInterest, {
+      source: "bundle_card_add_to_cart",
+      bundle_interest: true,
+      primary_bundle_key: product.key,
+      bundle_keys: [product.key],
+      bundle_titles: [product.title],
+      line_count: 1,
+      subtotal: Number.parseFloat(product.price),
+      $value: Number.parseFloat(product.price),
+      currency: "USD",
+    });
     try {
       await addMembershipToCart([product.variantId]);
       await refreshCart();
