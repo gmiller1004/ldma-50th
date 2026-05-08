@@ -72,8 +72,8 @@ export const italianBarData: CampPageData = {
   },
   amenities: [
     {
-      icon: "Plug",
-      text: "RV hookup campsites (dry and water sites)",
+      icon: "Tent",
+      text: "RV campsites (dry and water sites)",
       highlight: true,
     },
     { icon: "Tent", text: "Tent & dry camping sites" },
@@ -81,7 +81,6 @@ export const italianBarData: CampPageData = {
     { icon: "ShowerHead", text: "Showers & restrooms (hot water)" },
     { icon: "Fuel", text: "Dump station" },
     { icon: "Trophy", text: "Community fire pit & common areas" },
-    { icon: "Shirt", text: "Trash service" },
   ],
   goldProspecting: {
     text: "Gold panning and sluicing in the Stanislaus River. Designated area for self-contained recirculating units and dry washers. Many members find their first gold here.",
