@@ -321,6 +321,8 @@ export async function cancelCampaignMembersForShopifyOrder(
 export type SyncOrderResult = {
   processedLineItems: number;
   skippedLineItems: number;
+  /** Shopify products found in the `events` collection (same source as the storefront Events page). */
+  eventRegistrationProductCount: number;
   errors: string[];
 };
 
@@ -333,6 +335,7 @@ export async function syncShopifyOrderToSalesforce(
   const result: SyncOrderResult = {
     processedLineItems: 0,
     skippedLineItems: 0,
+    eventRegistrationProductCount: 0,
     errors: [],
   };
 
@@ -378,6 +381,7 @@ export async function syncShopifyOrderToSalesforce(
   }
 
   const eventProductIds = await getEventRegistrationProductIds();
+  result.eventRegistrationProductCount = eventProductIds.size;
   const items = order.line_items ?? [];
 
   const productMetaCache = new Map<string, ProductCache | null>();
@@ -399,6 +403,12 @@ export async function syncShopifyOrderToSalesforce(
     }
 
     if (meta?.handle === VIP_UPSELL_PRODUCT_HANDLE) {
+      result.skippedLineItems += 1;
+      continue;
+    }
+
+    const displayTitle = (meta?.title || line.name || "").trim();
+    if (/vip\s*gold\s*package/i.test(displayTitle)) {
       result.skippedLineItems += 1;
       continue;
     }
