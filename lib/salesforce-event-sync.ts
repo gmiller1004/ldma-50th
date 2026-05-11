@@ -437,6 +437,10 @@ export async function syncShopifyOrderToSalesforce(
   }
 
   if (!isPaidEnough(order)) {
+    console.log("[sf-event-sync] skip: order not paid enough for sync", {
+      orderId,
+      financial_status: order.financial_status ?? null,
+    });
     return result;
   }
 
