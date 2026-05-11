@@ -89,6 +89,11 @@ export async function GET(request: NextRequest) {
   clearEventProductIdCache();
 
   const startedAt = Date.now();
+  console.log("[shopify-event-backfill] start", {
+    created_at_min: createdAtMin,
+    maxOrders,
+    fetchTimeoutMs: process.env.SHOPIFY_ADMIN_FETCH_TIMEOUT_MS || "60000(default)",
+  });
 
   let path: string | null =
     `/orders.json?status=any&limit=250&created_at_min=${encodeURIComponent(createdAtMin)}`;
@@ -100,6 +105,11 @@ export async function GET(request: NextRequest) {
   while (path && processedOrders < maxOrders) {
     const { json, linkHeader } = await shopifyAdminRestJsonWithLink<OrdersJson>(path);
     const orders = json?.orders ?? [];
+    console.log("[shopify-event-backfill] orders page", {
+      pathSuffix: path.slice(0, 120),
+      count: orders.length,
+      elapsedMs: Date.now() - startedAt,
+    });
     if (orders.length === 0) break;
 
     for (const order of orders) {

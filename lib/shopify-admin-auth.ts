@@ -13,6 +13,26 @@ export const SHOPIFY_ADMIN_REST_API_VERSION =
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
+function shopifyAdminFetchTimeoutMs(): number {
+  const n = parseInt(process.env.SHOPIFY_ADMIN_FETCH_TIMEOUT_MS || "60000", 10);
+  return Math.min(Math.max(Number.isFinite(n) ? n : 60_000, 5_000), 120_000);
+}
+
+/** Avoid serverless hangs when Shopify or the network stalls (OAuth expiry returns 401, not hang). */
+function shopifyAdminFetchInit(base?: RequestInit): RequestInit {
+  const ms = shopifyAdminFetchTimeoutMs();
+  let timeoutSignal: AbortSignal | undefined;
+  try {
+    if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+      timeoutSignal = AbortSignal.timeout(ms);
+    }
+  } catch {
+    timeoutSignal = undefined;
+  }
+  if (!timeoutSignal || base?.signal) return { ...base };
+  return { ...base, signal: timeoutSignal };
+}
+
 export function getShopifyShopDomain(): string | null {
   const raw =
     process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN?.trim() ||
@@ -46,15 +66,22 @@ export async function getShopifyAdminAccessToken(): Promise<string | null> {
     return cachedToken.token;
   }
 
-  const res = await fetch(`https://${shop}/admin/oauth/access_token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: clientId,
-      client_secret: clientSecret,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`https://${shop}/admin/oauth/access_token`, {
+      ...shopifyAdminFetchInit(),
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    });
+  } catch (e) {
+    console.error("[shopify-admin-auth] client_credentials fetch failed:", e);
+    return null;
+  }
 
   if (!res.ok) {
     console.error("[shopify-admin-auth] client_credentials failed:", await res.text());
@@ -77,14 +104,21 @@ export async function shopifyAdminGraphql<T>(
   const shop = getShopifyShopDomain();
   if (!token || !shop) return null;
 
-  const res = await fetch(`https://${shop}/admin/api/${SHOPIFY_ADMIN_REST_API_VERSION}/graphql.json`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Access-Token": token,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`https://${shop}/admin/api/${SHOPIFY_ADMIN_REST_API_VERSION}/graphql.json`, {
+      ...shopifyAdminFetchInit(),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": token,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+  } catch (e) {
+    console.error("[shopify-admin] GraphQL fetch failed (timeout or network):", e);
+    return null;
+  }
 
   if (!res.ok) {
     console.error("[shopify-admin] GraphQL HTTP error:", res.status, await res.text());
@@ -112,10 +146,13 @@ export async function shopifyAdminRestJson<T>(
     headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
   }
 
-  const res = await fetch(url, {
-    ...init,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, shopifyAdminFetchInit({ ...init, headers }));
+  } catch (e) {
+    console.error("[shopify-admin] REST fetch failed (timeout or network):", path, e);
+    return null;
+  }
 
   if (!res.ok) {
     console.error("[shopify-admin] REST error:", path, res.status, await res.text());
@@ -146,7 +183,13 @@ export async function shopifyAdminRestJsonWithLink<T>(
     headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
   }
 
-  const res = await fetch(url, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(url, shopifyAdminFetchInit({ ...init, headers }));
+  } catch (e) {
+    console.error("[shopify-admin] REST fetch failed (timeout or network):", path, e);
+    return { json: null, linkHeader: null };
+  }
   if (!res.ok) {
     console.error("[shopify-admin] REST error:", path, res.status, await res.text());
     return { json: null, linkHeader: null };
