@@ -23,6 +23,7 @@ if (!connectionString) {
 }
 
 const migrations = [
+  "migrate-shopify-admin-session.sql",
   "migrate-community-edit-reactions.sql",
   "migrate-member-avatars.sql",
   "migrate-member-notifications.sql",

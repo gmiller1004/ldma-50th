@@ -54,7 +54,7 @@ export type MemberLookupResult = {
 };
 
 export async function lookupMember(memberNumber: string): Promise<MemberLookupResult> {
-  const client = await getSalesforceClient();
+  const client = await getSalesforceRestClient();
   if (!client) {
     if (process.env.NODE_ENV === "development") {
       return mockLookup(memberNumber);
@@ -236,8 +236,8 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
   }
 }
 
-/** Get Salesforce API client. Returns null if not configured. */
-async function getSalesforceClient(): Promise<{
+/** Get Salesforce API client. Returns null if not configured. Shared by Contact flows and event sync. */
+export async function getSalesforceRestClient(): Promise<{
   accessToken: string;
   instanceUrl: string;
 } | null> {
@@ -325,7 +325,7 @@ export async function updateContact(
     return { success: true }; // Mock for dev without Salesforce
   }
 
-  const client = await getSalesforceClient();
+  const client = await getSalesforceRestClient();
   if (!client) {
     return { success: false, error: "Salesforce not configured" };
   }
@@ -380,7 +380,7 @@ export async function recordLegacyOfferRequest(
     return { success: true };
   }
 
-  const client = await getSalesforceClient();
+  const client = await getSalesforceRestClient();
   if (!client) {
     return { success: false, error: "Salesforce not configured" };
   }
