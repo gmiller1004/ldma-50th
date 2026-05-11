@@ -15,6 +15,9 @@ export const dynamic = "force-dynamic";
 /** Vercel / Next cap; one HTTP request cannot safely process thousands of orders end-to-end. */
 export const maxDuration = 300;
 
+/** Stop before maxDuration so the handler returns JSON + since_id instead of a platform hard kill. */
+const BACKFILL_TIME_BUDGET_MS = 275_000;
+
 type OrdersJson = { orders?: ShopifyOrderPayload[] };
 
 /**
@@ -94,12 +97,14 @@ export async function GET(request: NextRequest) {
 
   clearEventProductIdCache();
   const startedAt = Date.now();
+  const eventIdsStarted = Date.now();
   const eventProductIds = await getEventRegistrationProductIds();
   console.log("[shopify-event-backfill] start", {
     created_at_min: createdAtMin,
     maxOrders,
     since_id: sinceId,
     event_registration_product_count: eventProductIds.size,
+    event_product_ids_load_ms: Date.now() - eventIdsStarted,
     fetchTimeoutMs: process.env.SHOPIFY_ADMIN_FETCH_TIMEOUT_MS || "60000(default)",
   });
 
@@ -111,8 +116,9 @@ export async function GET(request: NextRequest) {
   let ordersWithSyncMessages = 0;
   const samples: unknown[] = [];
   let maxOrderIdSeen: bigint | null = null;
+  let stoppedForTimeBudget = false;
 
-  while (path && processedOrders < maxOrders) {
+  while (path && processedOrders < maxOrders && !stoppedForTimeBudget) {
     const { json, linkHeader } = await shopifyAdminRestJsonWithLink<OrdersJson>(path);
     const orders = json?.orders ?? [];
     console.log("[shopify-event-backfill] orders page", {
@@ -124,6 +130,16 @@ export async function GET(request: NextRequest) {
 
     for (const order of orders) {
       if (processedOrders >= maxOrders) break;
+      if (Date.now() - startedAt >= BACKFILL_TIME_BUDGET_MS) {
+        stoppedForTimeBudget = true;
+        console.log("[shopify-event-backfill] time budget stop", {
+          processedOrders,
+          maxOrders,
+          elapsedMs: Date.now() - startedAt,
+          budgetMs: BACKFILL_TIME_BUDGET_MS,
+        });
+        break;
+      }
       processedOrders += 1;
       if (order.id != null) {
         try {
@@ -159,25 +175,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (stoppedForTimeBudget) break;
+
     path = nextShopifyAdminPathFromLinkHeader(linkHeader);
-    if (!path) break;
   }
 
   const durationMs = Date.now() - startedAt;
   const lastOrderId = maxOrderIdSeen != null ? maxOrderIdSeen.toString() : null;
-  const likelyTimeout = durationMs >= 285_000;
+  const likelyTimeout = stoppedForTimeBudget || durationMs >= 285_000;
 
   return NextResponse.json({
     ok: true,
     created_at_min: createdAtMin,
     since_id: sinceId,
+    stopped_for_time_budget: stoppedForTimeBudget,
     orders_seen: processedOrders,
     orders_with_errors_or_warnings: ordersWithSyncMessages,
     sample_issues: samples,
     duration_ms: durationMs,
     last_order_id: lastOrderId,
     next_chunk_hint:
-      lastOrderId && processedOrders >= maxOrders
+      lastOrderId && (processedOrders >= maxOrders || stoppedForTimeBudget)
         ? `Re-run with the same created_at_min, same max_orders, and since_id=${lastOrderId} to continue without re-processing this batch.`
         : lastOrderId && processedOrders > 0 && likelyTimeout
           ? `Run likely hit the ~300s cap; re-run with since_id=${lastOrderId} to continue after the last order seen.`

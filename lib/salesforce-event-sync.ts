@@ -19,6 +19,29 @@ import {
 
 const SF_VERSION = process.env.SALESFORCE_API_VERSION || "v59.0";
 
+function salesforceFetchTimeoutMs(): number {
+  const n = parseInt(process.env.SALESFORCE_FETCH_TIMEOUT_MS || "45000", 10);
+  return Math.min(Math.max(Number.isFinite(n) ? n : 45_000, 5_000), 120_000);
+}
+
+/** Avoid hung cron when Salesforce or the network never completes a response. */
+function sfFetchInit(base?: RequestInit): RequestInit {
+  const ms = salesforceFetchTimeoutMs();
+  let timeoutSignal: AbortSignal | undefined;
+  try {
+    if (
+      typeof AbortSignal !== "undefined" &&
+      typeof AbortSignal.timeout === "function"
+    ) {
+      timeoutSignal = AbortSignal.timeout(ms);
+    }
+  } catch {
+    timeoutSignal = undefined;
+  }
+  if (!timeoutSignal || base?.signal) return { ...base };
+  return { ...base, signal: timeoutSignal };
+}
+
 const campaignProductField =
   process.env.SF_CAMPAIGN_SHOPIFY_PRODUCT_FIELD?.trim() || "Shopify_Product_Id__c";
 const cmOrderLineKeyField =
@@ -86,15 +109,26 @@ function escapeSoql(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
+/** Same buyer email on many orders in one backfill — skip repeat Contact SOQL. */
+const resolvedContactIdByEmail = new Map<string, string>();
+
 async function sfQuery<T extends Record<string, unknown>>(
   instanceUrl: string,
   token: string,
   soql: string
 ): Promise<T[]> {
-  const res = await fetch(
-    `${instanceUrl}/services/data/${SF_VERSION}/query?q=${encodeURIComponent(soql)}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `${instanceUrl}/services/data/${SF_VERSION}/query?q=${encodeURIComponent(soql)}`,
+      sfFetchInit({
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    );
+  } catch (e) {
+    console.error("[sf-event-sync] query fetch failed:", e);
+    return [];
+  }
   if (!res.ok) {
     console.error("[sf-event-sync] query failed:", await res.text());
     return [];
@@ -109,14 +143,23 @@ async function sfPatch(
   path: string,
   body: Record<string, unknown>
 ): Promise<boolean> {
-  const res = await fetch(`${instanceUrl}/services/data/${SF_VERSION}${path}`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(
+      `${instanceUrl}/services/data/${SF_VERSION}${path}`,
+      sfFetchInit({
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      })
+    );
+  } catch (e) {
+    console.error("[sf-event-sync] PATCH fetch failed:", path, e);
+    return false;
+  }
   if (!res.ok) {
     console.error("[sf-event-sync] PATCH failed:", path, await res.text());
     return false;
@@ -225,14 +268,23 @@ async function createContactForShopifyBuyer(
   const descOpt = process.env.SF_EVENT_SYNC_CONTACT_DESCRIPTION?.trim();
   if (descOpt) body.Description = descOpt.slice(0, 255);
 
-  const res = await fetch(`${instanceUrl}/services/data/${SF_VERSION}/sobjects/Contact`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(
+      `${instanceUrl}/services/data/${SF_VERSION}/sobjects/Contact`,
+      sfFetchInit({
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      })
+    );
+  } catch (e) {
+    console.error("[sf-event-sync] create Contact fetch failed:", e);
+    return null;
+  }
 
   if (res.ok) {
     const created = (await res.json()) as { id?: string };
@@ -256,13 +308,22 @@ async function findOrCreateContactForShopifyOrder(
   order: ShopifyOrderPayload,
   email: string
 ): Promise<string | null> {
+  const key = email.toLowerCase();
+  const memo = resolvedContactIdByEmail.get(key);
+  if (memo) return memo;
+
   const existing = await findContactIdByEmail(instanceUrl, token, email);
-  if (existing) return existing;
+  if (existing) {
+    resolvedContactIdByEmail.set(key, existing);
+    return existing;
+  }
 
   const allowCreate = sfEventSyncContactCreateAllowed();
   if (!allowCreate) return null;
 
-  return createContactForShopifyBuyer(instanceUrl, token, order, email);
+  const created = await createContactForShopifyBuyer(instanceUrl, token, order, email);
+  if (created) resolvedContactIdByEmail.set(key, created);
+  return created;
 }
 
 async function findCampaignIdByProductId(
@@ -287,14 +348,23 @@ async function createCampaign(
     IsActive: true,
     [campaignProductField]: productId,
   };
-  const res = await fetch(`${instanceUrl}/services/data/${SF_VERSION}/sobjects/Campaign`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(
+      `${instanceUrl}/services/data/${SF_VERSION}/sobjects/Campaign`,
+      sfFetchInit({
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      })
+    );
+  } catch (e) {
+    console.error("[sf-event-sync] create Campaign fetch failed:", e);
+    return null;
+  }
   if (!res.ok) {
     console.error("[sf-event-sync] create Campaign failed:", await res.text());
     return null;
@@ -312,6 +382,45 @@ async function ensureCampaign(
   const existing = await findCampaignIdByProductId(instanceUrl, token, productId);
   if (existing) return existing;
   return createCampaign(instanceUrl, token, productId, defaultName);
+}
+
+type ProductCache = { handle?: string; title?: string; tags?: string };
+
+/**
+ * In-process caches for bulk backfill: same variant/product appears on many orders;
+ * without this we repeat Admin GraphQL + Campaign SOQL once per line item (dominates wall time).
+ */
+const cachedProductMetaById = new Map<string, ProductCache | null>();
+const cachedVariantPriceLevelById = new Map<string, string | null>();
+const cachedCampaignIdByProductId = new Map<string, string>();
+
+async function ensureCampaignCached(
+  instanceUrl: string,
+  token: string,
+  productId: string,
+  defaultName: string
+): Promise<string | null> {
+  const hit = cachedCampaignIdByProductId.get(productId);
+  if (hit) return hit;
+  const id = await ensureCampaign(instanceUrl, token, productId, defaultName);
+  if (id) cachedCampaignIdByProductId.set(productId, id);
+  return id;
+}
+
+async function fetchProductMeta(productId: string): Promise<ProductCache | null> {
+  const json = await shopifyAdminRestJson<{ product?: ProductCache }>(
+    `/products/${productId}.json?fields=id,handle,title,tags`
+  );
+  return json?.product ?? null;
+}
+
+async function getProductMetaCached(productId: string): Promise<ProductCache | null> {
+  if (cachedProductMetaById.has(productId)) {
+    return cachedProductMetaById.get(productId) ?? null;
+  }
+  const meta = await fetchProductMeta(productId);
+  cachedProductMetaById.set(productId, meta);
+  return meta;
 }
 
 function variantGid(variantId: string): string {
@@ -341,13 +450,13 @@ async function fetchVariantPriceLevel(variantId: string): Promise<string | null>
   return v?.trim() ? v : null;
 }
 
-type ProductCache = { handle?: string; title?: string; tags?: string };
-
-async function fetchProductMeta(productId: string): Promise<ProductCache | null> {
-  const json = await shopifyAdminRestJson<{ product?: ProductCache }>(
-    `/products/${productId}.json?fields=id,handle,title,tags`
-  );
-  return json?.product ?? null;
+async function getVariantPriceLevelCached(variantId: string): Promise<string | null> {
+  if (cachedVariantPriceLevelById.has(variantId)) {
+    return cachedVariantPriceLevelById.get(variantId) ?? null;
+  }
+  const v = await fetchVariantPriceLevel(variantId);
+  cachedVariantPriceLevelById.set(variantId, v);
+  return v;
 }
 
 function orderBuyerEmail(order: ShopifyOrderPayload): string | null {
@@ -480,8 +589,6 @@ export async function syncShopifyOrderToSalesforce(
   result.eventRegistrationProductCount = eventProductIds.size;
   const items = order.line_items ?? [];
 
-  const productMetaCache = new Map<string, ProductCache | null>();
-
   for (const line of items) {
     const productId =
       line.product_id != null && line.product_id !== ""
@@ -492,11 +599,7 @@ export async function syncShopifyOrderToSalesforce(
       continue;
     }
 
-    let meta = productMetaCache.get(productId);
-    if (meta === undefined) {
-      meta = await fetchProductMeta(productId);
-      productMetaCache.set(productId, meta);
-    }
+    const meta = await getProductMetaCached(productId);
 
     if (meta?.handle === VIP_UPSELL_PRODUCT_HANDLE) {
       result.skippedLineItems += 1;
@@ -524,7 +627,7 @@ export async function syncShopifyOrderToSalesforce(
 
     let priceLevel: string | null = null;
     if (variantId) {
-      priceLevel = await fetchVariantPriceLevel(variantId);
+      priceLevel = await getVariantPriceLevelCached(variantId);
     }
 
     const kind: RegistrationKind | null = classifyEventRegistration({
@@ -542,7 +645,7 @@ export async function syncShopifyOrderToSalesforce(
     const campaignName =
       (meta?.title || line.name || line.title || `Event ${productId}`).slice(0, 120);
 
-    const campaignId = await ensureCampaign(
+    const campaignId = await ensureCampaignCached(
       client.instanceUrl,
       client.accessToken,
       productId,
@@ -586,17 +689,25 @@ export async function syncShopifyOrderToSalesforce(
     );
 
     if (!patchOk) {
-      const postRes = await fetch(
-        `${client.instanceUrl}/services/data/${SF_VERSION}/sobjects/CampaignMember`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${client.accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(cmBody),
-        }
-      );
+      let postRes: Response;
+      try {
+        postRes = await fetch(
+          `${client.instanceUrl}/services/data/${SF_VERSION}/sobjects/CampaignMember`,
+          sfFetchInit({
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${client.accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(cmBody),
+          })
+        );
+      } catch (e) {
+        result.errors.push(
+          `CampaignMember upsert failed for ${externalKey}: fetch error ${String(e)}`
+        );
+        continue;
+      }
       if (!postRes.ok) {
         result.errors.push(
           `CampaignMember upsert failed for ${externalKey}: ${await postRes.text()}`
