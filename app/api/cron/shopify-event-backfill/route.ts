@@ -23,6 +23,8 @@ type OrdersJson = { orders?: ShopifyOrderPayload[] };
  *
  * GET /api/cron/shopify-event-backfill?order_id=5678901234
  * GET /api/cron/shopify-event-backfill?created_at_min=2026-01-01T00:00:00Z&max_orders=500
+ * GET /api/cron/shopify-event-backfill?created_at_min=...&max_orders=80&since_id=LAST_ORDER_ID
+ *   (since_id optional: continue after that order id; use last_order_id from the previous JSON response.)
  *
  * Authorization: Bearer CRON_SECRET (when CRON_SECRET is set).
  */
@@ -86,21 +88,28 @@ export async function GET(request: NextRequest) {
     Math.max(1, parseInt(searchParams.get("max_orders") || "500", 10) || 500)
   );
 
+  const sinceIdRaw = searchParams.get("since_id")?.trim();
+  const sinceId =
+    sinceIdRaw && /^\d{1,20}$/.test(sinceIdRaw) ? sinceIdRaw : null;
+
   clearEventProductIdCache();
 
   const startedAt = Date.now();
   console.log("[shopify-event-backfill] start", {
     created_at_min: createdAtMin,
     maxOrders,
+    since_id: sinceId,
     fetchTimeoutMs: process.env.SHOPIFY_ADMIN_FETCH_TIMEOUT_MS || "60000(default)",
   });
 
   let path: string | null =
-    `/orders.json?status=any&limit=250&created_at_min=${encodeURIComponent(createdAtMin)}`;
+    `/orders.json?status=any&limit=250&created_at_min=${encodeURIComponent(createdAtMin)}` +
+    (sinceId ? `&since_id=${encodeURIComponent(sinceId)}` : "");
 
   let processedOrders = 0;
   let ordersWithSyncMessages = 0;
   const samples: unknown[] = [];
+  let maxOrderIdSeen: bigint | null = null;
 
   while (path && processedOrders < maxOrders) {
     const { json, linkHeader } = await shopifyAdminRestJsonWithLink<OrdersJson>(path);
@@ -115,6 +124,14 @@ export async function GET(request: NextRequest) {
     for (const order of orders) {
       if (processedOrders >= maxOrders) break;
       processedOrders += 1;
+      if (order.id != null) {
+        try {
+          const bid = BigInt(String(order.id));
+          if (maxOrderIdSeen == null || bid > maxOrderIdSeen) maxOrderIdSeen = bid;
+        } catch {
+          /* ignore */
+        }
+      }
       if (processedOrders === 1 || processedOrders % 50 === 0) {
         console.log("[shopify-event-backfill] progress", {
           processedOrders,
@@ -146,17 +163,28 @@ export async function GET(request: NextRequest) {
   }
 
   const durationMs = Date.now() - startedAt;
+  const lastOrderId = maxOrderIdSeen != null ? maxOrderIdSeen.toString() : null;
+  const likelyTimeout = durationMs >= 285_000;
 
   return NextResponse.json({
     ok: true,
     created_at_min: createdAtMin,
+    since_id: sinceId,
     orders_seen: processedOrders,
     orders_with_errors_or_warnings: ordersWithSyncMessages,
     sample_issues: samples,
     duration_ms: durationMs,
+    last_order_id: lastOrderId,
+    next_chunk_hint:
+      lastOrderId && processedOrders >= maxOrders
+        ? `Re-run with the same created_at_min, same max_orders, and since_id=${lastOrderId} to continue without re-processing this batch.`
+        : lastOrderId && processedOrders > 0 && likelyTimeout
+          ? `Run likely hit the ~300s cap; re-run with since_id=${lastOrderId} to continue after the last order seen.`
+          : undefined,
+    likely_timeout: likelyTimeout,
     note:
-      maxOrders > 250
-        ? "Serverless runs are capped (~300s on Vercel Pro with maxDuration). Use multiple passes with the same created_at_min and a lower max_orders (e.g. 150-300) if you hit timeouts or see orders_seen below max_orders without finishing the store."
+      maxOrders > 250 || likelyTimeout
+        ? "Serverless runs are capped (~300s on Vercel Pro with maxDuration). If each order does full Salesforce work, use max_orders 40-80 and chain since_id=last_order_id from each JSON response. Without since_id, each run starts from the newest orders again."
         : undefined,
   });
 }

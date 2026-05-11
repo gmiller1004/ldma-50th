@@ -130,7 +130,12 @@ curl -sS -H "Authorization: Bearer $CRON_SECRET" \
 
 - Requires **`Authorization: Bearer <CRON_SECRET>`** when `CRON_SECRET` is set (same pattern as other crons).
 - Adjust `created_at_min` to your seed window; raise `max_orders` cautiously (each order runs full sync logic).
-- Response includes counts and sample rows with messages (e.g. classification skips on mixed carts).
+- **Vercel wall time** is capped (~**300s** with `maxDuration`). If many orders need full Salesforce work, use **`max_orders` 40–80** per call, read **`duration_ms`** and **`likely_timeout`**, then **chain** the next call with **`since_id=<last_order_id>`** from the previous JSON (same `created_at_min`) so you do not re-run the same newest orders forever.
+- Response includes **`last_order_id`**, optional **`next_chunk_hint`**, counts, and sample rows with messages (e.g. classification skips on mixed carts).
+
+Optional query:
+
+`&since_id=6680308645959` — only applies to the first `orders.json` request; follow-up pages use Shopify’s `Link` cursor.
 
 ```bash
 curl -sS -H "Authorization: Bearer $CRON_SECRET" \
