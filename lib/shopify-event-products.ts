@@ -1,6 +1,6 @@
 /**
  * Resolve which Shopify products count as event registrations (same collection as storefront Events page).
- * Paginates the entire `events` collection — Admin GraphQL returns max 250 products per page.
+ * Uses Admin GraphQL `collectionByHandle` (the `collection` query is id-only). Paginates with cursors (250/page).
  */
 
 import { EVENT_COLLECTION_HANDLE } from "@/lib/events-config";
@@ -8,7 +8,8 @@ import { shopifyAdminGraphql } from "@/lib/shopify-admin-auth";
 
 type EventProductNode = { id?: string; legacyResourceId?: string | number | null };
 type EventProductIdsData = {
-  collection: {
+  /** Admin `collection` is id-only; use `collectionByHandle` for the storefront handle. */
+  collectionByHandle: {
     products: {
       pageInfo: { hasNextPage: boolean; endCursor: string | null };
       edges: Array<{ node: EventProductNode }>;
@@ -18,7 +19,7 @@ type EventProductIdsData = {
 
 type EventProductIdsGqlResponse = { data?: EventProductIdsData; errors?: unknown } | null;
 
-type EventCollectionNode = NonNullable<EventProductIdsData["collection"]>;
+type EventCollectionNode = NonNullable<EventProductIdsData["collectionByHandle"]>;
 type EventProductsPageInfo = EventCollectionNode["products"]["pageInfo"];
 
 let cachedIds: { ids: Set<string>; expiresAt: number } | null = null;
@@ -46,10 +47,16 @@ export async function getEventRegistrationProductIds(): Promise<Set<string>> {
   const maxPages = 40; // 40 * 250 = 10k products safety cap
 
   for (let pages = 0; pages < maxPages; pages++) {
+    const variables: Record<string, unknown> = {
+      handle: EVENT_COLLECTION_HANDLE,
+      first: 250,
+    };
+    if (cursor) variables.after = cursor;
+
     const gqlResponse: EventProductIdsGqlResponse = await shopifyAdminGraphql<EventProductIdsData>(
       `#graphql
       query EventProductIds($handle: String!, $first: Int!, $after: String) {
-        collection(handle: $handle) {
+        collectionByHandle(handle: $handle) {
           products(first: $first, after: $after) {
             pageInfo {
               hasNextPage
@@ -64,15 +71,11 @@ export async function getEventRegistrationProductIds(): Promise<Set<string>> {
           }
         }
       }`,
-      {
-        handle: EVENT_COLLECTION_HANDLE,
-        first: 250,
-        after: cursor,
-      }
+      variables
     );
 
-    const collection: EventProductIdsData["collection"] =
-      gqlResponse?.data?.collection ?? null;
+    const collection: EventProductIdsData["collectionByHandle"] =
+      gqlResponse?.data?.collectionByHandle ?? null;
     if (!collection) {
       if (gqlResponse && "errors" in gqlResponse && gqlResponse.errors) {
         console.error("[shopify-event-products] GraphQL errors:", gqlResponse.errors);
