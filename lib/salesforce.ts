@@ -236,6 +236,40 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
   }
 }
 
+type SalesforceTokenJson = {
+  access_token: string;
+  instance_url: string;
+  expires_in?: number;
+};
+
+let salesforceRestClientCache: {
+  accessToken: string;
+  instanceUrl: string;
+  expiresAt: number;
+} | null = null;
+
+/** In-process OAuth cache so backfills do not POST /services/oauth2/token once per order (was causing Vercel timeouts). */
+function cacheSalesforceToken(data: SalesforceTokenJson): {
+  accessToken: string;
+  instanceUrl: string;
+} {
+  const now = Date.now();
+  const raw =
+    typeof data.expires_in === "number" && Number.isFinite(data.expires_in)
+      ? data.expires_in
+      : 3600;
+  const expiresInSec = Math.min(Math.max(raw, 300), 7200);
+  salesforceRestClientCache = {
+    accessToken: data.access_token,
+    instanceUrl: data.instance_url,
+    expiresAt: now + expiresInSec * 1000,
+  };
+  return {
+    accessToken: data.access_token,
+    instanceUrl: data.instance_url,
+  };
+}
+
 /** Get Salesforce API client. Returns null if not configured. Shared by Contact flows and event sync. */
 export async function getSalesforceRestClient(): Promise<{
   accessToken: string;
@@ -248,6 +282,14 @@ export async function getSalesforceRestClient(): Promise<{
   const domain = process.env.SALESFORCE_DOMAIN || "login.salesforce.com";
 
   if (!clientId || !clientSecret) return null;
+
+  const now = Date.now();
+  if (salesforceRestClientCache && now < salesforceRestClientCache.expiresAt - 60_000) {
+    return {
+      accessToken: salesforceRestClientCache.accessToken,
+      instanceUrl: salesforceRestClientCache.instanceUrl,
+    };
+  }
 
   const tokenUrl = `https://${domain}/services/oauth2/token`;
 
@@ -264,12 +306,16 @@ export async function getSalesforceRestClient(): Promise<{
       }),
     });
 
-    if (!tokenRes.ok) return null;
-    const { access_token, instance_url } = (await tokenRes.json()) as {
-      access_token: string;
-      instance_url: string;
-    };
-    return { accessToken: access_token, instanceUrl: instance_url };
+    if (!tokenRes.ok) {
+      salesforceRestClientCache = null;
+      return null;
+    }
+    const data = (await tokenRes.json()) as SalesforceTokenJson;
+    if (!data.access_token || !data.instance_url) {
+      salesforceRestClientCache = null;
+      return null;
+    }
+    return cacheSalesforceToken(data);
   }
 
   // Password (Resource Owner) flow - for classic Connected Apps. Deprecated.
@@ -295,12 +341,16 @@ export async function getSalesforceRestClient(): Promise<{
     }),
   });
 
-  if (!tokenRes.ok) return null;
-  const { access_token, instance_url } = (await tokenRes.json()) as {
-    access_token: string;
-    instance_url: string;
-  };
-  return { accessToken: access_token, instanceUrl: instance_url };
+  if (!tokenRes.ok) {
+    salesforceRestClientCache = null;
+    return null;
+  }
+  const data = (await tokenRes.json()) as SalesforceTokenJson;
+  if (!data.access_token || !data.instance_url) {
+    salesforceRestClientCache = null;
+    return null;
+  }
+  return cacheSalesforceToken(data);
 }
 
 export type ProfileUpdateInput = {

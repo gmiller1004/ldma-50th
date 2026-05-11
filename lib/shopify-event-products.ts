@@ -102,12 +102,14 @@ export async function getEventRegistrationProductIds(): Promise<Set<string>> {
     }
   }
 
-  // Never cache an empty set: a failed or partial GraphQL response would block
-  // all line items for TTL_MS; callers can retry on the next request.
+  // Never cache an empty set at full TTL: a failed GraphQL response would block
+  // all line items for TTL_MS. Short negative cache avoids hammering Shopify
+  // while still allowing retry after transient failures.
+  const NEGATIVE_CACHE_MS = 60_000;
   if (ids.size > 0) {
     cachedIds = { ids, expiresAt: now + TTL_MS };
   } else {
-    cachedIds = null;
+    cachedIds = { ids: new Set(), expiresAt: now + NEGATIVE_CACHE_MS };
   }
   return ids;
 }

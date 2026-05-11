@@ -405,11 +405,17 @@ export type SyncOrderResult = {
   errors: string[];
 };
 
+export type SyncShopifyOrderOptions = {
+  /** When set (e.g. bulk backfill), avoids reloading the events collection on every order. */
+  eventProductIds?: Set<string>;
+};
+
 /**
  * Process a Shopify Admin order JSON payload (from webhook or REST fetch).
  */
 export async function syncShopifyOrderToSalesforce(
-  order: ShopifyOrderPayload
+  order: ShopifyOrderPayload,
+  options?: SyncShopifyOrderOptions
 ): Promise<SyncOrderResult> {
   const result: SyncOrderResult = {
     processedLineItems: 0,
@@ -469,7 +475,8 @@ export async function syncShopifyOrderToSalesforce(
     return result;
   }
 
-  const eventProductIds = await getEventRegistrationProductIds();
+  const eventProductIds =
+    options?.eventProductIds ?? (await getEventRegistrationProductIds());
   result.eventRegistrationProductCount = eventProductIds.size;
   const items = order.line_items ?? [];
 

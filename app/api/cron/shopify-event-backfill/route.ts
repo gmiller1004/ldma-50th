@@ -8,7 +8,7 @@ import {
   syncShopifyOrderToSalesforce,
   type ShopifyOrderPayload,
 } from "@/lib/salesforce-event-sync";
-import { clearEventProductIdCache } from "@/lib/shopify-event-products";
+import { clearEventProductIdCache, getEventRegistrationProductIds } from "@/lib/shopify-event-products";
 
 export const dynamic = "force-dynamic";
 
@@ -93,12 +93,13 @@ export async function GET(request: NextRequest) {
     sinceIdRaw && /^\d{1,20}$/.test(sinceIdRaw) ? sinceIdRaw : null;
 
   clearEventProductIdCache();
-
   const startedAt = Date.now();
+  const eventProductIds = await getEventRegistrationProductIds();
   console.log("[shopify-event-backfill] start", {
     created_at_min: createdAtMin,
     maxOrders,
     since_id: sinceId,
+    event_registration_product_count: eventProductIds.size,
     fetchTimeoutMs: process.env.SHOPIFY_ADMIN_FETCH_TIMEOUT_MS || "60000(default)",
   });
 
@@ -140,7 +141,7 @@ export async function GET(request: NextRequest) {
         });
       }
       try {
-        const r = await syncShopifyOrderToSalesforce(order);
+        const r = await syncShopifyOrderToSalesforce(order, { eventProductIds });
         if (r.errors.length) {
           ordersWithSyncMessages += 1;
           if (samples.length < 8) {
