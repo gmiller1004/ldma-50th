@@ -12,6 +12,9 @@ import { clearEventProductIdCache } from "@/lib/shopify-event-products";
 
 export const dynamic = "force-dynamic";
 
+/** Vercel / Next cap; one HTTP request cannot safely process thousands of orders end-to-end. */
+export const maxDuration = 300;
+
 type OrdersJson = { orders?: ShopifyOrderPayload[] };
 
 /**
@@ -85,6 +88,8 @@ export async function GET(request: NextRequest) {
 
   clearEventProductIdCache();
 
+  const startedAt = Date.now();
+
   let path: string | null =
     `/orders.json?status=any&limit=250&created_at_min=${encodeURIComponent(createdAtMin)}`;
 
@@ -100,6 +105,13 @@ export async function GET(request: NextRequest) {
     for (const order of orders) {
       if (processedOrders >= maxOrders) break;
       processedOrders += 1;
+      if (processedOrders === 1 || processedOrders % 50 === 0) {
+        console.log("[shopify-event-backfill] progress", {
+          processedOrders,
+          maxOrders,
+          elapsedMs: Date.now() - startedAt,
+        });
+      }
       try {
         const r = await syncShopifyOrderToSalesforce(order);
         if (r.errors.length) {
@@ -123,11 +135,18 @@ export async function GET(request: NextRequest) {
     if (!path) break;
   }
 
+  const durationMs = Date.now() - startedAt;
+
   return NextResponse.json({
     ok: true,
     created_at_min: createdAtMin,
     orders_seen: processedOrders,
     orders_with_errors_or_warnings: ordersWithSyncMessages,
     sample_issues: samples,
+    duration_ms: durationMs,
+    note:
+      maxOrders > 250
+        ? "Serverless runs are capped (~300s on Vercel Pro with maxDuration). Use multiple passes with the same created_at_min and a lower max_orders (e.g. 150-300) if you hit timeouts or see orders_seen below max_orders without finishing the store."
+        : undefined,
   });
 }
