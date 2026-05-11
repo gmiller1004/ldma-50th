@@ -34,6 +34,17 @@ const cmCancelledField =
 const cmSeatCountField =
   process.env.SF_CM_SEAT_COUNT_FIELD?.trim() || "Seat_Count__c";
 
+/** API name of a Contact checkbox (e.g. Shipping_Same_As_Billing__c) when shipping matches billing or is absent. */
+const sfContactShippingSameAsBillingField =
+  process.env.SF_CONTACT_SHIPPING_SAME_AS_BILLING_FIELD?.trim() || null;
+
+function sfEventSyncContactCreateAllowed(): boolean {
+  return (
+    process.env.SF_EVENT_SYNC_CREATE_CONTACTS !== "false" &&
+    process.env.SF_EVENT_SYNC_CREATE_CONTACTS !== "0"
+  );
+}
+
 export type ShopifyOrderPayload = {
   id?: number | string;
   financial_status?: string | null;
@@ -44,11 +55,21 @@ export type ShopifyOrderPayload = {
     first_name?: string | null;
     last_name?: string | null;
   } | null;
-  billing_address?: {
-    first_name?: string | null;
-    last_name?: string | null;
-  } | null;
+  billing_address?: ShopifyOrderAddress | null;
+  shipping_address?: ShopifyOrderAddress | null;
   line_items?: ShopifyLineItemPayload[];
+};
+
+type ShopifyOrderAddress = {
+  first_name?: string | null;
+  last_name?: string | null;
+  address1?: string | null;
+  address2?: string | null;
+  city?: string | null;
+  province?: string | null;
+  zip?: string | null;
+  country?: string | null;
+  country_code?: string | null;
 };
 
 export type ShopifyLineItemPayload = {
@@ -129,6 +150,65 @@ function contactNamesFromOrder(order: ShopifyOrderPayload, email: string): {
   return { firstName: first, lastName: last };
 }
 
+function clip(s: string, max: number): string {
+  const t = s.trim();
+  if (!t) return "";
+  return t.length > max ? t.slice(0, max) : t;
+}
+
+function addrFingerprint(a: ShopifyOrderAddress | null | undefined): string {
+  if (!a) return "";
+  return [
+    clip(a.address1 ?? "", 200),
+    clip(a.city ?? "", 80),
+    clip(a.zip ?? "", 40),
+    clip(a.country ?? a.country_code ?? "", 80),
+  ]
+    .join("|")
+    .toLowerCase();
+}
+
+/** Maps Shopify billing/shipping into standard Contact address fields + optional org checkbox. */
+function contactAddressFieldsFromOrder(order: ShopifyOrderPayload): Record<string, unknown> {
+  const bill = order.billing_address;
+  const ship = order.shipping_address;
+
+  const street = (parts: (string | null | undefined)[]) =>
+    clip(parts.map((p) => (p ?? "").trim()).filter(Boolean).join(", "), 255);
+
+  const from = (a: ShopifyOrderAddress | null | undefined) => ({
+    Street: street([a?.address1, a?.address2]),
+    City: clip(a?.city ?? "", 40),
+    State: clip(a?.province ?? "", 40),
+    PostalCode: clip(a?.zip ?? "", 20),
+    Country: clip(a?.country ?? a?.country_code ?? "", 80),
+  });
+
+  const mailing = from(bill);
+  const shipEmpty = !ship?.address1?.trim();
+  const sameShip = shipEmpty || addrFingerprint(bill) === addrFingerprint(ship);
+  const other = sameShip ? mailing : from(ship);
+
+  const out: Record<string, unknown> = {
+    MailingStreet: mailing.Street || clip("Shopify order", 255),
+    MailingCity: mailing.City || "—",
+    MailingState: mailing.State || "—",
+    MailingPostalCode: mailing.PostalCode || "—",
+    MailingCountry: mailing.Country || "—",
+    OtherStreet: other.Street || mailing.Street || clip("Shopify order", 255),
+    OtherCity: other.City || mailing.City || "—",
+    OtherState: other.State || mailing.State || "—",
+    OtherPostalCode: other.PostalCode || mailing.PostalCode || "—",
+    OtherCountry: other.Country || mailing.Country || "—",
+  };
+
+  if (sfContactShippingSameAsBillingField && sameShip) {
+    out[sfContactShippingSameAsBillingField] = true;
+  }
+
+  return out;
+}
+
 async function createContactForShopifyBuyer(
   instanceUrl: string,
   token: string,
@@ -140,6 +220,7 @@ async function createContactForShopifyBuyer(
     Email: email,
     FirstName: firstName,
     LastName: lastName,
+    ...contactAddressFieldsFromOrder(order),
   };
   const descOpt = process.env.SF_EVENT_SYNC_CONTACT_DESCRIPTION?.trim();
   if (descOpt) body.Description = descOpt.slice(0, 255);
@@ -178,9 +259,7 @@ async function findOrCreateContactForShopifyOrder(
   const existing = await findContactIdByEmail(instanceUrl, token, email);
   if (existing) return existing;
 
-  const allowCreate =
-    process.env.SF_EVENT_SYNC_CREATE_CONTACTS !== "false" &&
-    process.env.SF_EVENT_SYNC_CREATE_CONTACTS !== "0";
+  const allowCreate = sfEventSyncContactCreateAllowed();
   if (!allowCreate) return null;
 
   return createContactForShopifyBuyer(instanceUrl, token, order, email);
@@ -374,9 +453,15 @@ export async function syncShopifyOrderToSalesforce(
     buyerEmail
   );
   if (!contactId) {
-    result.errors.push(
-      `No Salesforce Contact for ${buyerEmail} and auto-create failed or is disabled (SF_EVENT_SYNC_CREATE_CONTACTS)`
-    );
+    if (!sfEventSyncContactCreateAllowed()) {
+      result.errors.push(
+        `No Salesforce Contact for ${buyerEmail} (SF_EVENT_SYNC_CREATE_CONTACTS is disabled)`
+      );
+    } else {
+      result.errors.push(
+        `No Salesforce Contact for ${buyerEmail} (lookup and create failed; see logs for [sf-event-sync] create Contact failed — often org validation rules; set SF_CONTACT_SHIPPING_SAME_AS_BILLING_FIELD to your “shipping same as billing” checkbox API name if required)`
+      );
+    }
     return result;
   }
 
@@ -479,11 +564,14 @@ export async function syncShopifyOrderToSalesforce(
     };
 
     const upsertPath = `/sobjects/CampaignMember/${cmOrderLineKeyField}/${externalKey}`;
+    // PATCH upsert URL already identifies the record by external id; body must not repeat that field.
+    const cmPatchBody: Record<string, unknown> = { ...cmBody };
+    delete cmPatchBody[cmOrderLineKeyField];
     const patchOk = await sfPatch(
       client.instanceUrl,
       client.accessToken,
       upsertPath,
-      cmBody
+      cmPatchBody
     );
 
     if (!patchOk) {
