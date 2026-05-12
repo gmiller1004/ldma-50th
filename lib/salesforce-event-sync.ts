@@ -199,6 +199,30 @@ function clip(s: string, max: number): string {
   return t.length > max ? t.slice(0, max) : t;
 }
 
+/**
+ * When POST Contact returns DUPLICATES_DETECTED, Salesforce often includes the
+ * winning record Id. Email-based SOQL can miss the same person (different Email
+ * on file, fuzzy duplicate rules), so we use this before retrying SOQL only.
+ */
+function extractContactIdFromSalesforceDuplicateError(body: unknown): string | null {
+  const items: unknown[] = Array.isArray(body) ? body : [body];
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as {
+      errorCode?: string;
+      duplicateResult?: {
+        matchResults?: Array<{
+          matchRecords?: Array<{ record?: { Id?: string } }>;
+        }>;
+      };
+    };
+    if (o.errorCode !== "DUPLICATES_DETECTED") continue;
+    const id = o.duplicateResult?.matchResults?.[0]?.matchRecords?.[0]?.record?.Id;
+    if (typeof id === "string" && /^[a-zA-Z0-9]{15,18}$/.test(id)) return id;
+  }
+  return null;
+}
+
 function addrFingerprint(a: ShopifyOrderAddress | null | undefined): string {
   if (!a) return "";
   return [
@@ -293,6 +317,19 @@ async function createContactForShopifyBuyer(
 
   const errText = await res.text();
   console.error("[sf-event-sync] create Contact failed:", errText);
+
+  let duplicateContactId: string | null = null;
+  try {
+    duplicateContactId = extractContactIdFromSalesforceDuplicateError(JSON.parse(errText) as unknown);
+  } catch {
+    /* not JSON */
+  }
+  if (duplicateContactId) {
+    console.log("[sf-event-sync] using Contact Id from duplicate rule match", {
+      contactId: duplicateContactId,
+    });
+    return duplicateContactId;
+  }
 
   if (res.status === 400 || res.status === 409) {
     const retry = await findContactIdByEmail(instanceUrl, token, email);
@@ -578,7 +615,7 @@ export async function syncShopifyOrderToSalesforce(
       );
     } else {
       result.errors.push(
-        `No Salesforce Contact for ${buyerEmail} (lookup and create failed; see logs for [sf-event-sync] create Contact failed — often org validation rules; set SF_CONTACT_SHIPPING_SAME_AS_BILLING_FIELD to your “shipping same as billing” checkbox API name if required)`
+        `No Salesforce Contact for ${buyerEmail} (lookup and create failed; see logs for [sf-event-sync] create Contact failed — often duplicate rules (Contact exists with a different primary Email), validation rules, or set SF_CONTACT_SHIPPING_SAME_AS_BILLING_FIELD if a required checkbox blocks create)`
       );
     }
     return result;
