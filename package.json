@@ -16,7 +16,8 @@
     "db:seed:burnt-river-sites": "node --env-file=.env.local scripts/seed-burnt-river-sites.mjs",
     "db:seed:vein-mountain-sites": "node --env-file=.env.local scripts/seed-camp-sites.mjs vein-mountain-north-carolina vein-mountain-sites.csv",
     "addendum:pdf": "node scripts/addendum-to-pdf.mjs",
-    "generate:knowledge-embeddings": "node --env-file=.env.local scripts/generate-knowledge-embeddings.mjs"
+    "generate:knowledge-embeddings": "node --env-file=.env.local scripts/generate-knowledge-embeddings.mjs",
+    "sf:seed-events-csv": "node --env-file=.env.local --import tsx scripts/seed-salesforce-events-from-shopify-csv.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -30,6 +31,7 @@
     "jose": "^6.1.3",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
+    "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "stripe": "^20.4.1"
@@ -44,6 +46,7 @@
     "pg": "^8.19.0",
     "puppeteer": "^24.39.0",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
