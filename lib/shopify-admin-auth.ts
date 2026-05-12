@@ -201,6 +201,62 @@ export async function shopifyAdminRestJsonWithLink<T>(
   };
 }
 
+export type ShopifyAdminRestDiagResult =
+  | { ok: true; shop: string; path: string; status: number; data: unknown }
+  | {
+      ok: false;
+      shop: string | null;
+      path: string;
+      status: number;
+      detail: string;
+    }
+  | { ok: false; reason: "no_token_or_shop" };
+
+/** For scripts and debugging: same auth as REST helpers, returns status + body snippet on failure. */
+export async function shopifyAdminRestDiagnostics(
+  path: string
+): Promise<ShopifyAdminRestDiagResult> {
+  const token = await getShopifyAdminAccessToken();
+  const shop = getShopifyShopDomain();
+  if (!token || !shop) {
+    return { ok: false, reason: "no_token_or_shop" };
+  }
+  const url = `https://${shop}/admin/api/${SHOPIFY_ADMIN_REST_API_VERSION}${path.startsWith("/") ? path : `/${path}`}`;
+  try {
+    const res = await fetch(
+      url,
+      shopifyAdminFetchInit({
+        headers: { "X-Shopify-Access-Token": token },
+      })
+    );
+    const text = await res.text();
+    if (!res.ok) {
+      return {
+        ok: false,
+        shop,
+        path,
+        status: res.status,
+        detail: text.slice(0, 1200),
+      };
+    }
+    let data: unknown = text;
+    try {
+      data = JSON.parse(text) as unknown;
+    } catch {
+      /* non-JSON success body */
+    }
+    return { ok: true, shop, path, status: res.status, data };
+  } catch (e) {
+    return {
+      ok: false,
+      shop,
+      path,
+      status: 0,
+      detail: `fetch error: ${String(e)}`,
+    };
+  }
+}
+
 /** Next page path for orders list, e.g. `/orders.json?page_info=...` */
 export function nextShopifyAdminPathFromLinkHeader(
   linkHeader: string | null

@@ -8,12 +8,22 @@
  *   npm run sf:seed-events-csv
  *   npm run sf:seed-events-csv -- --file data/ldma-event-backfill/orders_export_1.csv --limit 10 --dry-run
  *   npm run sf:seed-events-csv -- --since-order-id 6670000000000
+ *
+ * Requires Admin API credentials for the **same** Shopify store the CSV was exported from
+ * (order ids are store-specific). Optional: EVENT_COLLECTION_HANDLE if your collection is not `events`.
+ * Use --ignore-probe-failure to run despite a failed first-order probe (not recommended).
  */
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { shopifyAdminRestJson } from "@/lib/shopify-admin-auth";
+import { EVENT_COLLECTION_HANDLE } from "@/lib/events-config";
+import {
+  getShopifyAdminAccessToken,
+  getShopifyShopDomain,
+  shopifyAdminRestDiagnostics,
+  shopifyAdminRestJson,
+} from "@/lib/shopify-admin-auth";
 import { getEventRegistrationProductIds } from "@/lib/shopify-event-products";
 import {
   syncShopifyOrderToSalesforce,
@@ -64,6 +74,7 @@ function parseArgs(): {
   dryRun: boolean;
   sinceOrderId: bigint | null;
   concurrency: number;
+  ignoreProbeFailure: boolean;
 } {
   const argv = process.argv.slice(2);
   let file = "data/ldma-event-backfill/orders_export_1.csv";
@@ -71,10 +82,12 @@ function parseArgs(): {
   let dryRun = false;
   let sinceOrderId: bigint | null = null;
   let concurrency = 1;
+  let ignoreProbeFailure = false;
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === "--dry-run") dryRun = true;
+    else if (a === "--ignore-probe-failure") ignoreProbeFailure = true;
     else if (a.startsWith("--file=")) file = a.slice("--file=".length);
     else if (a === "--file" && argv[i + 1]) {
       file = argv[++i]!;
@@ -96,7 +109,7 @@ function parseArgs(): {
     }
   }
 
-  return { file, limit, dryRun, sinceOrderId, concurrency };
+  return { file, limit, dryRun, sinceOrderId, concurrency, ignoreProbeFailure };
 }
 
 function collectPaidOrderIds(
@@ -160,7 +173,8 @@ async function mapPool<T, R>(
 }
 
 async function main() {
-  const { file, limit, dryRun, sinceOrderId, concurrency } = parseArgs();
+  const { file, limit, dryRun, sinceOrderId, concurrency, ignoreProbeFailure } =
+    parseArgs();
   const abs = resolve(process.cwd(), file);
   const raw = readFileSync(abs, "utf8");
   const lines = raw.split(/\r?\n/).filter((l) => l.length > 0);
@@ -184,6 +198,7 @@ async function main() {
     dryRun,
     sinceOrderId: sinceOrderId?.toString() ?? null,
     concurrency,
+    event_collection_handle: EVENT_COLLECTION_HANDLE,
   });
 
   if (dryRun) {
@@ -191,8 +206,85 @@ async function main() {
     return;
   }
 
+  const shopDomain = getShopifyShopDomain();
+  const tokenPresent = Boolean(await getShopifyAdminAccessToken());
+  console.log("[sf-seed-csv] shopify_env", {
+    shop_domain: shopDomain ?? "(missing — set NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN or SHOPIFY_SHOP_DOMAIN)",
+    admin_token_resolved: tokenPresent,
+  });
+
+  if (!shopDomain || !tokenPresent) {
+    console.error(
+      "[sf-seed-csv] Missing Shopify shop domain or Admin token. Fix .env.local before seeding."
+    );
+    process.exit(1);
+  }
+
+  const shopProbe = await shopifyAdminRestDiagnostics("/shop.json");
+  if (shopProbe.ok && shopProbe.data && typeof shopProbe.data === "object") {
+    const s = (shopProbe.data as { shop?: { name?: string; myshopify_domain?: string } })
+      .shop;
+    console.log("[sf-seed-csv] admin_api_connected_store", {
+      name: s?.name ?? null,
+      myshopify_domain: s?.myshopify_domain ?? null,
+    });
+  } else {
+    console.warn("[sf-seed-csv] shop.json probe failed (check token scopes)", shopProbe);
+  }
+
+  if (orderIds.length > 0) {
+    const path = `/orders/${orderIds[0]}.json`;
+    const orderProbe = await shopifyAdminRestDiagnostics(path);
+    if (!orderProbe.ok) {
+      if ("reason" in orderProbe) {
+        console.error("[sf-seed-csv] Probe: no token or shop.");
+        process.exit(1);
+      }
+      const { status, detail, shop: failShop, path } = orderProbe;
+      console.error("[sf-seed-csv] probe_first_order FAILED", {
+        sample_order_id: orderIds[0],
+        path,
+        shop: failShop,
+        http_status: status,
+        detail: detail.slice(0, 600),
+      });
+      if (status === 404) {
+        console.error(
+          "[sf-seed-csv] HTTP 404 means this order id does not exist on the store your Admin token uses.\n" +
+            "Your CSV is almost certainly from a different Shopify shop than " +
+            shopDomain +
+            ".\n" +
+            "Fix: set NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN / SHOPIFY_SHOP_DOMAIN (and token) to the **Lost Dutchman's** myshopify.com host you exported from, then re-run."
+        );
+      } else if (status === 403) {
+        console.error(
+          "[sf-seed-csv] HTTP 403: token may lack read_orders / read_all_orders for this shop."
+        );
+      }
+      if (!ignoreProbeFailure) process.exit(1);
+    } else {
+      const body = orderProbe.data as { order?: { id?: unknown } };
+      if (!body?.order) {
+        console.error(
+          "[sf-seed-csv] probe_first_order: 200 response but no `order` key — unexpected shape"
+        );
+        if (!ignoreProbeFailure) process.exit(1);
+      }
+    }
+  }
+
   const eventProductIds = await getEventRegistrationProductIds();
   console.log("[sf-seed-csv] event_registration_product_count", eventProductIds.size);
+  if (eventProductIds.size === 0) {
+    console.error(
+      "[sf-seed-csv] No products in the `" +
+        EVENT_COLLECTION_HANDLE +
+        "` collection on this store — every line item will be skipped.\n" +
+        "Create/rename a collection with handle `" +
+        EVENT_COLLECTION_HANDLE +
+        "` and add event products, or set EVENT_COLLECTION_HANDLE in .env.local to match your real handle."
+    );
+  }
 
   let ok = 0;
   let withErrors = 0;

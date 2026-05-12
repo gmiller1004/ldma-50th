@@ -73,6 +73,7 @@ If your org uses different API names, set env vars (see below).
 
 | Variable | Purpose |
 |----------|---------|
+| `EVENT_COLLECTION_HANDLE` | Optional; default `events`. Admin GraphQL loads event product ids from `collectionByHandle(handle: …)`. If your Shopify collection uses another handle (or you pointed Admin at a store that has not created `events` yet), set this to match. |
 | `SF_EVENT_SYNC_CREATE_CONTACTS` | Default on; set `false` or `0` to skip creating Contacts |
 | `SF_EVENT_SYNC_CONTACT_DESCRIPTION` | If set, saved on new Contacts (max 255 chars) |
 
@@ -141,6 +142,8 @@ Optional query:
 curl -sS -H "Authorization: Bearer $CRON_SECRET" \
   "https://myldma.com/api/cron/shopify-event-backfill?created_at_min=2026-05-01T00:00:00Z&max_orders=200"
 ```
+
+**Local CSV seed** — `npm run sf:seed-events-csv` reads a Shopify **Orders** export, dedupes paid order ids, then `GET /orders/{id}.json` once per order. **Admin credentials must be for the same myshopify.com store as the export** (order ids from Store A will 404 on Store B). If `[shopify-event-products] No collection for handle: events`, create that collection on that store or set `EVENT_COLLECTION_HANDLE`.
 
 ---
 

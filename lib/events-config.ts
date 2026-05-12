@@ -4,7 +4,8 @@
  */
 
 /** Collection handle for event products. Only products in this collection are shown on the Events page. */
-export const EVENT_COLLECTION_HANDLE = "events";
+export const EVENT_COLLECTION_HANDLE =
+  process.env.EVENT_COLLECTION_HANDLE?.trim() || "events";
 
 /** Event type filter values — match against product tags (case-insensitive) */
 export const EVENT_TYPES = [
