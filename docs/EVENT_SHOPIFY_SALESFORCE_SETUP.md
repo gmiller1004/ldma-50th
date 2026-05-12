@@ -55,6 +55,8 @@ If your org uses different API names, set env vars (see below).
 |----------|---------|
 | `NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN` | `myldmastore.myshopify.com` |
 
+**Storefront vs Admin:** `NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN` is for the **Storefront API** only. It does **not** authorize **Admin** REST/GraphQL (`/admin/api/...`). Event sync, CSV seed, and order backfill need an **Admin** token (`SHOPIFY_ADMIN_ACCESS_TOKEN`, or `shopify_admin_session` in Postgres after Admin OAuth, or client credentials). If Admin auth is missing, you may see misleading “no `events` collection” / order fetch failures even when the domain and collection are correct.
+
 ### Admin app (Dev Dashboard)
 
 | Variable | Purpose |

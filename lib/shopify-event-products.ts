@@ -77,12 +77,17 @@ export async function getEventRegistrationProductIds(): Promise<Set<string>> {
     const collection: EventProductIdsData["collectionByHandle"] =
       gqlResponse?.data?.collectionByHandle ?? null;
     if (!collection) {
-      if (gqlResponse && "errors" in gqlResponse && gqlResponse.errors) {
+      if (!gqlResponse) {
+        console.error(
+          "[shopify-event-products] Admin GraphQL returned no payload (missing Admin token, HTTP error, or network — see [shopify-admin] logs above). Not a missing `events` collection."
+        );
+      } else if ("errors" in gqlResponse && gqlResponse.errors) {
         console.error("[shopify-event-products] GraphQL errors:", gqlResponse.errors);
       } else {
         console.error(
           "[shopify-event-products] No collection for handle:",
-          EVENT_COLLECTION_HANDLE
+          EVENT_COLLECTION_HANDLE,
+          "(collectionByHandle returned null; confirm handle exists and token has read_products)"
         );
       }
       break;

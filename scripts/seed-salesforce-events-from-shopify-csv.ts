@@ -208,16 +208,32 @@ async function main() {
 
   const shopDomain = getShopifyShopDomain();
   const tokenPresent = Boolean(await getShopifyAdminAccessToken());
+  const hasAdminEnvToken = Boolean(process.env.SHOPIFY_ADMIN_ACCESS_TOKEN?.trim());
+  const hasAdminClientCreds = Boolean(process.env.SHOPIFY_ADMIN_API_CLIENT_ID?.trim());
   console.log("[sf-seed-csv] shopify_env", {
     shop_domain: shopDomain ?? "(missing — set NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN or SHOPIFY_SHOP_DOMAIN)",
     admin_token_resolved: tokenPresent,
+    SHOPIFY_ADMIN_ACCESS_TOKEN_set: hasAdminEnvToken,
+    SHOPIFY_ADMIN_API_CLIENT_ID_set: hasAdminClientCreds,
+    has_storefront_token: Boolean(
+      process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN?.trim()
+    ),
+    note:
+      "Admin REST/GraphQL require SHOPIFY_ADMIN_ACCESS_TOKEN, OAuth session in Postgres (shopify_admin_session), or client_credentials env vars — not the Storefront token.",
   });
 
   if (!shopDomain || !tokenPresent) {
     console.error(
-      "[sf-seed-csv] Missing Shopify shop domain or Admin token. Fix .env.local before seeding."
+      "[sf-seed-csv] Missing Shopify shop domain or Admin API token. " +
+        "NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN alone is not enough: add SHOPIFY_ADMIN_ACCESS_TOKEN (or complete Admin OAuth so shopify_admin_session exists on the DB from STORAGE_DATABASE_URL / DATABASE_URL per lib/db.ts)."
     );
     process.exit(1);
+  }
+
+  if (!hasAdminEnvToken && !hasAdminClientCreds) {
+    console.log(
+      "[sf-seed-csv] Admin token is coming from Postgres shopify_admin_session (no SHOPIFY_ADMIN_* env vars). If seed fails with 401/404, verify that row exists on the same Neon DB lib/db.ts uses."
+    );
   }
 
   const shopProbe = await shopifyAdminRestDiagnostics("/shop.json");

@@ -41,6 +41,23 @@ export function getShopifyShopDomain(): string | null {
   return raw.replace(/^https?:\/\//, "").split("/")[0].toLowerCase();
 }
 
+let warnedMissingAdminToken = false;
+
+function warnMissingAdminTokenOnce(context: string): void {
+  if (warnedMissingAdminToken) return;
+  warnedMissingAdminToken = true;
+  const shop = getShopifyShopDomain();
+  console.warn(
+    `[shopify-admin] ${context}: missing Admin API token or shop domain. ` +
+      "NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN is Storefront-only and does not authorize Admin REST/GraphQL. " +
+      "Set SHOPIFY_ADMIN_ACCESS_TOKEN, or complete Admin OAuth (shopify_admin_session in Postgres), " +
+      "or SHOPIFY_ADMIN_API_CLIENT_ID + SHOPIFY_ADMIN_API_CLIENT_SECRET (client_credentials). " +
+      "If OAuth session is in Neon, it must live on the same database lib/db.ts uses " +
+      "(STORAGE_DATABASE_URL, else POSTGRES_URL, else DATABASE_URL — first set wins). " +
+      `Resolved shop: ${shop ?? "(none)"}.`
+  );
+}
+
 export async function getShopifyAdminAccessToken(): Promise<string | null> {
   const envTok = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN?.trim();
   if (envTok) return envTok;
@@ -102,7 +119,10 @@ export async function shopifyAdminGraphql<T>(
 ): Promise<{ data?: T; errors?: unknown } | null> {
   const token = await getShopifyAdminAccessToken();
   const shop = getShopifyShopDomain();
-  if (!token || !shop) return null;
+  if (!token || !shop) {
+    warnMissingAdminTokenOnce("GraphQL");
+    return null;
+  }
 
   let res: Response;
   try {
@@ -134,7 +154,10 @@ export async function shopifyAdminRestJson<T>(
 ): Promise<T | null> {
   const token = await getShopifyAdminAccessToken();
   const shop = getShopifyShopDomain();
-  if (!token || !shop) return null;
+  if (!token || !shop) {
+    warnMissingAdminTokenOnce(`REST ${path}`);
+    return null;
+  }
 
   const url = `https://${shop}/admin/api/${SHOPIFY_ADMIN_REST_API_VERSION}${path.startsWith("/") ? path : `/${path}`}`;
   const method = init?.method ?? "GET";
@@ -171,7 +194,10 @@ export async function shopifyAdminRestJsonWithLink<T>(
 ): Promise<{ json: T | null; linkHeader: string | null }> {
   const token = await getShopifyAdminAccessToken();
   const shop = getShopifyShopDomain();
-  if (!token || !shop) return { json: null, linkHeader: null };
+  if (!token || !shop) {
+    warnMissingAdminTokenOnce(`REST ${path}`);
+    return { json: null, linkHeader: null };
+  }
 
   const url = `https://${shop}/admin/api/${SHOPIFY_ADMIN_REST_API_VERSION}${path.startsWith("/") ? path : `/${path}`}`;
   const method = init?.method ?? "GET";
@@ -219,6 +245,7 @@ export async function shopifyAdminRestDiagnostics(
   const token = await getShopifyAdminAccessToken();
   const shop = getShopifyShopDomain();
   if (!token || !shop) {
+    warnMissingAdminTokenOnce(`diagnostics ${path}`);
     return { ok: false, reason: "no_token_or_shop" };
   }
   const url = `https://${shop}/admin/api/${SHOPIFY_ADMIN_REST_API_VERSION}${path.startsWith("/") ? path : `/${path}`}`;
