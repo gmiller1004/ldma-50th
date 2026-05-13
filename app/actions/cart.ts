@@ -3,12 +3,17 @@
 import {
   createCartAndAddLines,
   addLinesToExistingCart,
+  cartDiscountCodesUpdate,
   cartLinesUpdate,
   cartLinesRemove,
   cartNoteUpdate,
   getCart,
 } from "@/lib/shopify";
 import { cookies } from "next/headers";
+import {
+  PENDING_DISCOUNT_COOKIE,
+  sanitizeDiscountCode,
+} from "@/lib/pending-discount";
 import { isLdmaLifetimeProduct, isMembershipProduct } from "@/lib/membership-config";
 import {
   MEMBERSHIP_QUOTE_EMAIL_COOKIE,
@@ -16,6 +21,42 @@ import {
 } from "@/lib/klaviyo-membership-events";
 
 const CART_ID_COOKIE = "shopify_cart_id";
+
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
+function getPendingDiscountCartOptions(cookieStore: CookieStore) {
+  const code = sanitizeDiscountCode(cookieStore.get(PENDING_DISCOUNT_COOKIE)?.value ?? undefined);
+  if (!code) return undefined;
+  return { discountCodes: [code] };
+}
+
+function clearPendingDiscountCookie(cookieStore: CookieStore) {
+  cookieStore.delete(PENDING_DISCOUNT_COOKIE);
+}
+
+/**
+ * If the discount was already sent on cartCreate, drop the cookie.
+ * Otherwise try cartDiscountCodesUpdate (e.g. lines were added to an existing cart).
+ */
+async function finalizePendingDiscountAfterCartChange(
+  cookieStore: CookieStore,
+  cartId: string | undefined,
+  discountAppliedOnCartCreate: boolean
+): Promise<void> {
+  if (!cartId) return;
+  if (discountAppliedOnCartCreate) {
+    clearPendingDiscountCookie(cookieStore);
+    return;
+  }
+  const code = sanitizeDiscountCode(cookieStore.get(PENDING_DISCOUNT_COOKIE)?.value ?? undefined);
+  if (!code) return;
+  try {
+    await cartDiscountCodesUpdate(cartId, [code]);
+    clearPendingDiscountCookie(cookieStore);
+  } catch (e) {
+    console.warn("[cart] pending discount attach failed:", e);
+  }
+}
 
 /** When user has saved a membership quote, sync Shopify cart to Klaviyo for remarketing. */
 async function maybeSyncMembershipCartToKlaviyo(cartId: string | undefined) {
@@ -40,7 +81,8 @@ export async function addToCart(
   quantity: number = 1
 ) {
   const cookieStore = await cookies();
-  let existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
+  const pendingOpts = getPendingDiscountCartOptions(cookieStore);
+  const existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
   const line = {
     merchandiseId: variantId,
     quantity: Math.max(1, Math.min(100, quantity)),
@@ -49,6 +91,7 @@ export async function addToCart(
 
   let checkoutUrl: string;
   let cartId: string | undefined;
+  let discountAppliedOnCartCreate = false;
 
   if (existingCartId) {
     try {
@@ -57,9 +100,10 @@ export async function addToCart(
       cartId = existingCartId;
     } catch (e) {
       if (isCartNotFoundError(e)) {
-        const result = await createCartAndAddLines([line]);
+        const result = await createCartAndAddLines([line], pendingOpts);
         checkoutUrl = result.checkoutUrl;
         cartId = result.cartId;
+        discountAppliedOnCartCreate = Boolean(pendingOpts?.discountCodes?.length);
         if (result.cartId) {
           cookieStore.set(CART_ID_COOKIE, result.cartId, {
             path: "/",
@@ -72,9 +116,10 @@ export async function addToCart(
       }
     }
   } else {
-    const result = await createCartAndAddLines([line]);
+    const result = await createCartAndAddLines([line], pendingOpts);
     checkoutUrl = result.checkoutUrl;
     cartId = result.cartId;
+    discountAppliedOnCartCreate = Boolean(pendingOpts?.discountCodes?.length);
     if (result.cartId) {
       cookieStore.set(CART_ID_COOKIE, result.cartId, {
         path: "/",
@@ -84,6 +129,7 @@ export async function addToCart(
     }
   }
 
+  await finalizePendingDiscountAfterCartChange(cookieStore, cartId, discountAppliedOnCartCreate);
   await maybeSyncMembershipCartToKlaviyo(cartId);
   return { checkoutUrl };
 }
@@ -92,6 +138,7 @@ export async function addToCart(
 export async function addMembershipToCart(variantIds: string[]) {
   if (variantIds.length === 0) throw new Error("No variants to add");
   const cookieStore = await cookies();
+  const pendingOpts = getPendingDiscountCartOptions(cookieStore);
   let existingCartId = cookieStore.get(CART_ID_COOKIE)?.value;
   const lines = variantIds.map((id) => ({ merchandiseId: id, quantity: 1 }));
 
@@ -103,6 +150,7 @@ export async function addMembershipToCart(variantIds: string[]) {
       const result = await addLinesToExistingCart(existingCartId, lines);
       checkoutUrl = result.checkoutUrl;
       cartId = existingCartId;
+      await finalizePendingDiscountAfterCartChange(cookieStore, cartId, false);
       await maybeSyncMembershipCartToKlaviyo(cartId);
       return { checkoutUrl };
     }
@@ -110,9 +158,10 @@ export async function addMembershipToCart(variantIds: string[]) {
     existingCartId = undefined;
   }
 
-  const result = await createCartAndAddLines(lines);
+  const result = await createCartAndAddLines(lines, pendingOpts);
   checkoutUrl = result.checkoutUrl;
   cartId = result.cartId;
+  const discountAppliedOnCartCreate = Boolean(pendingOpts?.discountCodes?.length);
   if (result.cartId) {
     cookieStore.set(CART_ID_COOKIE, result.cartId, {
       path: "/",
@@ -120,6 +169,7 @@ export async function addMembershipToCart(variantIds: string[]) {
       sameSite: "lax",
     });
   }
+  await finalizePendingDiscountAfterCartChange(cookieStore, cartId, discountAppliedOnCartCreate);
   await maybeSyncMembershipCartToKlaviyo(cartId);
   return { checkoutUrl };
 }

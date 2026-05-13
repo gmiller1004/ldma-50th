@@ -879,14 +879,26 @@ export async function createCartAndAddLine(
   return createCartAndAddLines([{ merchandiseId: variantId, sellingPlanId }]);
 }
 
+export type CreateCartOptions = {
+  discountCodes?: string[];
+};
+
 export async function createCartAndAddLines(
-  lines: CartLineInput[] | string[]
+  lines: CartLineInput[] | string[],
+  options?: CreateCartOptions
 ) {
   const normalizedLines: CartLineInput[] = lines.map((item) =>
     typeof item === "string"
       ? { merchandiseId: item, quantity: 1 }
       : { merchandiseId: item.merchandiseId, quantity: item.quantity ?? 1, sellingPlanId: item.sellingPlanId }
   );
+  const input: {
+    lines: typeof normalizedLines;
+    discountCodes?: string[];
+  } = { lines: normalizedLines };
+  if (options?.discountCodes?.length) {
+    input.discountCodes = options.discountCodes;
+  }
   const result = await shopifyFetch<{
     cartCreate: {
       cart: { checkoutUrl: string; id: string } | null;
@@ -907,7 +919,7 @@ export async function createCartAndAddLines(
       }
     `,
     variables: {
-      input: { lines: normalizedLines },
+      input,
     },
   });
 
@@ -965,6 +977,43 @@ export async function addLinesToExistingCart(
   }
   if (!cart?.checkoutUrl) {
     throw new Error("Failed to add to cart");
+  }
+  return { checkoutUrl: cart.checkoutUrl };
+}
+
+/** Apply discount codes to an existing Storefront cart (e.g. after email deep-link). */
+export async function cartDiscountCodesUpdate(cartId: string, discountCodes: string[]) {
+  const codes = discountCodes.map((c) => c.trim()).filter(Boolean);
+  if (codes.length === 0) {
+    throw new Error("No discount codes to apply");
+  }
+  const result = await shopifyFetch<{
+    cartDiscountCodesUpdate: {
+      cart: { checkoutUrl: string } | null;
+      userErrors: Array<{ message: string }>;
+    };
+  }>({
+    query: `
+      mutation cartDiscountCodesUpdate($cartId: ID!, $discountCodes: [String!]!) {
+        cartDiscountCodesUpdate(cartId: $cartId, discountCodes: $discountCodes) {
+          cart {
+            checkoutUrl
+          }
+          userErrors {
+            message
+          }
+        }
+      }
+    `,
+    variables: { cartId, discountCodes: codes },
+  });
+
+  const { cart, userErrors } = result.cartDiscountCodesUpdate;
+  if (userErrors?.length) {
+    throw new Error(userErrors[0].message);
+  }
+  if (!cart?.checkoutUrl) {
+    throw new Error("Failed to update cart discount codes");
   }
   return { checkoutUrl: cart.checkoutUrl };
 }
