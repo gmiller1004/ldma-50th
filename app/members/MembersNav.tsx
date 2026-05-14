@@ -20,7 +20,7 @@ export function MembersNav() {
           const mode = data.caretakerPortalMode;
           const show = mode === "admin" || mode === "camp";
           setShowCaretakerPortal(show);
-          setCaretakerNavLabel(mode === "admin" ? "Caretaker Admin" : "Caretaker Portal");
+          setCaretakerNavLabel(mode === "admin" ? "Director dashboard" : "Caretaker Portal");
         }
       })
       .catch(() => {

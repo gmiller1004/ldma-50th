@@ -18,15 +18,16 @@ export default async function CaretakerPortalPage() {
           items={[
             { label: "Home", href: "/" },
             { label: "Members", href: "/members" },
-            { label: "Caretaker Admin" },
+            { label: "Director dashboard" },
           ]}
         />
         <MembersNav />
         <h1 className="font-serif text-3xl font-semibold text-[#f0d48f] mb-2">
-          Caretaker Admin
+          Director dashboard
         </h1>
-        <p className="text-[#e8e0d5]/70 mb-8">
-          Overview of all camps: roster from Salesforce and activity from this site.
+        <p className="text-[#e8e0d5]/70 mb-8 max-w-3xl">
+          Cross-camp read-only view: pick a Stripe date range, scan KPIs and the grid, then expand a camp for
+          reservations, revenue detail, and caretaker activity.
         </p>
         <CaretakerAdminDashboard />
       </>

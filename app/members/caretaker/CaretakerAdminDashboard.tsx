@@ -24,7 +24,38 @@ type CampRow = {
   reservationsOnProperty: number;
   assignedCaretakers: RosterRow[];
   checkInsLast30DaysByCaretaker: { caretakerContactId: string; count: number }[];
+  stripeReservationCents: number;
+  stripePastDueCents: number;
+  stripeOtherCents: number;
+  stripeTotalCents: number;
+  stripePaymentCount: number;
 };
+
+type GlobalMetrics = {
+  totalMembersOnStay: number;
+  totalGuestsOnStay: number;
+  totalMemberCheckIns30d: number;
+  totalGuestCheckIns30d: number;
+  totalOpenReservations: number;
+  totalOnSiteReservations: number;
+  stripeReservationCents: number;
+  stripePastDueCents: number;
+  stripeOtherCents: number;
+  stripeTotalCents: number;
+  stripePaymentCount: number;
+  totalRosterAssignments: number;
+};
+
+type SortKey =
+  | "name"
+  | "membersStay"
+  | "guestsStay"
+  | "mem30"
+  | "gst30"
+  | "openRes"
+  | "onSite"
+  | "assigned"
+  | "stripeTotal";
 
 type ReservationRow = {
   id: string;
@@ -57,7 +88,7 @@ type StripePaymentRow = {
 const COLUMN_HELP: Record<string, { title: string; body: string }> = {
   expand: {
     title: "Expand row",
-    body: "Opens this camp’s detail: reservation list, Stripe card payments (with optional date range), and member check-ins by caretaker for the last 30 days.",
+    body: "Opens this camp in tabs: Overview (at-a-glance), Reservations, Stripe revenue (same date range as the toolbar above), and Caretakers (30-day check-ins by caretaker).",
   },
   camp: {
     title: "Camp",
@@ -115,6 +146,10 @@ const COLUMN_HELP: Record<string, { title: string; body: string }> = {
     title: "Reservation",
     body: "Internal reservation ID when this payment was for a reservation or extension; blank for some past-due-only sessions.",
   },
+  stripeCol: {
+    title: "Stripe total (range)",
+    body: "Sum of Stripe Checkout card payments for this camp in the date range selected in the toolbar (reservation + past-due + any other types). Database aggregate, not capped at 500 rows.",
+  },
 };
 
 function rosterName(r: RosterRow): string {
@@ -142,6 +177,58 @@ function formatPaymentType(t: string): string {
   if (t === "past_due") return "Past due";
   if (t === "reservation") return "Reservation";
   return t;
+}
+
+function formatLocalIso(d: Date): string {
+  return d.toLocaleDateString("en-CA");
+}
+
+function sortCampRows(rows: CampRow[], key: SortKey, dir: "asc" | "desc"): CampRow[] {
+  const out = [...rows];
+  const s = dir === "asc" ? 1 : -1;
+  out.sort((a, b) => {
+    switch (key) {
+      case "name":
+        return s * a.name.localeCompare(b.name);
+      case "membersStay":
+        return s * (a.activeMemberCheckIns - b.activeMemberCheckIns);
+      case "guestsStay":
+        return s * (a.activeGuestCheckIns - b.activeGuestCheckIns);
+      case "mem30":
+        return s * (a.memberCheckInsLast30Days - b.memberCheckInsLast30Days);
+      case "gst30":
+        return s * (a.guestCheckInsLast30Days - b.guestCheckInsLast30Days);
+      case "openRes":
+        return s * (a.activeReservations - b.activeReservations);
+      case "onSite":
+        return s * (a.reservationsOnProperty - b.reservationsOnProperty);
+      case "assigned":
+        return s * (a.assignedCaretakers.length - b.assignedCaretakers.length);
+      case "stripeTotal":
+        return s * (a.stripeTotalCents - b.stripeTotalCents);
+      default:
+        return 0;
+    }
+  });
+  return out;
+}
+
+function KpiCard({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-[#d4af37]/20 bg-[#0f0a06]/70 p-4 min-w-[10rem] flex-1">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-[#d4af37]/75 mb-1">{label}</p>
+      <p className="font-serif text-xl sm:text-2xl font-semibold tabular-nums text-[#f0d48f]">{value}</p>
+      {sub ? <p className="text-[11px] text-[#e8e0d5]/45 mt-1">{sub}</p> : null}
+    </div>
+  );
 }
 
 function HeaderHelpButton({
@@ -221,7 +308,7 @@ function ThCampWithHelp({
   return (
     <th
       scope="col"
-      className="relative min-w-[7.5rem] p-3 text-left align-bottom font-semibold lg:min-w-[9rem]"
+      className="sticky left-14 z-30 min-w-[7.5rem] bg-[#1a1208] p-3 text-left align-bottom font-semibold shadow-[4px_0_12px_-2px_rgba(0,0,0,0.5)] lg:min-w-[9rem]"
       title={meta.body}
     >
       <div className="flex min-h-[4.25rem] flex-col justify-end pb-7 pl-0.5">
@@ -243,7 +330,11 @@ function ThExpandWithHelp({
 }) {
   const meta = COLUMN_HELP.expand;
   return (
-    <th scope="col" className="relative w-14 p-2 text-center align-bottom" title={meta.body}>
+    <th
+      scope="col"
+      className="sticky left-0 z-30 w-14 min-w-[3.5rem] bg-[#1a1208] p-2 text-center align-bottom shadow-[4px_0_12px_-2px_rgba(0,0,0,0.5)]"
+      title={meta.body}
+    >
       <span className="sr-only">Expand row for camp details</span>
       <div className="flex min-h-[4.25rem] flex-col items-center justify-end pb-9">
         <span className="text-[10px] font-medium uppercase tracking-wide text-[#d4af37]/75">
@@ -317,27 +408,50 @@ export function CaretakerAdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [camps, setCamps] = useState<CampRow[]>([]);
   const [rosterUnmapped, setRosterUnmapped] = useState<RosterRow[]>([]);
+  const [global, setGlobal] = useState<GlobalMetrics | null>(null);
+  const [revenuePeriod, setRevenuePeriod] = useState<{ from: string | null; to: string | null }>({
+    from: null,
+    to: null,
+  });
+  const [revFromInput, setRevFromInput] = useState("");
+  const [revToInput, setRevToInput] = useState("");
+  const [appliedRevenueFrom, setAppliedRevenueFrom] = useState("");
+  const [appliedRevenueTo, setAppliedRevenueTo] = useState("");
   const [filterSlug, setFilterSlug] = useState<string>("");
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
   const [reservationCache, setReservationCache] = useState<Record<string, ReservationRow[]>>({});
   const reservationCacheRef = useRef(reservationCache);
   reservationCacheRef.current = reservationCache;
   const [columnHelpId, setColumnHelpId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/members/caretaker/admin/summary", { cache: "no-store" })
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (appliedRevenueFrom) params.set("revenueFrom", appliedRevenueFrom);
+    if (appliedRevenueTo) params.set("revenueTo", appliedRevenueTo);
+    const qs = params.toString();
+    fetch(`/api/members/caretaker/admin/summary${qs ? `?${qs}` : ""}`, { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
           throw new Error(typeof j.error === "string" ? j.error : res.statusText);
         }
-        return res.json() as Promise<{ camps: CampRow[]; rosterUnmapped: RosterRow[] }>;
+        return res.json() as Promise<{
+          camps: CampRow[];
+          rosterUnmapped: RosterRow[];
+          global: GlobalMetrics;
+          revenuePeriod: { from: string | null; to: string | null };
+        }>;
       })
       .then((data) => {
         if (cancelled) return;
         setCamps(data.camps ?? []);
         setRosterUnmapped(data.rosterUnmapped ?? []);
+        setGlobal(data.global ?? null);
+        setRevenuePeriod(data.revenuePeriod ?? { from: null, to: null });
         setError(null);
       })
       .catch((e) => {
@@ -349,7 +463,7 @@ export function CaretakerAdminDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [appliedRevenueFrom, appliedRevenueTo]);
 
   useEffect(() => {
     if (!expandedSlug) return;
@@ -388,9 +502,28 @@ export function CaretakerAdminDashboard() {
     return camps.filter((c) => c.slug === filterSlug);
   }, [camps, filterSlug]);
 
+  const sortedFiltered = useMemo(
+    () => sortCampRows(filtered, sortKey, sortDir),
+    [filtered, sortKey, sortDir]
+  );
+
   const toggleExpand = (slug: string) => {
     setExpandedSlug((cur) => (cur === slug ? null : slug));
   };
+
+  const revenueRangeDescription = useMemo(() => {
+    const { from, to } = revenuePeriod;
+    if (from && to) return `${from} → ${to}`;
+    if (from) return `From ${from}`;
+    if (to) return `Through ${to}`;
+    return "All dates (Stripe)";
+  }, [revenuePeriod]);
+
+  useEffect(() => {
+    if (loading) return;
+    setRevFromInput(revenuePeriod.from ?? "");
+    setRevToInput(revenuePeriod.to ?? "");
+  }, [loading, revenuePeriod.from, revenuePeriod.to]);
 
   if (loading) {
     return (
@@ -414,7 +547,10 @@ export function CaretakerAdminDashboard() {
       <ColumnHelpSheet helpId={columnHelpId} onClose={() => setColumnHelpId(null)} />
 
       {rosterUnmapped.length > 0 && (
-        <div className="rounded-lg border border-amber-500/35 bg-amber-950/20 px-4 py-3 text-sm text-amber-100/90">
+        <div
+          className="rounded-lg border border-amber-500/35 bg-amber-950/20 px-4 py-3 text-sm text-amber-100/90"
+          role="status"
+        >
           <p className="font-medium text-amber-200/95 mb-1">Caretakers not mapped to a directory camp</p>
           <ul className="list-disc pl-5 space-y-0.5">
             {rosterUnmapped.map((r) => (
@@ -426,7 +562,128 @@ export function CaretakerAdminDashboard() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-end gap-3">
+      <section className="rounded-lg border border-[#d4af37]/25 bg-[#0f0a06]/40 p-4 space-y-4">
+        <h2 className="text-sm font-medium text-[#f0d48f]">Stripe revenue period</h2>
+        <p className="text-xs text-[#e8e0d5]/55 -mt-2">
+          Applies to KPI amounts and the <strong className="text-[#e8e0d5]/75">Stripe (range)</strong> column.
+          Expanded camp → Revenue tab uses the same dates. Other columns use live / rolling windows as labeled.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-xs text-[#e8e0d5]/65">
+            From
+            <input
+              type="date"
+              value={revFromInput}
+              onChange={(e) => setRevFromInput(e.target.value)}
+              className="rounded border border-[#d4af37]/30 bg-[#0f0a06] text-[#e8e0d5] px-2 py-1.5 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-[#e8e0d5]/65">
+            To
+            <input
+              type="date"
+              value={revToInput}
+              onChange={(e) => setRevToInput(e.target.value)}
+              className="rounded border border-[#d4af37]/30 bg-[#0f0a06] text-[#e8e0d5] px-2 py-1.5 text-sm"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              setAppliedRevenueFrom(revFromInput.trim());
+              setAppliedRevenueTo(revToInput.trim());
+            }}
+            className="rounded border border-[#d4af37]/50 bg-[#d4af37]/15 text-[#f0d48f] px-4 py-2 text-sm hover:bg-[#d4af37]/25"
+          >
+            Apply to dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setRevFromInput("");
+              setRevToInput("");
+              setAppliedRevenueFrom("");
+              setAppliedRevenueTo("");
+            }}
+            className="text-sm text-[#e8e0d5]/55 hover:text-[#d4af37] px-2 py-2"
+          >
+            All dates
+          </button>
+          <div className="flex flex-wrap gap-2 ml-auto">
+            <button
+              type="button"
+              className="rounded border border-[#d4af37]/25 px-3 py-1.5 text-xs text-[#e8e0d5]/80 hover:bg-[#d4af37]/10"
+              onClick={() => {
+                const to = new Date();
+                const from = new Date();
+                from.setDate(from.getDate() - 29);
+                const f = formatLocalIso(from);
+                const t = formatLocalIso(to);
+                setRevFromInput(f);
+                setRevToInput(t);
+                setAppliedRevenueFrom(f);
+                setAppliedRevenueTo(t);
+              }}
+            >
+              Last 30 days
+            </button>
+            <button
+              type="button"
+              className="rounded border border-[#d4af37]/25 px-3 py-1.5 text-xs text-[#e8e0d5]/80 hover:bg-[#d4af37]/10"
+              onClick={() => {
+                const y = new Date().getFullYear();
+                const f = `${y}-01-01`;
+                const t = `${y}-12-31`;
+                setRevFromInput(f);
+                setRevToInput(t);
+                setAppliedRevenueFrom(f);
+                setAppliedRevenueTo(t);
+              }}
+            >
+              This calendar year
+            </button>
+          </div>
+        </div>
+        <p className="text-[11px] text-[#e8e0d5]/45">Stripe filter: {revenueRangeDescription}</p>
+      </section>
+
+      {global ? (
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium text-[#f0d48f]">All camps — at a glance</h2>
+          <div className="flex flex-wrap gap-3">
+            <KpiCard
+              label="Stripe — combined"
+              value={formatUsd(global.stripeTotalCents)}
+              sub={`${global.stripePaymentCount} card payment${global.stripePaymentCount === 1 ? "" : "s"} · ${revenueRangeDescription}`}
+            />
+            <KpiCard label="Stripe — reservations" value={formatUsd(global.stripeReservationCents)} />
+            <KpiCard label="Stripe — past due" value={formatUsd(global.stripePastDueCents)} />
+            <KpiCard
+              label="On site (lodging)"
+              value={String(global.totalOnSiteReservations)}
+              sub="Reservations including today"
+            />
+            <KpiCard label="Open reservations" value={String(global.totalOpenReservations)} />
+            <KpiCard
+              label="Check-ins (30d)"
+              value={String(global.totalMemberCheckIns30d + global.totalGuestCheckIns30d)}
+              sub="Member + guest"
+            />
+            <KpiCard
+              label="On stay (check-ins)"
+              value={String(global.totalMembersOnStay + global.totalGuestsOnStay)}
+              sub="Member + guest active stays"
+            />
+            <KpiCard
+              label="Roster assignments"
+              value={String(global.totalRosterAssignments)}
+              sub="Salesforce caretaker rows"
+            />
+          </div>
+        </section>
+      ) : null}
+
+      <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1 text-sm text-[#e8e0d5]/70">
           <span className="flex items-center gap-1.5">
             <Tent className="w-4 h-4 text-[#d4af37]" />
@@ -449,10 +706,39 @@ export function CaretakerAdminDashboard() {
             ))}
           </select>
         </label>
+        <label className="flex flex-col gap-1 text-sm text-[#e8e0d5]/70">
+          Sort by
+          <select
+            className="rounded border border-[#d4af37]/30 bg-[#0f0a06] text-[#e8e0d5] px-3 py-2 min-w-[200px]"
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+          >
+            <option value="name">Camp name</option>
+            <option value="stripeTotal">Stripe total (range)</option>
+            <option value="onSite">On site today</option>
+            <option value="openRes">Open reservations</option>
+            <option value="mem30">Member check-ins (30d)</option>
+            <option value="gst30">Guest check-ins (30d)</option>
+            <option value="membersStay">Members on stay</option>
+            <option value="guestsStay">Guests on stay</option>
+            <option value="assigned">Caretaker roster count</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-[#e8e0d5]/70">
+          Order
+          <select
+            className="rounded border border-[#d4af37]/30 bg-[#0f0a06] text-[#e8e0d5] px-3 py-2 min-w-[140px]"
+            value={sortDir}
+            onChange={(e) => setSortDir(e.target.value as "asc" | "desc")}
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+        </label>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-[#d4af37]/20">
-        <table className="w-full min-w-[880px] border-collapse text-left text-sm sm:text-[0.9375rem]">
+        <table className="w-full min-w-[1000px] border-collapse text-left text-sm sm:text-[0.9375rem]">
           <thead>
             <tr className="border-b border-[#d4af37]/25 bg-[#1a1208]/90 text-[#d4af37]/95">
               <ThExpandWithHelp columnHelpId={columnHelpId} onColumnHelp={setColumnHelpId} />
@@ -499,6 +785,13 @@ export function CaretakerAdminDashboard() {
                 title="On site today"
                 subtitle="Reserved or checked in, stay includes today"
               />
+              <ThWithHelp
+                helpId="stripeCol"
+                columnHelpId={columnHelpId}
+                onColumnHelp={setColumnHelpId}
+                title="Stripe (range)"
+                subtitle={revenueRangeDescription}
+              />
               <th
                 scope="col"
                 className="relative min-w-[12rem] p-3 text-left align-bottom font-semibold lg:min-w-[15rem]"
@@ -517,16 +810,16 @@ export function CaretakerAdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((row) => {
+            {sortedFiltered.map((row) => {
               const open = expandedSlug === row.slug;
               return (
                 <Fragment key={row.slug}>
-                  <tr className="border-b border-[#d4af37]/10 odd:bg-[#0f0a06]/40 even:bg-[#0a0704]/40">
-                    <td className="p-1 align-middle text-center">
+                  <tr className="border-b border-[#d4af37]/10 bg-[#0d0905]/90 hover:bg-[#15100a]/75 transition-colors">
+                    <td className="sticky left-0 z-20 bg-[#0d0905]/95 p-1 text-center align-middle shadow-[4px_0_12px_-2px_rgba(0,0,0,0.4)]">
                       <button
                         type="button"
                         onClick={() => toggleExpand(row.slug)}
-                        className="p-2 rounded text-[#d4af37] hover:bg-[#d4af37]/10 transition-colors mx-auto"
+                        className="mx-auto rounded p-2 text-[#d4af37] hover:bg-[#d4af37]/10 transition-colors"
                         aria-expanded={open}
                         aria-label={open ? `Collapse ${row.name}` : `Expand ${row.name}`}
                       >
@@ -537,11 +830,11 @@ export function CaretakerAdminDashboard() {
                         )}
                       </button>
                     </td>
-                    <td className="p-3 font-medium text-[#f0d48f]">
+                    <td className="sticky left-14 z-20 bg-[#0d0905]/95 p-3 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.4)]">
                       <button
                         type="button"
                         onClick={() => toggleExpand(row.slug)}
-                        className="text-left hover:underline decoration-[#d4af37]/50"
+                        className="text-left font-medium text-[#f0d48f] hover:underline decoration-[#d4af37]/50"
                       >
                         {row.name}
                       </button>
@@ -552,6 +845,9 @@ export function CaretakerAdminDashboard() {
                     <td className="p-3 text-center tabular-nums">{row.guestCheckInsLast30Days}</td>
                     <td className="p-3 text-center tabular-nums">{row.activeReservations}</td>
                     <td className="p-3 text-center tabular-nums">{row.reservationsOnProperty}</td>
+                    <td className="p-3 text-right tabular-nums text-[#f0d48f]/95 font-medium">
+                      {formatUsd(row.stripeTotalCents)}
+                    </td>
                     <td className="p-3 text-[#e8e0d5]/85">
                       {row.assignedCaretakers.length === 0 ? (
                         <span className="text-[#e8e0d5]/45">—</span>
@@ -570,13 +866,16 @@ export function CaretakerAdminDashboard() {
                     </td>
                   </tr>
                   {open ? (
-                    <tr key={`${row.slug}-detail`} className="bg-[#080604]/90 border-b border-[#d4af37]/15">
-                      <td colSpan={9} className="p-0">
+                    <tr key={`${row.slug}-detail`} className="border-b border-[#d4af37]/15 bg-[#080604]/90">
+                      <td colSpan={10} className="p-0">
                         <CampExpandedPanel
                           camp={row}
                           reservations={reservationCache[row.slug]}
                           columnHelpId={columnHelpId}
                           onColumnHelp={setColumnHelpId}
+                          revenueFrom={appliedRevenueFrom}
+                          revenueTo={appliedRevenueTo}
+                          revenueRangeLabel={revenueRangeDescription}
                         />
                       </td>
                     </tr>
@@ -741,20 +1040,23 @@ function CampExpandedPanel({
   reservations,
   columnHelpId,
   onColumnHelp,
+  revenueFrom,
+  revenueTo,
+  revenueRangeLabel,
 }: {
   camp: CampRow;
   reservations: ReservationRow[] | undefined;
   columnHelpId: string | null;
   onColumnHelp: (id: string | null) => void;
+  revenueFrom: string;
+  revenueTo: string;
+  revenueRangeLabel: string;
 }) {
   const idToName = new Map(
     camp.assignedCaretakers.map((r) => [r.contactId, rosterName(r)] as const)
   );
 
-  const [revFromInput, setRevFromInput] = useState("");
-  const [revToInput, setRevToInput] = useState("");
-  const [appliedFrom, setAppliedFrom] = useState("");
-  const [appliedTo, setAppliedTo] = useState("");
+  const [tab, setTab] = useState<"overview" | "reservations" | "revenue" | "caretakers">("overview");
   const [stripePayments, setStripePayments] = useState<StripePaymentRow[] | null>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
@@ -765,8 +1067,8 @@ function CampExpandedPanel({
     setStripePayments(null);
     setStripeError(null);
     const params = new URLSearchParams({ campSlug: camp.slug });
-    if (appliedFrom) params.set("from", appliedFrom);
-    if (appliedTo) params.set("to", appliedTo);
+    if (revenueFrom) params.set("from", revenueFrom);
+    if (revenueTo) params.set("to", revenueTo);
     fetch(`/api/members/caretaker/admin/stripe-payments?${params.toString()}`, { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) {
@@ -790,255 +1092,290 @@ function CampExpandedPanel({
     return () => {
       cancelled = true;
     };
-  }, [camp.slug, appliedFrom, appliedTo]);
+  }, [camp.slug, revenueFrom, revenueTo]);
 
   const stripeByDay = useMemo(
     () => (stripePayments ? groupStripeByDay(stripePayments) : []),
     [stripePayments]
   );
 
+  const tabs = [
+    { id: "overview" as const, label: "Overview" },
+    { id: "reservations" as const, label: "Reservations" },
+    { id: "revenue" as const, label: "Revenue" },
+    { id: "caretakers" as const, label: "Caretakers" },
+  ];
+
   return (
-    <div className="px-4 py-5 space-y-6 border-t border-[#d4af37]/15">
-      <div>
-        <h3 className="text-[#f0d48f] font-serif text-lg mb-3">Reservation history — {camp.name}</h3>
-        {reservations === undefined ? (
-          <div className="flex items-center gap-2 text-[#e8e0d5]/60 text-sm py-4">
-            <Loader2 className="w-4 h-4 animate-spin text-[#d4af37]" />
-            Loading reservations…
-          </div>
-        ) : reservations.length === 0 ? (
-          <p className="text-sm text-[#e8e0d5]/55 py-2">No reservations on record for this camp.</p>
-        ) : (
-          <div className="overflow-x-auto rounded border border-[#d4af37]/15">
-            <table className="w-full text-xs sm:text-sm text-left">
-              <thead>
-                <tr className="bg-[#1a1208]/80 text-[#d4af37]/90">
-                  <th className="p-2 font-semibold" title="Campsite name">
-                    Site
-                  </th>
-                  <th className="p-2 font-semibold" title="Member or guest on the reservation">
-                    Guest / member
-                  </th>
-                  <th className="p-2 font-semibold" title="First night of the stay">
-                    Check in
-                  </th>
-                  <th className="p-2 font-semibold" title="Morning of departure (checkout day)">
-                    Check out
-                  </th>
-                  <th className="p-2 font-semibold text-center" title="Number of nights billed">
-                    Nights
-                  </th>
-                  <th className="p-2 font-semibold" title="reserved, checked in, completed, or cancelled">
-                    Status
-                  </th>
-                  <th className="p-2 font-semibold" title="Member vs guest reservation">
-                    Type
-                  </th>
-                  <th className="p-2 font-semibold" title="When the reservation row was first created">
-                    Booked
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {reservations.map((r) => (
-                  <tr key={r.id} className="border-t border-[#d4af37]/10 text-[#e8e0d5]/90">
-                    <td className="p-2">{r.siteName ?? "—"}</td>
-                    <td className="p-2">{reservationPartyLabel(r)}</td>
-                    <td className="p-2 tabular-nums">{r.checkInDate.slice(0, 10)}</td>
-                    <td className="p-2 tabular-nums">{r.checkOutDate.slice(0, 10)}</td>
-                    <td className="p-2 text-center tabular-nums">{r.nights}</td>
-                    <td className="p-2 capitalize">{r.status.replace(/_/g, " ")}</td>
-                    <td className="p-2 capitalize">{r.reservationType}</td>
-                    <td className="p-2 tabular-nums text-[#e8e0d5]/70">
-                      {r.createdAt ? r.createdAt.slice(0, 10) : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="text-[11px] text-[#e8e0d5]/45 px-2 py-1.5 border-t border-[#d4af37]/10">
-              Showing up to 300 reservations, newest checkout first.
-            </p>
-          </div>
-        )}
+    <div className="border-t border-[#d4af37]/15 px-4 py-5">
+      <div className="mb-4 flex flex-wrap gap-2 border-b border-[#d4af37]/20 pb-3">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`rounded-full px-4 py-1.5 text-sm transition-colors ${
+              tab === t.id
+                ? "bg-[#d4af37]/25 text-[#f0d48f] ring-1 ring-[#d4af37]/50"
+                : "text-[#e8e0d5]/70 hover:bg-[#d4af37]/10 hover:text-[#e8e0d5]"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div>
-        <h3 className="text-[#f0d48f] font-serif text-lg mb-2">Stripe card revenue — {camp.name}</h3>
-        <p className="text-sm text-[#e8e0d5]/60 mb-3">
-          Payments recorded when Stripe Checkout completed (card only). Cash is not included. Sorted by
-          processed time, grouped by calendar day (UTC date).
-        </p>
-        <div className="flex flex-wrap items-end gap-3 mb-4">
-          <label className="flex flex-col gap-1 text-xs text-[#e8e0d5]/65">
-            From
-            <input
-              type="date"
-              value={revFromInput}
-              onChange={(e) => setRevFromInput(e.target.value)}
-              className="rounded border border-[#d4af37]/30 bg-[#0f0a06] text-[#e8e0d5] px-2 py-1.5 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-[#e8e0d5]/65">
-            To
-            <input
-              type="date"
-              value={revToInput}
-              onChange={(e) => setRevToInput(e.target.value)}
-              className="rounded border border-[#d4af37]/30 bg-[#0f0a06] text-[#e8e0d5] px-2 py-1.5 text-sm"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => {
-              setAppliedFrom(revFromInput.trim());
-              setAppliedTo(revToInput.trim());
-            }}
-            className="rounded border border-[#d4af37]/50 bg-[#d4af37]/15 text-[#f0d48f] px-4 py-2 text-sm hover:bg-[#d4af37]/25"
-          >
-            Apply range
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setRevFromInput("");
-              setRevToInput("");
-              setAppliedFrom("");
-              setAppliedTo("");
-            }}
-            className="text-sm text-[#e8e0d5]/55 hover:text-[#d4af37] px-2 py-2"
-          >
-            Clear range
-          </button>
-        </div>
-
-        {!stripeLoading && !stripeError && stripePayments !== null ? (
-          <StripeRevenueTotals
-            payments={stripePayments}
-            appliedFrom={appliedFrom}
-            appliedTo={appliedTo}
-          />
-        ) : null}
-
-        {stripeLoading ? (
-          <div className="flex items-center gap-2 text-[#e8e0d5]/60 text-sm py-4">
-            <Loader2 className="w-4 h-4 animate-spin text-[#d4af37]" />
-            Loading Stripe payments…
-          </div>
-        ) : stripeError ? (
-          <p className="text-sm text-red-300/90">{stripeError}</p>
-        ) : stripePayments && stripePayments.length === 0 ? (
-          <p className="text-sm text-[#e8e0d5]/55 py-2">No Stripe card payments on record for this camp in the selected range.</p>
-        ) : stripePayments && stripePayments.length > 0 ? (
-          <div className="space-y-4">
-            {stripeByDay.map((g) => (
-              <div key={g.day} className="rounded border border-[#d4af37]/15 overflow-hidden">
-                <div className="bg-[#1a1208]/90 px-3 py-2 text-sm font-medium text-[#d4af37] tabular-nums">
-                  {g.day}{" "}
-                  <span className="text-[#e8e0d5]/50 font-normal text-xs ml-2">
-                    ({g.rows.length} payment{g.rows.length === 1 ? "" : "s"} ·{" "}
-                    {formatUsd(g.rows.reduce((s, r) => s + r.amountCents, 0))}{" "}
-                    total)
-                  </span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs sm:text-sm text-left">
-                    <thead>
-                      <tr className="bg-[#0f0a06]/80 text-[#d4af37]/85">
-                        <StripeTh
-                          helpId="stripeProcessed"
-                          columnHelpId={columnHelpId}
-                          onColumnHelp={onColumnHelp}
-                          className="text-left"
-                        >
-                          Processed
-                        </StripeTh>
-                        <StripeTh
-                          helpId="stripeAmount"
-                          columnHelpId={columnHelpId}
-                          onColumnHelp={onColumnHelp}
-                          className="text-right"
-                        >
-                          Amount
-                        </StripeTh>
-                        <StripeTh
-                          helpId="stripeType"
-                          columnHelpId={columnHelpId}
-                          onColumnHelp={onColumnHelp}
-                          className="text-left"
-                        >
-                          Type
-                        </StripeTh>
-                        <StripeTh
-                          helpId="stripeRecipient"
-                          columnHelpId={columnHelpId}
-                          onColumnHelp={onColumnHelp}
-                          className="text-left"
-                        >
-                          Recipient
-                        </StripeTh>
-                        <StripeTh
-                          helpId="stripeEmail"
-                          columnHelpId={columnHelpId}
-                          onColumnHelp={onColumnHelp}
-                          className="text-left"
-                        >
-                          Email
-                        </StripeTh>
-                        <StripeTh
-                          helpId="stripeReservation"
-                          columnHelpId={columnHelpId}
-                          onColumnHelp={onColumnHelp}
-                          className="text-left font-mono text-[11px]"
-                        >
-                          Reservation ID
-                        </StripeTh>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {g.rows.map((p) => (
-                        <tr key={p.id} className="border-t border-[#d4af37]/10 text-[#e8e0d5]/90">
-                          <td className="p-2 tabular-nums whitespace-nowrap">
-                            {p.createdAt.slice(0, 19).replace("T", " ")}
-                          </td>
-                          <td className="p-2 text-right tabular-nums font-medium text-[#f0d48f]/95">
-                            {formatUsd(p.amountCents)}
-                          </td>
-                          <td className="p-2 capitalize">{formatPaymentType(p.paymentType)}</td>
-                          <td className="p-2">{p.recipientDisplayName}</td>
-                          <td className="p-2 break-all max-w-[10rem] sm:max-w-none">{p.memberEmail}</td>
-                          <td className="p-2 font-mono text-[11px] text-[#e8e0d5]/70">
-                            {p.reservationId ?? "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
-            <p className="text-[11px] text-[#e8e0d5]/45">
-              Up to 500 Stripe payments per request. Session IDs are stored internally for support; not shown
-              here.
-            </p>
-          </div>
-        ) : null}
-      </div>
-
-      {camp.checkInsLast30DaysByCaretaker.length > 0 ? (
-        <div>
-          <h3 className="text-[#f0d48f] font-serif text-lg mb-2">Member check-ins (30 days) by caretaker</h3>
-          <ul className="text-sm text-[#e8e0d5]/85 space-y-1">
-            {camp.checkInsLast30DaysByCaretaker.map((b) => (
-              <li key={b.caretakerContactId}>
-                <span className="text-[#d4af37]/90">
-                  {idToName.get(b.caretakerContactId) ?? b.caretakerContactId}
+      {tab === "overview" ? (
+        <div className="space-y-4 text-sm text-[#e8e0d5]/85">
+          <p className="text-[#f0d48f] font-serif text-lg">{camp.name}</p>
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Members on stay</dt>
+              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.activeMemberCheckIns}</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Guests on stay</dt>
+              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.activeGuestCheckIns}</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Member check-ins (30d)</dt>
+              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.memberCheckInsLast30Days}</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Guest check-ins (30d)</dt>
+              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.guestCheckInsLast30Days}</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Open reservations</dt>
+              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.activeReservations}</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">On site today</dt>
+              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.reservationsOnProperty}</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3 sm:col-span-2 lg:col-span-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">
+                Stripe (same range as dashboard)
+              </dt>
+              <dd className="mt-1 text-[#e8e0d5]/70">{revenueRangeLabel}</dd>
+              <dd className="mt-2 flex flex-wrap gap-x-6 gap-y-1 tabular-nums text-[#f0d48f]">
+                <span>Total {formatUsd(camp.stripeTotalCents)}</span>
+                <span className="text-[#e8e0d5]/60">
+                  Res. {formatUsd(camp.stripeReservationCents)} · Past due{" "}
+                  {formatUsd(camp.stripePastDueCents)}
                 </span>
-                {": "}
-                <span className="tabular-nums">{b.count}</span>
-              </li>
-            ))}
-          </ul>
+              </dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
+
+      {tab === "reservations" ? (
+        <div>
+          <h3 className="mb-3 font-serif text-lg text-[#f0d48f]">Reservation history</h3>
+          {reservations === undefined ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-[#e8e0d5]/60">
+              <Loader2 className="h-4 w-4 animate-spin text-[#d4af37]" />
+              Loading reservations…
+            </div>
+          ) : reservations.length === 0 ? (
+            <p className="py-2 text-sm text-[#e8e0d5]/55">No reservations on record for this camp.</p>
+          ) : (
+            <div className="overflow-x-auto rounded border border-[#d4af37]/15">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-[#1a1208]/80 text-[#d4af37]/90">
+                    <th className="p-2 font-semibold">Site</th>
+                    <th className="p-2 font-semibold">Guest / member</th>
+                    <th className="p-2 font-semibold">Check in</th>
+                    <th className="p-2 font-semibold">Check out</th>
+                    <th className="p-2 text-center font-semibold">Nights</th>
+                    <th className="p-2 font-semibold">Status</th>
+                    <th className="p-2 font-semibold">Type</th>
+                    <th className="p-2 font-semibold">Booked</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reservations.map((r) => (
+                    <tr key={r.id} className="border-t border-[#d4af37]/10 text-[#e8e0d5]/90">
+                      <td className="p-2">{r.siteName ?? "—"}</td>
+                      <td className="p-2">{reservationPartyLabel(r)}</td>
+                      <td className="p-2 tabular-nums">{r.checkInDate.slice(0, 10)}</td>
+                      <td className="p-2 tabular-nums">{r.checkOutDate.slice(0, 10)}</td>
+                      <td className="p-2 text-center tabular-nums">{r.nights}</td>
+                      <td className="p-2 capitalize">{r.status.replace(/_/g, " ")}</td>
+                      <td className="p-2 capitalize">{r.reservationType}</td>
+                      <td className="p-2 tabular-nums text-[#e8e0d5]/70">
+                        {r.createdAt ? r.createdAt.slice(0, 10) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="border-t border-[#d4af37]/10 px-2 py-1.5 text-[11px] text-[#e8e0d5]/45">
+                Showing up to 300 reservations, newest checkout first.
+              </p>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {tab === "revenue" ? (
+        <div>
+          <h3 className="mb-2 font-serif text-lg text-[#f0d48f]">Stripe card revenue</h3>
+          <p className="mb-3 text-sm text-[#e8e0d5]/60">
+            Same date range as the dashboard toolbar: <strong className="text-[#e8e0d5]/85">{revenueRangeLabel}</strong>.
+            Card Checkout only; cash excluded. Grouped by processed day (UTC).
+          </p>
+
+          {!stripeLoading && !stripeError && stripePayments !== null ? (
+            <StripeRevenueTotals
+              payments={stripePayments}
+              appliedFrom={revenueFrom}
+              appliedTo={revenueTo}
+            />
+          ) : null}
+
+          {stripeLoading ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-[#e8e0d5]/60">
+              <Loader2 className="h-4 w-4 animate-spin text-[#d4af37]" />
+              Loading Stripe payments…
+            </div>
+          ) : stripeError ? (
+            <p className="text-sm text-red-300/90">{stripeError}</p>
+          ) : stripePayments && stripePayments.length === 0 ? (
+            <p className="py-2 text-sm text-[#e8e0d5]/55">No Stripe card payments in this range for this camp.</p>
+          ) : stripePayments && stripePayments.length > 0 ? (
+            <div className="space-y-4">
+              {stripeByDay.map((g) => (
+                <div key={g.day} className="overflow-hidden rounded border border-[#d4af37]/15">
+                  <div className="bg-[#1a1208]/90 px-3 py-2 text-sm font-medium text-[#d4af37] tabular-nums">
+                    {g.day}{" "}
+                    <span className="ml-2 text-xs font-normal text-[#e8e0d5]/50">
+                      ({g.rows.length} payment{g.rows.length === 1 ? "" : "s"} ·{" "}
+                      {formatUsd(g.rows.reduce((s, r) => s + r.amountCents, 0))} total)
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                      <thead>
+                        <tr className="bg-[#0f0a06]/80 text-[#d4af37]/85">
+                          <StripeTh
+                            helpId="stripeProcessed"
+                            columnHelpId={columnHelpId}
+                            onColumnHelp={onColumnHelp}
+                            className="text-left"
+                          >
+                            Processed
+                          </StripeTh>
+                          <StripeTh
+                            helpId="stripeAmount"
+                            columnHelpId={columnHelpId}
+                            onColumnHelp={onColumnHelp}
+                            className="text-right"
+                          >
+                            Amount
+                          </StripeTh>
+                          <StripeTh
+                            helpId="stripeType"
+                            columnHelpId={columnHelpId}
+                            onColumnHelp={onColumnHelp}
+                            className="text-left"
+                          >
+                            Type
+                          </StripeTh>
+                          <StripeTh
+                            helpId="stripeRecipient"
+                            columnHelpId={columnHelpId}
+                            onColumnHelp={onColumnHelp}
+                            className="text-left"
+                          >
+                            Recipient
+                          </StripeTh>
+                          <StripeTh
+                            helpId="stripeEmail"
+                            columnHelpId={columnHelpId}
+                            onColumnHelp={onColumnHelp}
+                            className="text-left"
+                          >
+                            Email
+                          </StripeTh>
+                          <StripeTh
+                            helpId="stripeReservation"
+                            columnHelpId={columnHelpId}
+                            onColumnHelp={onColumnHelp}
+                            className="text-left font-mono text-[11px]"
+                          >
+                            Reservation ID
+                          </StripeTh>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {g.rows.map((p) => (
+                          <tr key={p.id} className="border-t border-[#d4af37]/10 text-[#e8e0d5]/90">
+                            <td className="whitespace-nowrap p-2 tabular-nums">
+                              {p.createdAt.slice(0, 19).replace("T", " ")}
+                            </td>
+                            <td className="p-2 text-right font-medium tabular-nums text-[#f0d48f]/95">
+                              {formatUsd(p.amountCents)}
+                            </td>
+                            <td className="p-2 capitalize">{formatPaymentType(p.paymentType)}</td>
+                            <td className="p-2">{p.recipientDisplayName}</td>
+                            <td className="max-w-[10rem] break-all p-2 sm:max-w-none">{p.memberEmail}</td>
+                            <td className="p-2 font-mono text-[11px] text-[#e8e0d5]/70">
+                              {p.reservationId ?? "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+              <p className="text-[11px] text-[#e8e0d5]/45">
+                Up to 500 payments per request. Row totals can differ slightly from the grid column if this list
+                hits the cap (full aggregate is in Overview / main table).
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {tab === "caretakers" ? (
+        <div className="space-y-6">
+          <div>
+            <h3 className="mb-2 font-serif text-lg text-[#f0d48f]">Assigned caretakers (Salesforce)</h3>
+            {camp.assignedCaretakers.length === 0 ? (
+              <p className="text-sm text-[#e8e0d5]/55">No roster rows mapped to this camp.</p>
+            ) : (
+              <ul className="space-y-2 text-sm text-[#e8e0d5]/85">
+                {camp.assignedCaretakers.map((r) => (
+                  <li key={r.contactId}>
+                    <span className="text-[#f0d48f]">{rosterName(r)}</span>
+                    {r.email ? <span className="text-[#e8e0d5]/55"> · {r.email}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {camp.checkInsLast30DaysByCaretaker.length > 0 ? (
+            <div>
+              <h3 className="mb-2 font-serif text-lg text-[#f0d48f]">Member check-ins (30 days) by caretaker</h3>
+              <ul className="space-y-1 text-sm text-[#e8e0d5]/85">
+                {camp.checkInsLast30DaysByCaretaker.map((b) => (
+                  <li key={b.caretakerContactId}>
+                    <span className="text-[#d4af37]/90">
+                      {idToName.get(b.caretakerContactId) ?? b.caretakerContactId}
+                    </span>
+                    {": "}
+                    <span className="tabular-nums">{b.count}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-sm text-[#e8e0d5]/55">No member check-ins in the last 30 days for this camp.</p>
+          )}
         </div>
       ) : null}
     </div>
