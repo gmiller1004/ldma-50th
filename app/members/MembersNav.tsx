@@ -8,7 +8,8 @@ import { User, LogOut, Map, FileEdit, Tent } from "lucide-react";
 export function MembersNav() {
   const router = useRouter();
   const [isLdmaAdmin, setIsLdmaAdmin] = useState(false);
-  const [isCaretaker, setIsCaretaker] = useState(false);
+  const [showCaretakerPortal, setShowCaretakerPortal] = useState(false);
+  const [caretakerNavLabel, setCaretakerNavLabel] = useState("Caretaker Portal");
 
   useEffect(() => {
     fetch("/api/members/me", { cache: "no-store" })
@@ -16,12 +17,16 @@ export function MembersNav() {
       .then((data) => {
         if (data && typeof data === "object") {
           setIsLdmaAdmin(data.isLdmaAdmin === true);
-          setIsCaretaker(data.isCaretaker === true);
+          const mode = data.caretakerPortalMode;
+          const show = mode === "admin" || mode === "camp";
+          setShowCaretakerPortal(show);
+          setCaretakerNavLabel(mode === "admin" ? "Caretaker Admin" : "Caretaker Portal");
         }
       })
       .catch(() => {
         setIsLdmaAdmin(false);
-        setIsCaretaker(false);
+        setShowCaretakerPortal(false);
+        setCaretakerNavLabel("Caretaker Portal");
       });
   }, []);
 
@@ -62,13 +67,13 @@ export function MembersNav() {
           Blog Admin
         </Link>
       )}
-      {isCaretaker && (
+      {showCaretakerPortal && (
         <Link
           href="/members/caretaker"
           className="flex items-center gap-2 text-[#e8e0d5]/80 hover:text-[#d4af37] transition-colors"
         >
           <Tent className="w-4 h-4" />
-          Caretaker Portal
+          {caretakerNavLabel}
         </Link>
       )}
       <button

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifySessionToken } from "@/lib/session";
 import { lookupMember, updateContact } from "@/lib/salesforce";
+import { caretakerCampToSlug } from "@/lib/caretaker-camps";
 import { getAvatarUrl } from "@/lib/avatars";
 import {
   getCommentDigestEnabled,
@@ -42,6 +43,8 @@ function minimalMePayload(memberNumber: string) {
     legacyOfferIsPrePay: false,
     isLdmaAdmin: false,
     isCaretaker: false,
+    isCaretakerAdmin: false,
+    caretakerPortalMode: null,
     caretakerAtCamp: null,
   };
 }
@@ -83,6 +86,16 @@ export async function GET() {
         ? `${paymentBase}${paymentBase.includes("?") ? "&" : "?"}amount=${member.duesOwed.toFixed(2)}`
         : paymentBase || null;
 
+    const isCaretakerAdmin = member.isCaretakerAdmin === true;
+    const hasMappedCampCaretaker =
+      member.isCaretaker === true &&
+      Boolean(member.caretakerAtCamp && caretakerCampToSlug(member.caretakerAtCamp));
+    const caretakerPortalMode: "admin" | "camp" | null = isCaretakerAdmin
+      ? "admin"
+      : hasMappedCampCaretaker
+        ? "camp"
+        : null;
+
     return NextResponse.json({
       authenticated: true,
       memberNumber: session.memberNumber,
@@ -113,6 +126,8 @@ export async function GET() {
       legacyOfferIsPrePay: member.isPrePayTransfer ?? false,
       isLdmaAdmin: member.isLdmaAdmin ?? false,
       isCaretaker: member.isCaretaker ?? false,
+      isCaretakerAdmin,
+      caretakerPortalMode,
       caretakerAtCamp: member.caretakerAtCamp ?? null,
     });
   } catch (e) {
