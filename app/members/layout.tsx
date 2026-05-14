@@ -9,7 +9,8 @@ export default function MembersLayout({
     <div className="min-h-screen bg-[#1a120b] text-[#e8e0d5]">
       <Navbar />
       <main className="pt-24 md:pt-28 pb-16">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6">
+        {/* Narrow on small screens for readability; from md up use nearly full width for data-heavy pages (e.g. caretaker admin). */}
+        <div className="mx-auto w-full max-w-2xl md:max-w-[min(88rem,calc(100vw-2rem))] px-4 sm:px-6">
           {children}
         </div>
       </main>

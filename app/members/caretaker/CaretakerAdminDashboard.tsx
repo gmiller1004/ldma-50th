@@ -190,19 +190,21 @@ function ThWithHelp({
   return (
     <th
       scope="col"
-      className="p-3 font-semibold text-center align-bottom max-w-[11rem]"
+      className="relative p-3 sm:p-3.5 font-semibold text-center align-bottom min-w-[6.5rem] lg:min-w-[7.75rem]"
       title={meta?.body}
     >
-      <div className="flex flex-col items-center gap-0.5">
-        <div className="flex items-start justify-center gap-0.5">
-          <span className="block text-[#d4af37]/95 leading-snug text-center">{title}</span>
-          <HeaderHelpButton helpId={helpId} currentId={columnHelpId} onToggle={onColumnHelp} />
-        </div>
+      <div className="flex min-h-[4.25rem] flex-col items-center justify-end px-1 pb-7">
+        <span className="text-balance text-center text-xs font-semibold leading-snug text-[#d4af37] sm:text-[13px]">
+          {title}
+        </span>
         {subtitle ? (
-          <span className="block mt-0.5 text-[11px] font-normal text-[#e8e0d5]/55 leading-tight max-w-[9.5rem] mx-auto">
+          <span className="text-balance mt-1 max-w-[14rem] text-center text-[10px] font-normal leading-snug text-[#e8e0d5]/55 sm:text-[11px]">
             {subtitle}
           </span>
         ) : null}
+      </div>
+      <div className="absolute bottom-1.5 right-1.5">
+        <HeaderHelpButton helpId={helpId} currentId={columnHelpId} onToggle={onColumnHelp} />
       </div>
     </th>
   );
@@ -217,9 +219,15 @@ function ThCampWithHelp({
 }) {
   const meta = COLUMN_HELP.camp;
   return (
-    <th scope="col" className="p-3 font-semibold text-left align-bottom" title={meta.body}>
-      <div className="inline-flex items-center gap-0.5">
-        <span className="text-[#d4af37]/95">Camp</span>
+    <th
+      scope="col"
+      className="relative min-w-[7.5rem] p-3 text-left align-bottom font-semibold lg:min-w-[9rem]"
+      title={meta.body}
+    >
+      <div className="flex min-h-[4.25rem] flex-col justify-end pb-7 pl-0.5">
+        <span className="text-[#d4af37]">Camp</span>
+      </div>
+      <div className="absolute bottom-1.5 right-1.5">
         <HeaderHelpButton helpId="camp" currentId={columnHelpId} onToggle={onColumnHelp} />
       </div>
     </th>
@@ -235,9 +243,14 @@ function ThExpandWithHelp({
 }) {
   const meta = COLUMN_HELP.expand;
   return (
-    <th scope="col" className="p-2 w-12 text-center align-middle" title={meta.body}>
-      <div className="flex flex-col items-center gap-0.5">
-        <span className="text-[10px] font-medium text-[#d4af37]/80 leading-none">Open</span>
+    <th scope="col" className="relative w-14 p-2 text-center align-bottom" title={meta.body}>
+      <span className="sr-only">Expand row for camp details</span>
+      <div className="flex min-h-[4.25rem] flex-col items-center justify-end pb-9">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-[#d4af37]/75">
+          Details
+        </span>
+      </div>
+      <div className="absolute bottom-1 left-1/2 flex -translate-x-1/2 justify-center">
         <HeaderHelpButton helpId="expand" currentId={columnHelpId} onToggle={onColumnHelp} />
       </div>
     </th>
@@ -439,9 +452,9 @@ export function CaretakerAdminDashboard() {
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-[#d4af37]/20">
-        <table className="w-full text-sm text-left border-collapse min-w-[920px]">
+        <table className="w-full min-w-[880px] border-collapse text-left text-sm sm:text-[0.9375rem]">
           <thead>
-            <tr className="bg-[#1a1208]/90 text-[#d4af37]/95 border-b border-[#d4af37]/25">
+            <tr className="border-b border-[#d4af37]/25 bg-[#1a1208]/90 text-[#d4af37]/95">
               <ThExpandWithHelp columnHelpId={columnHelpId} onColumnHelp={setColumnHelpId} />
               <ThCampWithHelp columnHelpId={columnHelpId} onColumnHelp={setColumnHelpId} />
               <ThWithHelp
@@ -488,11 +501,16 @@ export function CaretakerAdminDashboard() {
               />
               <th
                 scope="col"
-                className="p-3 font-semibold text-left align-bottom min-w-[11rem] max-w-[14rem]"
+                className="relative min-w-[12rem] p-3 text-left align-bottom font-semibold lg:min-w-[15rem]"
                 title={COLUMN_HELP.assigned.body}
               >
-                <div className="inline-flex items-center gap-0.5">
-                  <span className="block text-[#d4af37]/95">Assigned caretakers</span>
+                <div className="flex min-h-[4.25rem] flex-col justify-end pb-7 pr-8">
+                  <span className="text-balance text-[#d4af37]">Assigned caretakers</span>
+                  <span className="text-balance mt-1 text-[10px] font-normal leading-snug text-[#e8e0d5]/50 sm:text-[11px]">
+                    Salesforce roster
+                  </span>
+                </div>
+                <div className="absolute bottom-1.5 right-1.5">
                   <HeaderHelpButton helpId="assigned" currentId={columnHelpId} onToggle={setColumnHelpId} />
                 </div>
               </th>
@@ -587,12 +605,15 @@ function StripeTh({
   className?: string;
 }) {
   const meta = COLUMN_HELP[helpId];
+  const rightAlign = className.includes("text-right");
   return (
-    <th scope="col" className={`p-2 font-semibold ${className}`} title={meta?.body}>
+    <th scope="col" className={`relative p-2 pb-7 font-semibold ${className}`} title={meta?.body}>
       <div
-        className={`flex items-center gap-0.5 ${className.includes("text-right") ? "justify-end w-full" : ""}`}
+        className={`flex min-h-[2.5rem] items-end ${rightAlign ? "justify-end pr-8" : "justify-start pl-0.5 pr-8"}`}
       >
-        {children}
+        <span className={rightAlign ? "text-right" : ""}>{children}</span>
+      </div>
+      <div className={`absolute bottom-1 ${rightAlign ? "right-1" : "right-1"}`}>
         <HeaderHelpButton helpId={helpId} currentId={columnHelpId} onToggle={onColumnHelp} />
       </div>
     </th>
@@ -608,6 +629,111 @@ function groupStripeByDay(payments: StripePaymentRow[]): { day: string; rows: St
     else last.rows.push(p);
   }
   return groups;
+}
+
+function summarizeStripeRevenue(payments: StripePaymentRow[]) {
+  let reservationCents = 0;
+  let pastDueCents = 0;
+  let otherCents = 0;
+  let reservationCount = 0;
+  let pastDueCount = 0;
+  let otherCount = 0;
+  for (const p of payments) {
+    if (p.paymentType === "reservation") {
+      reservationCents += p.amountCents;
+      reservationCount += 1;
+    } else if (p.paymentType === "past_due") {
+      pastDueCents += p.amountCents;
+      pastDueCount += 1;
+    } else {
+      otherCents += p.amountCents;
+      otherCount += 1;
+    }
+  }
+  const totalCents = reservationCents + pastDueCents + otherCents;
+  const totalCount = payments.length;
+  return {
+    reservationCents,
+    pastDueCents,
+    otherCents,
+    totalCents,
+    reservationCount,
+    pastDueCount,
+    otherCount,
+    totalCount,
+  };
+}
+
+function StripeRevenueTotals({
+  payments,
+  appliedFrom,
+  appliedTo,
+}: {
+  payments: StripePaymentRow[];
+  appliedFrom: string;
+  appliedTo: string;
+}) {
+  const s = useMemo(() => summarizeStripeRevenue(payments), [payments]);
+  const rangeLabel =
+    appliedFrom && appliedTo
+      ? `${appliedFrom} through ${appliedTo}`
+      : appliedFrom
+        ? `from ${appliedFrom}`
+        : appliedTo
+          ? `through ${appliedTo}`
+          : "all loaded payments";
+
+  return (
+    <div className="mb-4 rounded-lg border border-[#d4af37]/20 bg-[#0f0a06]/55 p-4">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-[#d4af37]/85">
+        Totals for selected range ({rangeLabel})
+      </p>
+      <ul className="space-y-2 text-sm text-[#e8e0d5]/90">
+        <li className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[#d4af37]/10 pb-2">
+          <span>
+            Reservation revenue{" "}
+            <span className="text-[#e8e0d5]/50">
+              ({s.reservationCount} payment{s.reservationCount === 1 ? "" : "s"})
+            </span>
+          </span>
+          <span className="tabular-nums font-medium text-[#f0d48f]">{formatUsd(s.reservationCents)}</span>
+        </li>
+        <li className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[#d4af37]/10 pb-2">
+          <span>
+            Past-due revenue{" "}
+            <span className="text-[#e8e0d5]/50">
+              (maintenance / membership · {s.pastDueCount} payment{s.pastDueCount === 1 ? "" : "s"})
+            </span>
+          </span>
+          <span className="tabular-nums font-medium text-[#f0d48f]">{formatUsd(s.pastDueCents)}</span>
+        </li>
+        {s.otherCount > 0 ? (
+          <li className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[#d4af37]/10 pb-2">
+            <span>
+              Other / unknown type{" "}
+              <span className="text-[#e8e0d5]/50">
+                ({s.otherCount} payment{s.otherCount === 1 ? "" : "s"})
+              </span>
+            </span>
+            <span className="tabular-nums font-medium text-[#f0d48f]">{formatUsd(s.otherCents)}</span>
+          </li>
+        ) : null}
+        <li className="flex flex-wrap items-baseline justify-between gap-3 pt-1">
+          <span className="font-semibold text-[#f0d48f]">
+            Combined Stripe revenue{" "}
+            <span className="font-normal text-[#e8e0d5]/55">
+              ({s.totalCount} payment{s.totalCount === 1 ? "" : "s"})
+            </span>
+          </span>
+          <span className="tabular-nums text-lg font-semibold text-[#f0d48f]">{formatUsd(s.totalCents)}</span>
+        </li>
+      </ul>
+      <p className="mt-3 text-[11px] leading-snug text-[#e8e0d5]/45">
+        Amounts sum the Stripe Checkout sessions in this result. The list is capped at 500 rows; if you hit
+        that cap, totals include only those rows.
+      </p>
+    </div>
+  );
 }
 
 function CampExpandedPanel({
@@ -636,6 +762,7 @@ function CampExpandedPanel({
   useEffect(() => {
     let cancelled = false;
     setStripeLoading(true);
+    setStripePayments(null);
     setStripeError(null);
     const params = new URLSearchParams({ campSlug: camp.slug });
     if (appliedFrom) params.set("from", appliedFrom);
@@ -784,6 +911,14 @@ function CampExpandedPanel({
             Clear range
           </button>
         </div>
+
+        {!stripeLoading && !stripeError && stripePayments !== null ? (
+          <StripeRevenueTotals
+            payments={stripePayments}
+            appliedFrom={appliedFrom}
+            appliedTo={appliedTo}
+          />
+        ) : null}
 
         {stripeLoading ? (
           <div className="flex items-center gap-2 text-[#e8e0d5]/60 text-sm py-4">
