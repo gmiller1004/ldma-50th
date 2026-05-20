@@ -157,7 +157,7 @@ function getEventDates(product: EventProduct): EventDates {
     const parsed = parseDateRangeFromTitle(product.title);
     if (parsed) {
       startDate = parsed.startDate;
-      endDate = parsed.endDate;
+      endDate = parsed.endDate ?? parsed.startDate;
     }
   }
 
@@ -176,23 +176,72 @@ function getEventDates(product: EventProduct): EventDates {
   return result;
 }
 
-/** Try to parse "March 16-22" or "Mar 16 – 22, 2026" from title. Year from title or current year. */
-function parseDateRangeFromTitle(
+const TITLE_MONTH: Record<string, number> = {
+  jan: 0,
+  january: 0,
+  feb: 1,
+  february: 1,
+  mar: 2,
+  march: 2,
+  apr: 3,
+  april: 3,
+  may: 4,
+  jun: 5,
+  june: 5,
+  jul: 6,
+  july: 6,
+  aug: 7,
+  august: 7,
+  sep: 8,
+  sept: 8,
+  september: 8,
+  oct: 9,
+  october: 9,
+  nov: 10,
+  november: 10,
+  dec: 11,
+  december: 11,
+};
+
+function monthIndexFromName(token: string): number | undefined {
+  const key = token.toLowerCase().replace(/[^a-z]/g, "");
+  if (key.startsWith("sept")) return 8;
+  return TITLE_MONTH[key.slice(0, 3)] ?? TITLE_MONTH[key];
+}
+
+/** e.g. "Desert Chaos 2026 Week 2 - Sept 30 - Oct 3" */
+function parseCrossMonthDateRangeFromTitle(
   title: string
 ): { startDate: Date; endDate: Date } | null {
   const yearMatch = title.match(/\b(20\d{2})\b/);
   const year = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
-  const months: Record<string, number> = {
-    jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3,
-    may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7,
-    sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10,
-    dec: 11, december: 11,
-  };
+  const cross = title.match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})\s*[-–—]\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})\b/i
+  );
+  if (!cross) return null;
+  const mo1 = monthIndexFromName(cross[1]);
+  const mo2 = monthIndexFromName(cross[3]);
+  if (mo1 === undefined || mo2 === undefined) return null;
+  const startDay = parseInt(cross[2], 10);
+  const endDay = parseInt(cross[4], 10);
+  const startDate = new Date(year, mo1, startDay);
+  const endDate = new Date(year, mo2, endDay);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return null;
+  if (endDate < startDate) return null;
+  return { startDate, endDate };
+}
+
+/** Try to parse "March 16-22" or "Mar 16 – 22, 2026" from title (same month only). */
+function parseSameMonthDateRangeFromTitle(
+  title: string
+): { startDate: Date; endDate: Date } | null {
+  const yearMatch = title.match(/\b(20\d{2})\b/);
+  const year = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
   const monthNameMatch = title.match(
     /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)(?:uary|ruary|ch|il|e|y|tember|ober|ember)?\b/i
   );
   if (!monthNameMatch) return null;
-  const month = months[monthNameMatch[1].toLowerCase().slice(0, 3)];
+  const month = monthIndexFromName(monthNameMatch[1]);
   if (month === undefined) return null;
   const dayMatch = title.match(/(\d{1,2})\s*[-–—]\s*(\d{1,2})/);
   if (!dayMatch) return null;
@@ -202,6 +251,12 @@ function parseDateRangeFromTitle(
   const endDate = new Date(year, month, endDay);
   if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return null;
   return { startDate, endDate };
+}
+
+function parseDateRangeFromTitle(
+  title: string
+): { startDate: Date; endDate: Date } | null {
+  return parseCrossMonthDateRangeFromTitle(title) ?? parseSameMonthDateRangeFromTitle(title);
 }
 
 function formatDateRange(start: Date | null, end: Date | null): string | null {

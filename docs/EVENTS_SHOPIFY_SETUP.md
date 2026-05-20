@@ -45,7 +45,16 @@ Use ISO format (YYYY-MM-DD). For single-day events, only add the start date.
 
 ### 3. Title (fallback)
 
-Include the date range in the product title, e.g. **Dirt Fest Stanton 2026 - March 16-22**. The site will try to parse patterns like "March 16-22" or "Oct 5 – 11" from the title when metafields/tags are not available.
+Include the date range in the product title when metafields/tags are not set. Supported patterns:
+
+- Same month: **Dirt Fest Stanton 2026 - March 16-22** or **Sept 23-26**
+- Cross month: **Desert Chaos 2026 Week 2 - Sept 30 - Oct 3**
+
+The year is taken from `2026` in the title when present. For cross-month titles, both month names must appear (not only day numbers).
+
+### 4. URL handle (fallback)
+
+If the product **handle** ends with month-day-month-day segments, e.g. `desert-chaos-2026-week-2-sept-30-oct-3`, dates can be inferred when metafields/tags/title parsing are missing. A short handle like `desert-chaos-2026-week-2` alone is not enough.
 
 ---
 

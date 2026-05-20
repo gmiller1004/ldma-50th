@@ -5,66 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>LDMA Pre-Paid Maintenance Offer (25% Off)</title>
-  <style type="text/css">
-    body {
-      margin: 0;
-      padding: 0;
-      -webkit-text-size-adjust: 100%;
-      -ms-text-size-adjust: 100%;
-    }
-    table {
-      border-collapse: collapse;
-      mso-table-lspace: 0pt;
-      mso-table-rspace: 0pt;
-    }
-    td {
-      padding: 0;
-    }
-    img {
-      border: 0;
-      height: auto;
-      line-height: 100%;
-      outline: none;
-      text-decoration: none;
-      -ms-interpolation-mode: bicubic;
-    }
-    a {
-      color: #B8860B;
-    }
+  <!--
+    KLAVIYO CAMPAIGN / FLOW — Pre-Paid Maintenance 2026 (25% off)
+    -------------------------------------------------------------
+    1. Audience: LDMA members on the maintenance plan (segment by profile property
+       "Maintenance Fee" — values 10 or 8).
+    2. This template is conditional on Maintenance Fee:
+         - 8  → $96/year plan, links to /products/pre-paid-maintenance-dues-96-annual
+         - 10 → $120/year plan (default), links to /products/pre-paid-maintenance-dues-120-annual
+       Discount code PrePayMaint26 is the same for both groups (percentage code in Shopify).
+    3. The CTA uses the headless storefront's /discount/<code>?redirect=… route. This
+       auto-applies PrePayMaint26 to the customer's cart. See app/discount/[code]/route.ts.
+    4. To preview both variants in Klaviyo, use Preview → Choose Profile and pick a
+       profile from each segment, or temporarily change the property in Preview.
+
+    Klaviyo merge syntax used here:
+      {{ first_name|default:'there' }}
+      {{ person|lookup:'Maintenance Fee' }}
+      {% if ... %} ... {% else %} ... {% endif %}
+      {% unsubscribe_link %}
+  -->
+  <style>
+    *|MC_PREVIEW_TEXT|* { display: none !important; }
     @media only screen and (max-width: 600px) {
-      .content-pad {
-        padding-left: 20px !important;
-        padding-right: 20px !important;
-      }
-      .headline {
-        font-size: 20px !important;
-      }
-      .body-text {
-        font-size: 16px !important;
-      }
+      .content-pad { padding-left: 20px !important; padding-right: 20px !important; }
+      .headline { font-size: 20px !important; }
+      .body-text { font-size: 16px !important; }
       .payment-grid th,
-      .payment-grid td {
-        font-size: 12px !important;
-        padding: 8px !important;
-      }
-    }
-    *|MC_PREVIEW_TEXT|* {
-      display: none !important;
+      .payment-grid td { font-size: 12px !important; padding: 8px !important; }
     }
   </style>
 </head>
 <body style="margin:0; padding:0; background-color:#F5F6F0; font-family: Arial, Helvetica, sans-serif; color:#1C2526;">
-  <!-- Hidden preview text -->
+  <!-- Preheader (set duplicate copy in Klaviyo "Preview text" for clients that hide it) -->
   <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">
-    Lock in your $120/year maintenance dues for 1 to 5 years at 25% off. Use code PrePayMaint26 online or by phone.
+    {% if person|lookup:'Maintenance Fee'|floatformat:0 == "8" %}
+    Lock in your $96/year maintenance dues for 1 to 5 years at 25% off. Code PrePayMaint26.
+    {% else %}
+    Lock in your $120/year maintenance dues for 1 to 5 years at 25% off. Code PrePayMaint26.
+    {% endif %}
   </div>
+
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6F0;">
     <tr>
       <td align="center" style="padding:20px 16px 24px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background-color:#FFFFFF; border-radius:12px; overflow:hidden; border:1px solid #E0DCC8;">
-          <!-- Header: 50th anniversary logo (same asset as other myldma.com emails) -->
+
+          <!-- Header: 50th anniversary logo -->
           <tr>
-            <td mc:edit="header" style="padding:20px 28px 16px; text-align:center; border-bottom:1px solid #EEE9DC;">
+            <td style="padding:20px 28px 16px; text-align:center; border-bottom:1px solid #EEE9DC;">
               <a href="https://myldma.com/" style="text-decoration:none; display:inline-block;">
                 <img
                   src="https://myldma.com/images/global/50th-logo.png"
@@ -75,17 +64,28 @@
               </a>
             </td>
           </tr>
+
+          <!-- Intro copy -->
           <tr>
-            <td mc:edit="content" class="content-pad" style="padding:24px 28px 4px; text-align:left;">
+            <td class="content-pad" style="padding:24px 28px 4px; text-align:left;">
               <h1 class="headline" style="margin:0 0 14px; font-size:22px; line-height:1.3; font-weight:bold; color:#1C2526; text-align:left;">
-                Limited-time pre-paid maintenance savings, *|FNAME|*!
+                Limited-time pre-paid maintenance savings, {{ first_name|default:'there' }}!
               </h1>
+
+              {% if person|lookup:'Maintenance Fee'|floatformat:0 == "8" %}
+              <p class="body-text" style="margin:0 0 14px; font-size:17px; line-height:1.55; color:#1C2526;">
+                Lock in your <strong>$96/year</strong> maintenance dues for 1 to 5 years at a <strong>25% discount</strong>. Pre-pay for 5 years and save <strong>$120</strong>&mdash;perfect for funding more trips to our gold-rich claims.
+              </p>
+              {% else %}
               <p class="body-text" style="margin:0 0 14px; font-size:17px; line-height:1.55; color:#1C2526;">
                 Lock in your <strong>$120/year</strong> maintenance dues for 1 to 5 years at a <strong>25% discount</strong>. Pre-pay for 5 years and save <strong>$150</strong>&mdash;perfect for funding more trips to our gold-rich claims.
               </p>
+              {% endif %}
+
               <p class="body-text" style="margin:0 0 14px; font-size:16px; line-height:1.55; color:#444444;">
                 <strong>Already pre-paid?</strong> If you used an offer like this before and you&rsquo;re paid out for several years, you&rsquo;re in good shape&mdash;no need to do anything. If you&rsquo;d simply like to extend your pre-paid window further, you&rsquo;re welcome to use this promotion again; call <a href="tel:+18884653717" style="color:#B8860B; font-weight:bold; text-decoration:none;">(888) 465-3717</a> and we&rsquo;ll help line it up with what you already have on file.
               </p>
+
               <p class="body-text" style="margin:0 0 14px; font-size:17px; line-height:1.55; color:#1C2526;">
                 Pay online, by phone at <a href="tel:+18884653717" style="color:#B8860B; font-weight:bold; text-decoration:none;">(888) 465-3717</a>, or mail a check to <strong>PO Box 891509, Temecula, CA 92589</strong>. Use this code for online or phone payments:
               </p>
@@ -94,6 +94,8 @@
               </p>
             </td>
           </tr>
+
+          <!-- Pricing grid (dynamic per Maintenance Fee) -->
           <tr>
             <td class="content-pad" style="padding:12px 28px 16px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6F0; border-radius:10px; border:1px solid #E0DCC8;">
@@ -102,7 +104,44 @@
                     <p class="body-text" style="margin:0 0 12px; font-size:15px; font-weight:bold; color:#1C2526;">
                       Pre-paid amounts for mailing checks (with 25% discount)
                     </p>
-                    <table role="presentation" class="payment-grid" width="100%" cellpadding="0" cellspacing="0" mc:edit="payment-grid" style="border-collapse:collapse; text-align:center;">
+
+                    {% if person|lookup:'Maintenance Fee'|floatformat:0 == "8" %}
+                    <!-- $96/year plan -->
+                    <table role="presentation" class="payment-grid" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; text-align:center;">
+                      <tr>
+                        <th style="padding:8px 10px; font-size:14px; color:#1C2526; border:1px solid #E0DCC8; background-color:#EEE9DC; font-weight:bold;">Term</th>
+                        <th style="padding:8px 10px; font-size:14px; color:#1C2526; border:1px solid #E0DCC8; background-color:#EEE9DC; font-weight:bold;">Amount</th>
+                        <th style="padding:8px 10px; font-size:14px; color:#1C2526; border:1px solid #E0DCC8; background-color:#EEE9DC; font-weight:bold;">Savings</th>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">1 Year</td>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$72</td>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$24</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">2 Years</td>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$144</td>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$48</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">3 Years</td>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$216</td>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$72</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">4 Years</td>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$288</td>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$96</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">5 Years</td>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$360</td>
+                        <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$120</td>
+                      </tr>
+                    </table>
+                    {% else %}
+                    <!-- $120/year plan (default) -->
+                    <table role="presentation" class="payment-grid" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; text-align:center;">
                       <tr>
                         <th style="padding:8px 10px; font-size:14px; color:#1C2526; border:1px solid #E0DCC8; background-color:#EEE9DC; font-weight:bold;">Term</th>
                         <th style="padding:8px 10px; font-size:14px; color:#1C2526; border:1px solid #E0DCC8; background-color:#EEE9DC; font-weight:bold;">Amount</th>
@@ -134,23 +173,34 @@
                         <td style="padding:8px 10px; font-size:14px; color:#333333; border:1px solid #E0DCC8; background-color:#FFFFFF;">$150</td>
                       </tr>
                     </table>
+                    {% endif %}
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
+
+          <!-- CTA (dynamic product handle, auto-apply discount route) -->
           <tr>
             <td class="content-pad" style="padding:4px 28px 20px; text-align:center;">
+              {% if person|lookup:'Maintenance Fee'|floatformat:0 == "8" %}
+              <a
+                href="https://myldma.com/discount/PrePayMaint26?redirect=/products/pre-paid-maintenance-dues-96-annual"
+                style="display:inline-block; background-color:#B8860B; color:#FFFFFF; font-size:18px; font-weight:bold; padding:16px 32px; text-decoration:none; border-radius:8px;"
+              >Pre-pay now &amp; save up to $120</a>
+              {% else %}
               <a
                 href="https://myldma.com/discount/PrePayMaint26?redirect=/products/pre-paid-maintenance-dues-120-annual"
-                mc:edit="cta1"
-                style="display:inline-block; background-color:#B8860B; color:#FFFFFF !important; font-size:18px; font-weight:bold; padding:16px 32px; text-decoration:none; border-radius:8px;"
+                style="display:inline-block; background-color:#B8860B; color:#FFFFFF; font-size:18px; font-weight:bold; padding:16px 32px; text-decoration:none; border-radius:8px;"
               >Pre-pay now &amp; save up to $150</a>
+              {% endif %}
               <p class="body-text" style="margin:10px 0 0; font-size:13px; line-height:1.45; color:#555555;">
                 This link applies <strong>PrePayMaint26</strong> to your cart automatically. You can also enter the code at checkout.
               </p>
             </td>
           </tr>
+
+          <!-- Auto-pay note -->
           <tr>
             <td class="content-pad" style="padding:0 28px 20px; text-align:left;">
               <p class="body-text" style="margin:0; font-size:14px; line-height:1.5; color:#555555;">
@@ -158,8 +208,10 @@
               </p>
             </td>
           </tr>
+
+          <!-- Footer -->
           <tr>
-            <td mc:edit="footer" style="padding:16px 28px 20px; text-align:center; font-size:12px; line-height:1.5; color:#666666; border-top:1px solid #EEE9DC; background-color:#FAFAF8;">
+            <td style="padding:16px 28px 20px; text-align:center; font-size:12px; line-height:1.5; color:#666666; border-top:1px solid #EEE9DC; background-color:#FAFAF8;">
               <p style="margin:0 0 6px;">
                 Lost Dutchman&rsquo;s Mining Association &middot; 43105 Business Park Drive, Temecula, CA 92590
               </p>
@@ -168,16 +220,14 @@
               </p>
               <p style="margin:0 0 6px;">&copy; 2026 LDMA. All rights reserved.</p>
               <p style="margin:0;">
-                <a href="*|UNSUB|*" style="color:#B8860B;">Unsubscribe</a>
-                &nbsp;|&nbsp;
-                <a href="*|UPDATE_PROFILE|*" style="color:#B8860B;">Update preferences</a>
+                <a href="{% unsubscribe_link %}" style="color:#B8860B;">Unsubscribe</a>
               </p>
             </td>
           </tr>
+
         </table>
       </td>
     </tr>
   </table>
-  <img src="*|MC:PIXEL|*" style="display:none;" width="1" height="1" alt="">
 </body>
 </html>

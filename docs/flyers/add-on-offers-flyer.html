@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LDMA Add-On Offers Flyer (8x10.5, double-sided)</title>
+    <style>
+      :root {
+        /* Brand palette (matches in-app membership modal) */
+        --bg: #1a120b;
+        --panel: rgba(212, 175, 55, 0.12);
+        --border: rgba(212, 175, 55, 0.35);
+        --gold: #d4af37;
+        --gold-2: #f0d48f;
+        --text: rgba(232, 224, 213, 0.92);
+        --muted: rgba(232, 224, 213, 0.7);
+        --success: #6dd472;
+        --ink: #0b0704;
+        --shadow: rgba(0, 0, 0, 0.55);
+        --radius: 18px;
+
+        /* Print specs */
+        --trim-w: 8in;
+        --trim-h: 10.5in;
+        --bleed: 0.125in; /* standard 1/8" bleed */
+        --safe: 0.3in; /* keep key content inside this */
+      }
+
+      @page {
+        /* We include bleed in the page size so exported PDF contains it. */
+        size: calc(var(--trim-w) + 2 * var(--bleed)) calc(var(--trim-h) + 2 * var(--bleed));
+        margin: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #111;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          Helvetica,
+          Arial,
+          "Apple Color Emoji",
+          "Segoe UI Emoji";
+        color: var(--text);
+      }
+
+      .sheet {
+        width: calc(var(--trim-w) + 2 * var(--bleed));
+        height: calc(var(--trim-h) + 2 * var(--bleed));
+        page-break-after: always;
+        position: relative;
+        overflow: hidden;
+        background: radial-gradient(110% 70% at 20% 10%, rgba(240, 212, 143, 0.14), transparent 55%),
+          radial-gradient(80% 55% at 80% 30%, rgba(212, 175, 55, 0.12), transparent 60%),
+          linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.42)),
+          var(--bg);
+      }
+
+      .trim-area {
+        position: absolute;
+        left: var(--bleed);
+        top: var(--bleed);
+        width: var(--trim-w);
+        height: var(--trim-h);
+      }
+
+      .content {
+        position: absolute;
+        left: calc(var(--bleed) + var(--safe));
+        top: calc(var(--bleed) + var(--safe));
+        width: calc(var(--trim-w) - 2 * var(--safe));
+        height: calc(var(--trim-h) - 2 * var(--safe));
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 260px;
+      }
+
+      .logo-img {
+        width: 170px;
+        height: 44px;
+        object-fit: contain;
+        object-position: left center;
+        filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.35));
+      }
+
+      .logo-mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, rgba(212, 175, 55, 0.28), rgba(240, 212, 143, 0.12));
+        border: 1px solid rgba(212, 175, 55, 0.5);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+        display: grid;
+        place-items: center;
+        color: var(--gold);
+        font-weight: 800;
+        letter-spacing: 0.5px;
+      }
+
+      .logo-text {
+        line-height: 1.05;
+      }
+      .logo-text .brand {
+        font-weight: 800;
+        color: var(--gold-2);
+        letter-spacing: 0.4px;
+      }
+      .logo-text .sub {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .badge {
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(212, 175, 55, 0.45);
+        background: rgba(212, 175, 55, 0.12);
+        color: var(--gold-2);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+      }
+
+      h1 {
+        margin: 0;
+        font-family:
+          ui-serif,
+          Georgia,
+          Cambria,
+          "Times New Roman",
+          Times,
+          serif;
+        font-size: 35px;
+        line-height: 1.06;
+        color: var(--gold-2);
+        letter-spacing: 0.2px;
+      }
+
+      .lede {
+        margin-top: 6px;
+        font-size: 14.3px;
+        color: var(--muted);
+        line-height: 1.45;
+        max-width: 700px;
+      }
+
+      .storyband {
+        border-radius: var(--radius);
+        border: 1px solid rgba(212, 175, 55, 0.25);
+        background: rgba(0, 0, 0, 0.14);
+        box-shadow: 0 18px 40px var(--shadow);
+        padding: 11px;
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .storyband h2 {
+        margin: 0;
+        font-family:
+          ui-serif,
+          Georgia,
+          Cambria,
+          "Times New Roman",
+          Times,
+          serif;
+        font-size: 18px;
+        color: rgba(240, 212, 143, 0.98);
+        letter-spacing: 0.2px;
+      }
+
+      .storyband p {
+        margin: 7px 0 0;
+        font-size: 12.6px;
+        line-height: 1.45;
+        color: rgba(232, 224, 213, 0.82);
+      }
+
+      .micro {
+        margin-top: 7px;
+        display: grid;
+        gap: 5px;
+      }
+
+      .micro .row {
+        display: grid;
+        grid-template-columns: 90px 1fr;
+        gap: 10px;
+        align-items: start;
+        padding: 6px 10px;
+        border-radius: 14px;
+        border: 1px solid rgba(212, 175, 55, 0.18);
+        background: rgba(0, 0, 0, 0.16);
+      }
+
+      .micro .tag {
+        font-size: 11.5px;
+        font-weight: 900;
+        letter-spacing: 0.2px;
+        color: rgba(240, 212, 143, 0.92);
+      }
+
+      .micro .txt {
+        font-size: 12.3px;
+        line-height: 1.35;
+        color: rgba(232, 224, 213, 0.78);
+      }
+
+      .hint {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(212, 175, 55, 0.22);
+        background: rgba(0, 0, 0, 0.16);
+      }
+
+      .hint .t {
+        margin: 0;
+        font-weight: 900;
+        color: rgba(240, 212, 143, 0.96);
+        font-size: 12.8px;
+        letter-spacing: 0.2px;
+      }
+
+      .hint .b {
+        margin: 7px 0 0;
+        color: rgba(232, 224, 213, 0.78);
+        font-size: 12.4px;
+        line-height: 1.35;
+      }
+
+      .img-ph {
+        border-radius: var(--radius);
+        border: 1px solid rgba(212, 175, 55, 0.28);
+        background:
+          radial-gradient(120% 100% at 20% 10%, rgba(240, 212, 143, 0.14), transparent 55%),
+          linear-gradient(135deg, rgba(212, 175, 55, 0.14), rgba(0, 0, 0, 0.22));
+        box-shadow: 0 18px 40px var(--shadow);
+        position: relative;
+        overflow: hidden;
+        min-height: 120px;
+      }
+
+      .img-ph::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(135deg, transparent 0 46%, rgba(240, 212, 143, 0.25) 46% 54%, transparent 54% 100%),
+          linear-gradient(45deg, transparent 0 46%, rgba(212, 175, 55, 0.18) 46% 54%, transparent 54% 100%);
+        opacity: 0.18;
+        pointer-events: none;
+      }
+
+      .img-ph .cap {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: 10px;
+        font-size: 11.5px;
+        line-height: 1.3;
+        color: rgba(232, 224, 213, 0.78);
+      }
+
+      .img-ph img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        filter: contrast(1.05) brightness(0.95);
+      }
+
+      .img-ph.has-image::before {
+        /* keep subtle diagonal overlay */
+        opacity: 0.14;
+      }
+
+      .img-ph.has-image .cap {
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(212, 175, 55, 0.18);
+        backdrop-filter: blur(6px);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        flex: 1;
+        margin-top: 6px;
+      }
+
+      .card {
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.18);
+        box-shadow: 0 18px 40px var(--shadow);
+        overflow: hidden;
+      }
+
+      .card-inner {
+        padding: 12px 12px 10px;
+      }
+
+      .card h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 900;
+        letter-spacing: 0.2px;
+        color: rgba(232, 224, 213, 0.96);
+      }
+
+      .card .eyebrow {
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.2px;
+        color: rgba(240, 212, 143, 0.92);
+        margin-bottom: 6px;
+      }
+
+      .desc {
+        margin: 0;
+        font-size: 12.8px;
+        line-height: 1.35;
+        color: rgba(232, 224, 213, 0.78);
+      }
+
+      .bullets {
+        margin: 8px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 5px;
+      }
+
+      .bullets li {
+        display: grid;
+        grid-template-columns: 10px 1fr;
+        gap: 8px;
+        align-items: start;
+        color: rgba(232, 224, 213, 0.8);
+        font-size: 12.4px;
+        line-height: 1.28;
+      }
+
+      .bullets li::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 4px;
+        margin-top: 2px;
+        background: rgba(212, 175, 55, 0.28);
+        border: 1px solid rgba(212, 175, 55, 0.5);
+      }
+
+      .footer {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(212, 175, 55, 0.25);
+      }
+
+      .fineprint {
+        font-size: 10.5px;
+        line-height: 1.35;
+        color: rgba(232, 224, 213, 0.62);
+        max-width: 520px;
+      }
+
+      .cta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .qr {
+        width: 104px;
+        height: 104px;
+        padding: 8px;
+        border-radius: 12px;
+        background: #fff;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(0, 0, 0, 0.15);
+      }
+
+      .qr img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        image-rendering: pixelated;
+      }
+
+      .cta-text .label {
+        font-weight: 900;
+        color: var(--gold-2);
+        letter-spacing: 0.2px;
+      }
+      .cta-text .url {
+        margin-top: 3px;
+        font-size: 12px;
+        color: rgba(232, 224, 213, 0.78);
+      }
+
+      /* Back side */
+      .back-hero {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 16px;
+        flex: 1;
+      }
+
+      .panel {
+        border-radius: var(--radius);
+        border: 1px solid rgba(212, 175, 55, 0.35);
+        background: rgba(212, 175, 55, 0.08);
+        box-shadow: 0 18px 40px var(--shadow);
+        padding: 16px;
+      }
+
+      .panel h2 {
+        margin: 0;
+        font-family:
+          ui-serif,
+          Georgia,
+          Cambria,
+          "Times New Roman",
+          Times,
+          serif;
+        font-size: 22px;
+        color: var(--gold-2);
+        letter-spacing: 0.2px;
+      }
+
+      .panel p {
+        margin: 10px 0 0;
+        font-size: 13px;
+        line-height: 1.45;
+        color: rgba(232, 224, 213, 0.78);
+      }
+
+      .site-list {
+        margin: 12px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 10px;
+      }
+
+      .site-item {
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(212, 175, 55, 0.25);
+        background: rgba(0, 0, 0, 0.18);
+      }
+
+      .site-item .t {
+        margin: 0;
+        font-weight: 900;
+        color: rgba(240, 212, 143, 0.96);
+        font-size: 13.2px;
+      }
+
+      .site-item .b {
+        margin: 7px 0 0;
+        color: rgba(232, 224, 213, 0.78);
+        font-size: 12.4px;
+        line-height: 1.35;
+      }
+
+      .steps {
+        margin-top: 12px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 26px 1fr;
+        gap: 10px;
+        align-items: start;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(212, 175, 55, 0.25);
+        background: rgba(0, 0, 0, 0.18);
+      }
+
+      .step .num {
+        width: 26px;
+        height: 26px;
+        border-radius: 9px;
+        background: rgba(212, 175, 55, 0.18);
+        border: 1px solid rgba(212, 175, 55, 0.45);
+        color: var(--gold-2);
+        display: grid;
+        place-items: center;
+        font-weight: 900;
+        font-size: 13px;
+      }
+
+      .step .txt {
+        font-size: 12.6px;
+        line-height: 1.35;
+        color: rgba(232, 224, 213, 0.82);
+      }
+
+      .contact {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(212, 175, 55, 0.25);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .contact .item {
+        font-size: 12.5px;
+        color: rgba(232, 224, 213, 0.8);
+      }
+
+      .contact strong {
+        color: var(--gold-2);
+      }
+
+      /* Non-print helpers */
+      @media screen {
+        body {
+          padding: 18px;
+        }
+
+        .sheet {
+          margin: 0 auto 18px;
+          border-radius: 18px;
+          outline: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .trim-area {
+          outline: 1px dashed rgba(255, 255, 255, 0.16);
+        }
+      }
+
+      @media print {
+        body {
+          padding: 0;
+          background: transparent;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- FRONT (Side A) -->
+    <section class="sheet" aria-label="Front side">
+      <div class="trim-area" aria-hidden="true"></div>
+      <div class="content">
+        <div class="topbar">
+          <div class="logo">
+            <img class="logo-img" alt="LDMA 50th logo" src="../../public/images/50th-logo.png" />
+            <div class="logo-text">
+              <div class="brand">LDMA</div>
+              <div class="sub">Member Add‑Ons</div>
+            </div>
+          </div>
+          <div class="badge">Available to LDMA Members</div>
+        </div>
+
+        <div>
+          <h1>Your Membership • Your Legacy</h1>
+          <div class="lede">
+            These optional add‑ons are available to LDMA Members — and your best options can depend on what you already have.
+          </div>
+        </div>
+
+        <div class="storyband">
+          <div>
+            <h2>The adventure you joined for — and the legacy you’ll leave</h2>
+            <p>
+              The best part of LDMA isn’t just the gold — it’s the stories. First pans. First nuggets. Campfire laughs.
+              The road trips and the friendships that start with “Where are you from?” and end with “See you next season.”
+              These add‑ons are here to help you enjoy more of that now — and to pass it down when the time comes.
+            </p>
+            <div class="micro" aria-label="Story-driven callouts">
+              <div class="row">
+                <div class="tag">For today</div>
+                <div class="txt">Bring family into the adventure with more flexibility.</div>
+              </div>
+              <div class="row">
+                <div class="tag">For tomorrow</div>
+                <div class="txt">Make a clear plan for who receives your membership later.</div>
+              </div>
+              <div class="row">
+                <div class="tag">For family</div>
+                <div class="txt">Lighten the load by handling the transfer fee ahead of time.</div>
+              </div>
+            </div>
+          </div>
+          <div class="img-ph has-image" aria-label="Front image: Oconee">
+            <img
+              src="../../public/images/campgrounds/oconee-south-carolina/oconee-2.jpg"
+              alt="Oconee camp photo"
+              style="object-position: 32% 50%"
+            />
+            <div class="cap">
+              Oconee — a day on the water, a little work, and a lot of memories.
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <!-- Offer 1 -->
+          <article class="card">
+            <div class="card-inner">
+              <div class="eyebrow">Companion Add‑On</div>
+              <h3>More flexibility for family travel</h3>
+              <p class="desc">
+                Add a spouse or eligible family member so they can visit camps and prospect on their own schedule.
+              </p>
+              <ul class="bullets">
+                <li>Ideal for separate trips or different arrival dates</li>
+                <li>Great when schedules don’t line up</li>
+              </ul>
+            </div>
+          </article>
+
+          <!-- Offer 2 -->
+          <article class="card">
+            <div class="card-inner">
+              <div class="eyebrow">Transferability Add‑On</div>
+              <h3>Protect your membership for the future</h3>
+              <p class="desc">
+                Designate who receives your membership later. A simple way to plan ahead and protect your family.
+              </p>
+              <ul class="bullets">
+                <li>Choose an heir for your membership</li>
+                <li>Peace of mind for your family</li>
+              </ul>
+            </div>
+          </article>
+
+          <!-- Offer 3 -->
+          <article class="card">
+            <div class="card-inner">
+              <div class="eyebrow">Pre‑Paid Transfer Fee Add‑On</div>
+              <h3>Make it easier on your family</h3>
+              <p class="desc">
+                Pre‑pay the transfer fee so your family doesn’t have to handle it later. One less burden.
+              </p>
+              <ul class="bullets">
+                <li>A thoughtful “future-proof” add‑on</li>
+                <li>Helpful when you’re planning ahead</li>
+              </ul>
+            </div>
+          </article>
+
+          <!-- CTA block -->
+          <article class="card">
+            <div class="card-inner">
+              <div class="eyebrow">See what’s available for YOU</div>
+              <h3>Log in to view your custom offers</h3>
+              <p class="desc">
+                Your best options can depend on what’s already on your membership. Log in to see what’s available for you.
+              </p>
+              <div style="display: flex; gap: 12px; align-items: center; margin-top: 12px">
+                <div class="qr" aria-label="QR code to myldma.com/family-legacy">
+                  <img
+                    src="../../public/images/family-legacy-qr.png"
+                    alt="QR code: https://myldma.com/family-legacy"
+                  />
+                </div>
+                <div style="flex: 1">
+                  <div class="cta-text">
+                    <div class="label">myldma.com/family-legacy</div>
+                    <div class="url">Questions? Call Member Relations: (888) 465‑3717</div>
+                  </div>
+                  <ul class="bullets" style="margin-top: 10px">
+                    <li>Sign in using your LDMA member number</li>
+                    <li>Don’t have it handy? It’s on the address block of your magazine cover</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="footer"></div>
+      </div>
+    </section>
+
+    <!-- BACK (Side B) -->
+    <section class="sheet" aria-label="Back side">
+      <div class="trim-area" aria-hidden="true"></div>
+      <div class="content">
+        <div class="topbar">
+          <div class="logo">
+            <img class="logo-img" alt="LDMA 50th logo" src="../../public/images/50th-logo.png" />
+            <div class="logo-text">
+              <div class="brand">LDMA</div>
+              <div class="sub">Now on myLDMA.com</div>
+            </div>
+          </div>
+          <div class="badge">Celebrating 50 years • 1976 → 2026</div>
+        </div>
+
+        <div class="storyband" aria-label="50 years story">
+          <div>
+            <h2>50 years of gold, discovery, and adventure</h2>
+            <p>
+              LDMA started in 1976 with a simple idea: get families out into the outdoors, on gold‑bearing land, with a
+              community that feels like family. myLDMA.com is a new home for that same spirit — with member tools,
+              camp info, and real stories from real trips.
+            </p>
+            <div class="micro" aria-label="What’s inside">
+              <div class="row">
+                <div class="tag">Members</div>
+                <div class="txt">Manage your profile and membership details in one place.</div>
+              </div>
+              <div class="row">
+                <div class="tag">Community</div>
+                <div class="txt">Share trip reports, swap tips, and join discussions with other members.</div>
+              </div>
+              <div class="row">
+                <div class="tag">Camps</div>
+                <div class="txt">Browse camp details and start planning your next adventure.</div>
+              </div>
+            </div>
+          </div>
+          <div class="img-ph has-image" aria-label="Back image: George at Italian Bar">
+            <img
+              src="../../public/images/home/hero-george-italian-bar.jpg"
+              alt="Historic Italian Bar camp photo"
+            />
+            <div class="cap">
+              Italian Bar — where the story began.
+            </div>
+          </div>
+        </div>
+
+        <div class="back-hero">
+          <div class="panel">
+            <h2>Welcome to the new myLDMA.com</h2>
+            <p>
+              We built myLDMA.com to make it easier to get more out of your membership — and to celebrate
+              <strong>50 years of gold, discovery, and adventure</strong>.
+            </p>
+            <div class="steps" role="list">
+              <div class="step" role="listitem">
+                <div class="num">1</div>
+                <div class="txt">
+                  <strong>Log in with your member number</strong>.
+                  Don’t have it handy? It’s on the address block of your magazine cover.
+                </div>
+              </div>
+              <div class="step" role="listitem">
+                <div class="num">2</div>
+                <div class="txt"><strong>Explore the Members section</strong> to manage your profile and membership.</div>
+              </div>
+              <div class="step" role="listitem">
+                <div class="num">3</div>
+                <div class="txt">
+                  <strong>Browse Camp Directory & Community</strong> to check out camps, share trip reports, and join discussions.
+                </div>
+              </div>
+            </div>
+
+            <div class="hint" aria-label="Member number help">
+              <p class="t">Member number tip</p>
+              <p class="b">
+                Look at the <strong>address block</strong> on the front cover of your Gold Prospectors Magazine.
+                Your member number is printed there.
+              </p>
+            </div>
+
+            <div class="contact">
+              <div class="item"><strong>Members</strong>: myldma.com/members</div>
+              <div class="item"><strong>Help</strong>: (888) 465‑3717</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>What you can do on the site</h2>
+            <p>
+              Here are a few member favorites to start with:
+            </p>
+            <ul class="site-list" aria-label="Site highlights">
+              <li class="site-item">
+                <p class="t">Member Dashboard</p>
+                <p class="b">Manage your profile and membership information.</p>
+              </li>
+              <li class="site-item">
+                <p class="t">Camp Directory & Community</p>
+                <p class="b">Browse camps, share trip reports, and join discussions with other members.</p>
+              </li>
+              <li class="site-item">
+                <p class="t">Exclusive Offers for LDMA Members</p>
+                <p class="b">Check back often — member-only deals come and go.</p>
+              </li>
+            </ul>
+
+            <div style="margin-top: 14px" class="cta">
+              <div class="qr" aria-label="QR code to myldma.com/family-legacy">
+                <img
+                  src="../../public/images/family-legacy-qr.png"
+                  alt="QR code: https://myldma.com/family-legacy"
+                />
+              </div>
+              <div class="cta-text">
+                <div class="label">Scan to get started</div>
+                <div class="url">myldma.com/members • myldma.com/directory</div>
+              </div>
+            </div>
+
+            <div style="margin-top: 10px" class="fineprint">
+              Want to see your camp photo featured? Send us a favorite trip shot and a short note about your adventure.
+            </div>
+          </div>
+        </div>
+
+        <div class="footer"></div>
+      </div>
+    </section>
+  </body>
+</html>
+

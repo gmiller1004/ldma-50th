@@ -1,0 +1,1268 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LDMA Lifetime Membership Bundle Flyer (8×10.5, double-sided)</title>
+    <style>
+      :root {
+        --bg: #1a120b;
+        --gold: #d4af37;
+        --gold-2: #f0d48f;
+        --text: rgba(232, 224, 213, 0.92);
+        --muted: rgba(232, 224, 213, 0.72);
+        --shadow: rgba(0, 0, 0, 0.55);
+        --radius: 14px;
+        --orange: #c45c1a;
+        --orange-2: #e8742d;
+        --trim-w: 8in;
+        --trim-h: 10.5in;
+        --bleed: 0.125in;
+        --safe: 0.28in;
+      }
+
+      @page {
+        size: calc(var(--trim-w) + 2 * var(--bleed)) calc(var(--trim-h) + 2 * var(--bleed));
+        margin: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #111;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          Helvetica,
+          Arial;
+        color: var(--text);
+      }
+
+      .sheet {
+        width: calc(var(--trim-w) + 2 * var(--bleed));
+        height: calc(var(--trim-h) + 2 * var(--bleed));
+        page-break-after: always;
+        position: relative;
+        overflow: hidden;
+        background: radial-gradient(110% 70% at 20% 10%, rgba(240, 212, 143, 0.12), transparent 55%),
+          linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.38)),
+          var(--bg);
+      }
+
+      .trim-area {
+        position: absolute;
+        left: var(--bleed);
+        top: var(--bleed);
+        width: var(--trim-w);
+        height: var(--trim-h);
+      }
+
+      .content {
+        position: absolute;
+        left: calc(var(--bleed) + var(--safe));
+        top: calc(var(--bleed) + var(--safe));
+        width: calc(var(--trim-w) - 2 * var(--safe));
+        height: calc(var(--trim-h) - 2 * var(--safe));
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .content--front {
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .front-hero {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        flex-shrink: 0;
+      }
+
+      .content--front .kicker {
+        margin-bottom: 5px;
+      }
+
+      .content--front .sub {
+        margin-top: 7px;
+      }
+
+      .content--front .storyband {
+        padding: 12px 14px;
+        gap: 12px;
+      }
+
+      .content--front .storyband .story-img {
+        min-height: 96px;
+      }
+
+      .content--front .storyband .story p {
+        font-size: 10.75px;
+        line-height: 1.42;
+      }
+
+      .content--front .price-ribbon {
+        padding: 11px 14px;
+      }
+
+      .content--front .benefits-grid {
+        gap: 10px;
+      }
+
+      .content--front .benefit {
+        padding: 9px 11px;
+        font-size: 9.5px;
+        line-height: 1.34;
+      }
+
+      .content--front .benefit h3 {
+        font-size: 10.5px;
+        margin-bottom: 4px;
+      }
+
+      .camps-section {
+        flex-shrink: 0;
+      }
+
+      .camps-kicker {
+        margin: 0 0 8px;
+        text-align: center;
+        font-size: 9.5px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(240, 212, 143, 0.88);
+      }
+
+      .camps-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+      }
+
+      .camp-card {
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid rgba(212, 175, 55, 0.28);
+        background: rgba(0, 0, 0, 0.16);
+      }
+
+      .camp-photo {
+        position: relative;
+        height: 50px;
+        overflow: hidden;
+        background: #0f3d1e;
+      }
+
+      .camp-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .camp-photo::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgba(26, 18, 11, 0.55) 0%, transparent 45%);
+        pointer-events: none;
+      }
+
+      .camp-state {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        z-index: 1;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(212, 175, 55, 0.92);
+        color: #1a120b;
+        font-size: 7px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        line-height: 1.1;
+      }
+
+      .camp-meta {
+        padding: 5px 6px 7px;
+      }
+
+      .camp-tag {
+        margin: 0 0 3px;
+        font-size: 7px;
+        line-height: 1.18;
+        color: rgba(212, 175, 55, 0.95);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .camp-name {
+        margin: 0;
+        font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+        font-size: 9.5px;
+        font-weight: 800;
+        color: var(--gold-2);
+        line-height: 1.2;
+      }
+
+      .content--front .front-footer {
+        margin: 0;
+        flex-shrink: 0;
+      }
+
+      .content--back {
+        gap: 5px;
+      }
+
+      .content--back .chart-head {
+        padding: 6px 8px;
+        font-size: 11px;
+      }
+
+      .content--back .chart-sub {
+        padding: 4px 6px;
+        font-size: 9px;
+      }
+
+      .content--back table.chart th,
+      .content--back table.chart td {
+        padding: 4px 5px;
+      }
+
+      .content--back .chart-note {
+        font-size: 8px;
+        padding: 3px 2px 0;
+      }
+
+      .content--back .masterclass {
+        padding: 6px 8px;
+        font-size: 9px;
+        line-height: 1.35;
+      }
+
+      .content--back .box {
+        padding: 5px 7px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+      }
+
+      .logo-img {
+        width: 170px;
+        height: 44px;
+        object-fit: contain;
+        object-position: left center;
+        filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.35));
+      }
+
+      .badge {
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(212, 175, 55, 0.45);
+        background: rgba(212, 175, 55, 0.1);
+        color: var(--gold-2);
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .topbar-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 5px;
+        flex-shrink: 0;
+      }
+
+      .topbar-phone {
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--gold-2);
+        letter-spacing: 0.04em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+        font-size: 20px;
+        line-height: 1.12;
+        color: var(--gold-2);
+        letter-spacing: 0.2px;
+      }
+
+      .sub {
+        margin: 4px 0 0;
+        font-size: 11.5px;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
+      .kicker {
+        margin: 0 0 2px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(240, 212, 143, 0.88);
+      }
+
+      .storyband {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 8px;
+        align-items: stretch;
+        border-radius: var(--radius);
+        border: 1px solid rgba(212, 175, 55, 0.28);
+        background: rgba(0, 0, 0, 0.2);
+        padding: 8px 10px;
+        box-shadow: 0 10px 22px var(--shadow);
+      }
+
+      .storyband .story p {
+        margin: 0;
+        font-size: 10.5px;
+        line-height: 1.4;
+        color: rgba(232, 224, 213, 0.88);
+      }
+
+      .storyband .story p + p {
+        margin-top: 6px;
+      }
+
+      .story-img {
+        position: relative;
+        border-radius: 10px;
+        overflow: hidden;
+        min-height: 92px;
+        background: rgba(0, 0, 0, 0.35);
+      }
+
+      .story-img img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 32% 50%;
+      }
+
+      .story-img .cap {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        bottom: 6px;
+        padding: 5px 7px;
+        border-radius: 8px;
+        font-size: 8.5px;
+        line-height: 1.25;
+        color: rgba(232, 224, 213, 0.95);
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(212, 175, 55, 0.2);
+      }
+
+      .price-ribbon {
+        background: linear-gradient(135deg, var(--orange), var(--orange-2));
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        color: #fff;
+        text-align: center;
+        box-shadow: 0 12px 28px var(--shadow);
+      }
+
+      .price-ribbon .line1 {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        opacity: 0.95;
+      }
+
+      .price-ribbon .line2 {
+        margin-top: 6px;
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .price-ribbon .strike {
+        font-size: 18px;
+        text-decoration: line-through;
+        opacity: 0.85;
+      }
+
+      .price-ribbon .now {
+        font-size: 28px;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+      }
+
+      .price-ribbon .note {
+        margin-top: 6px;
+        font-size: 10px;
+        line-height: 1.35;
+        opacity: 0.95;
+      }
+
+      .cols-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .benefits-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+
+      .benefit {
+        border-radius: var(--radius);
+        border: 1px solid rgba(212, 175, 55, 0.26);
+        background: rgba(0, 0, 0, 0.16);
+        padding: 6px 8px;
+        font-size: 9.5px;
+        line-height: 1.32;
+        color: rgba(232, 224, 213, 0.88);
+      }
+
+      .benefit h3 {
+        margin: 0 0 3px;
+        font-size: 10.5px;
+        font-weight: 900;
+        color: var(--gold-2);
+        letter-spacing: 0.02em;
+      }
+
+      .benefit p {
+        margin: 0;
+      }
+
+      .box {
+        border-radius: var(--radius);
+        border: 1px solid rgba(212, 175, 55, 0.28);
+        background: rgba(0, 0, 0, 0.18);
+        padding: 8px 10px;
+        font-size: 10.5px;
+        line-height: 1.35;
+        color: rgba(232, 224, 213, 0.85);
+      }
+
+      .box h2 {
+        margin: 0 0 4px;
+        font-size: 11.5px;
+        font-weight: 900;
+        color: var(--gold-2);
+      }
+
+      .box ul {
+        margin: 0;
+        padding-left: 14px;
+      }
+
+      .box li {
+        margin-bottom: 2px;
+      }
+
+      .chart-wrap {
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 1px solid rgba(0, 0, 0, 0.35);
+        box-shadow: 0 10px 24px var(--shadow);
+      }
+
+      .chart-head {
+        background: linear-gradient(180deg, var(--orange), #a84a15);
+        color: #fff;
+        text-align: center;
+        padding: 8px 10px;
+        font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+        font-weight: 800;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        line-height: 1.25;
+      }
+
+      .chart-sub {
+        background: #fff;
+        color: #111;
+        text-align: center;
+        padding: 5px 8px;
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      table.chart {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 8.5px;
+        background: #fff;
+        color: #111;
+      }
+
+      table.chart th,
+      table.chart td {
+        border: 1px solid #222;
+        padding: 5px 6px;
+        vertical-align: top;
+      }
+
+      table.chart th {
+        background: #e8e8e8;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      table.chart td:first-child {
+        background: #fff5e6;
+        font-weight: 800;
+        width: 22%;
+      }
+
+      table.chart .ldma-col {
+        background: #fff8ed;
+      }
+
+      .chart-note {
+        font-size: 8.5px;
+        color: var(--muted);
+        padding: 4px 2px 0;
+        line-height: 1.3;
+      }
+
+      .value-mini {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 2px 8px;
+        font-size: 9.5px;
+        margin-top: 4px;
+      }
+
+      .value-mini span:nth-child(odd) {
+        color: rgba(232, 224, 213, 0.75);
+      }
+
+      .value-mini span:nth-child(even) {
+        font-weight: 800;
+        color: var(--gold);
+        text-align: right;
+      }
+
+      .cta-row {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: auto;
+        padding-top: 3px;
+        border-top: 1px solid rgba(212, 175, 55, 0.22);
+      }
+
+      .cta-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+      }
+
+      .back-disclaimer {
+        margin: 0;
+        flex: 1 1 9rem;
+        max-width: 21rem;
+        font-size: 6.5px;
+        line-height: 1.35;
+        color: rgba(232, 224, 213, 0.52);
+        text-align: right;
+      }
+
+      .qr {
+        width: 72px;
+        height: 72px;
+        padding: 6px;
+        border-radius: 10px;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        flex-shrink: 0;
+      }
+
+      .qr img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        image-rendering: pixelated;
+      }
+
+      .cta-text .u {
+        font-weight: 900;
+        color: var(--gold-2);
+        font-size: 11px;
+      }
+
+      .cta-text .p {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .content--back .cta-text .u {
+        font-size: 15px;
+        line-height: 1.2;
+      }
+
+      .content--back .cta-text .p {
+        font-size: 14px;
+        font-weight: 700;
+        color: rgba(232, 224, 213, 0.88);
+        margin-top: 4px;
+      }
+
+      /* Bundle value impact block (back page) */
+      .chart-impact .impact-body {
+        background: #fff;
+        color: #111;
+      }
+
+      .chart-impact .impact-compare {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 2px 6px;
+        padding: 6px 8px 6px;
+        align-items: start;
+      }
+
+      .chart-impact .impact-eyebrow {
+        margin: 0 0 3px;
+        font-size: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: #444;
+      }
+
+      .chart-impact .impact-side--bundle .impact-eyebrow {
+        color: #a84a15;
+      }
+
+      .chart-impact .impact-price {
+        margin: 0 0 4px;
+        font-size: 19px;
+        font-weight: 900;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        color: #1a120b;
+      }
+
+      .chart-impact .impact-side--bundle .impact-price {
+        color: #b84a0f;
+      }
+
+      .chart-impact .impact-price--retail {
+        text-decoration: line-through;
+        color: #555;
+        font-size: 17px;
+      }
+
+      .chart-impact .impact-detail {
+        margin: 0;
+        font-size: 8px;
+        line-height: 1.28;
+        color: #333;
+      }
+
+      .chart-impact .impact-divider {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 52px;
+        font-size: 9px;
+        font-weight: 900;
+        color: #aaa;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .chart-impact .impact-savings {
+        background: linear-gradient(180deg, #fff8ed, #ffe8c8);
+        border-top: 2px solid #c45c1a;
+        padding: 5px 8px 6px;
+        text-align: center;
+      }
+
+      .chart-impact .impact-savings-label {
+        display: block;
+        font-size: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: #444;
+        margin-bottom: 2px;
+      }
+
+      .chart-impact .impact-savings-num {
+        display: block;
+        font-size: 19px;
+        font-weight: 900;
+        color: #1a120b;
+        letter-spacing: -0.02em;
+        line-height: 1.08;
+      }
+
+      .chart-impact .impact-savings-foot {
+        display: block;
+        font-size: 7px;
+        color: #555;
+        margin-top: 3px;
+        line-height: 1.3;
+      }
+
+      .content--back .chart-impact .chart-head {
+        padding: 5px 8px;
+        font-size: 10.5px;
+      }
+
+      /* Back page */
+      .det-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .det-card {
+        border-radius: var(--radius);
+        border: 1px solid rgba(212, 175, 55, 0.3);
+        background: rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        min-height: min-content;
+      }
+
+      .det-img {
+        height: 122px;
+        flex-shrink: 0;
+        position: relative;
+        overflow: hidden;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 3px;
+      }
+
+      .det-img img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        object-position: center;
+      }
+
+      .det-body {
+        padding: 5px 6px 6px;
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 9px;
+        line-height: 1.28;
+      }
+
+      .det-body h3 {
+        margin: 0;
+        font-size: 10.5px;
+        line-height: 1.15;
+        color: var(--gold-2);
+      }
+
+      .det-body .retail {
+        color: rgba(232, 224, 213, 0.65);
+        font-size: 8.5px;
+        line-height: 1.2;
+      }
+
+      .det-body .bundle {
+        font-weight: 900;
+        color: var(--gold);
+        font-size: 10px;
+        line-height: 1.2;
+      }
+
+      .det-body p:last-of-type {
+        margin: 1px 0 0;
+      }
+
+      .masterclass {
+        border-radius: var(--radius);
+        border: 1px solid rgba(212, 175, 55, 0.25);
+        background: rgba(15, 61, 30, 0.25);
+        padding: 8px 10px;
+        font-size: 10px;
+        line-height: 1.4;
+        color: rgba(232, 224, 213, 0.88);
+      }
+
+      .masterclass a {
+        color: var(--gold-2);
+        font-weight: 700;
+      }
+
+      @media screen {
+        body {
+          padding: 14px;
+        }
+        .sheet {
+          margin: 0 auto 14px;
+          border-radius: 14px;
+          outline: 1px solid rgba(255, 255, 255, 0.08);
+        }
+      }
+
+      @media print {
+        body {
+          padding: 0;
+          background: transparent;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- FRONT -->
+    <section class="sheet" aria-label="Front">
+      <div class="trim-area" aria-hidden="true"></div>
+      <div class="content content--front">
+        <div class="front-hero">
+          <div class="topbar">
+            <div class="logo">
+              <img
+                class="logo-img"
+                src="../../public/images/50th-logo.png"
+                alt="Lost Dutchman's Mining Association — 50th Anniversary"
+              />
+            </div>
+            <div class="topbar-stack">
+              <div class="badge">Lifetime bundle · GPAA included</div>
+              <div class="topbar-phone">(888) 465-3717</div>
+            </div>
+          </div>
+
+          <div>
+            <p class="kicker">A lifetime of discovery — 50 years strong</p>
+            <h1>Go all‑in: camps, claims, family &amp; the gold in the ground</h1>
+            <p class="sub">
+              <strong>Lifetime LDMA + GPAA + Companion + Transferability + Pre‑Paid Transfer + your choice of detector</strong>
+              — one bundle from <strong>$3,500–$4,000</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div class="storyband">
+          <div class="story">
+            <p>
+              Fresh air, dirt under your nails, and a story worth telling. LDMA is where families learn to pan together,
+              laugh around the fire, and pass the hobby down a generation.
+            </p>
+            <p>
+              This offer stacks what matters: <strong>lifetime access</strong> to LDMA’s campgrounds and claims,
+              <strong>GPAA Lifetime</strong> for even more ground to cover, <strong>membership options</strong> that add
+              flexibility for family travel and a clear plan for the future — plus a <strong>pro‑grade detector</strong>
+              (see back for models and pricing tiers).
+            </p>
+          </div>
+          <div class="story-img">
+            <img
+              src="../../public/images/campgrounds/oconee-south-carolina/oconee-2.jpg"
+              alt="LDMA members prospecting at camp"
+            />
+            <div class="cap">Real trips. Real memories. That’s what this membership is built on.</div>
+          </div>
+        </div>
+
+        <div class="price-ribbon">
+          <div class="line1">Big value · One price</div>
+          <div class="line2">
+            <span class="strike">$10,409–$11,498 retail*</span>
+            <span class="now">$3,500 – $4,000</span>
+          </div>
+          <div class="note">
+            *Retail-style total if you purchased LDMA Lifetime ($3,750), GPAA Lifetime ($2,499), Companion + Transferability
+            + Pre‑Paid Transfer ($3,250 combined at retail), plus your chosen detector at retail ($910–$1,999). Bundle
+            price depends on detector tier — see back.
+          </div>
+        </div>
+
+        <div class="benefits-grid">
+          <div class="benefit">
+            <h3>LDMA Lifetime — what you get</h3>
+            <p>
+              Gold prospecting and camping across <strong>12 private campgrounds</strong> on patented, gold‑bearing
+              claims — keep what you find. Member‑friendly camping, clubhouses, events, and a community that welcomes
+              beginners and old hands alike.
+            </p>
+          </div>
+          <div class="benefit">
+            <h3>GPAA Lifetime — what you get</h3>
+            <p>
+              Expand beyond LDMA with <strong>93,000+ additional acres</strong> of GPAA claims nationwide, chapters,
+              publications, and more ground to explore (see gpaalifetime.com).
+            </p>
+          </div>
+          <div class="benefit">
+            <h3>Companion</h3>
+            <p>
+              Lets an eligible family member (spouse, adult child, parent, or grandparent) <strong>visit LDMA camps and
+              prospect on their own</strong> — great when schedules don’t match or someone wants their own trip.
+            </p>
+          </div>
+          <div class="benefit">
+            <h3>Transferability</h3>
+            <p>
+              Lets you <strong>designate an heir</strong> who can receive your LDMA membership when the time comes — a
+              clear plan for the next generation.
+            </p>
+          </div>
+          <div class="benefit">
+            <h3>Pre‑Paid Transfer Fee</h3>
+            <p>
+              <strong>Pre‑pays the transfer fee</strong> so your heir isn’t facing that cost later — one less burden for
+              your family when it matters most.
+            </p>
+          </div>
+          <div class="benefit">
+            <h3>Your detector</h3>
+            <p>
+              <strong>Minelab Gold Monster 1000</strong>, <strong>Gold Monster 2000</strong>, or <strong>Garrett GoldMaster
+              24k</strong> — your choice. Retail $910–$1,999; bundle tiers on the back.
+            </p>
+          </div>
+        </div>
+
+        <div class="camps-section">
+          <p class="camps-kicker">Featured campgrounds</p>
+          <div class="camps-grid">
+            <article class="camp-card">
+              <div class="camp-photo">
+                <img
+                  src="../../public/images/campgrounds/stanton-arizona/camp-stanton.jpg"
+                  alt="Stanton campground"
+                />
+                <span class="camp-state">Arizona</span>
+              </div>
+              <div class="camp-meta">
+                <p class="camp-tag">Flagship Camp • Historic Ghost Town</p>
+                <p class="camp-name">Stanton</p>
+              </div>
+            </article>
+            <article class="camp-card">
+              <div class="camp-photo">
+                <img
+                  src="../../public/images/campgrounds/italian-bar-california/camp-italian-bar.jpg"
+                  alt="Italian Bar campground"
+                />
+                <span class="camp-state">California</span>
+              </div>
+              <div class="camp-meta">
+                <p class="camp-tag">First LDMA Camp • River Gold</p>
+                <p class="camp-name">Italian Bar</p>
+              </div>
+            </article>
+            <article class="camp-card">
+              <div class="camp-photo">
+                <img
+                  src="../../public/images/campgrounds/duisenburg-california/camp-duisenburg.jpg"
+                  alt="Duisenburg campground"
+                />
+                <span class="camp-state">California</span>
+              </div>
+              <div class="camp-meta">
+                <p class="camp-tag">High Desert Oasis</p>
+                <p class="camp-name">Duisenburg</p>
+              </div>
+            </article>
+            <article class="camp-card">
+              <div class="camp-photo">
+                <img
+                  src="../../public/images/campgrounds/blue-bucket-oregon/camp-blue-bucket.jpg"
+                  alt="Blue Bucket campground"
+                />
+                <span class="camp-state">Oregon</span>
+              </div>
+              <div class="camp-meta">
+                <p class="camp-tag">Scenic Gold &amp; Wildlife</p>
+                <p class="camp-name">Blue Bucket</p>
+              </div>
+            </article>
+            <article class="camp-card">
+              <div class="camp-photo">
+                <img
+                  src="../../public/images/campgrounds/burnt-river-oregon/camp-burnt-river.jpg"
+                  alt="Burnt River campground"
+                />
+                <span class="camp-state">Oregon</span>
+              </div>
+              <div class="camp-meta">
+                <p class="camp-tag">Wilderness River Camp</p>
+                <p class="camp-name">Burnt River</p>
+              </div>
+            </article>
+            <article class="camp-card">
+              <div class="camp-photo">
+                <img
+                  src="../../public/images/campgrounds/oconee-south-carolina/camp-oconee.jpg"
+                  alt="Oconee campground"
+                />
+                <span class="camp-state">South Carolina</span>
+              </div>
+              <div class="camp-meta">
+                <p class="camp-tag">Rustic Blue Ridge Gem &amp; Gold</p>
+                <p class="camp-name">Oconee</p>
+              </div>
+            </article>
+            <article class="camp-card">
+              <div class="camp-photo">
+                <img
+                  src="../../public/images/campgrounds/loud-mine-georgia/camp-loud-mine.jpg"
+                  alt="Loud Mine campground"
+                />
+                <span class="camp-state">Georgia</span>
+              </div>
+              <div class="camp-meta">
+                <p class="camp-tag">Dahlonega Gold Belt</p>
+                <p class="camp-name">Loud Mine</p>
+              </div>
+            </article>
+            <article class="camp-card">
+              <div class="camp-photo">
+                <img
+                  src="../../public/images/campgrounds/vein-mountain-north-carolina/camp-vein-mountain.jpg"
+                  alt="Vein Mountain campground"
+                />
+                <span class="camp-state">North Carolina</span>
+              </div>
+              <div class="camp-meta">
+                <p class="camp-tag">Mother Lode in the Blue Ridge</p>
+                <p class="camp-name">Vein Mountain</p>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <p
+          class="sub front-footer"
+          style="font-size: 10px; text-align: center; color: rgba(232, 224, 213, 0.55)"
+        >
+          Turn over for detector choices, training, and how the value compares.
+        </p>
+      </div>
+    </section>
+
+    <!-- BACK -->
+    <section class="sheet" aria-label="Back">
+      <div class="trim-area" aria-hidden="true"></div>
+      <div class="content content--back">
+        <div class="topbar">
+          <div class="logo">
+            <img
+              class="logo-img"
+              src="../../public/images/50th-logo.png"
+              alt="Lost Dutchman's Mining Association — 50th Anniversary"
+            />
+          </div>
+          <div class="badge">Pick your detector</div>
+        </div>
+
+        <div>
+          <p class="kicker">Your machine · Your style</p>
+          <h1 style="font-size: 19px">Pick the detector that fits how you hunt</h1>
+          <p class="sub">
+            Whether you like to slow down and listen for tiny targets or cover ground fast, choose the tool you’ll reach
+            for on LDMA and GPAA claims. <strong>$3,500</strong> tier: Gold Monster 1000 or Garrett GoldMaster 24k.
+            <strong>$4,000</strong> tier: Gold Monster 2000.
+          </p>
+          <p class="sub" style="margin-top: 6px; font-size: 10.5px">
+            Then put it to use with <strong>hands‑on training</strong> at Kevin Hoagland’s Metal Detecting Masterclass
+            (see below).
+          </p>
+        </div>
+
+        <div class="det-grid">
+          <div class="det-card">
+            <div class="det-img">
+              <img
+                src="../../public/images/flyers/deep-dive-minelab-gm1000%20copy.webp"
+                alt="Minelab Gold Monster 1000"
+              />
+            </div>
+            <div class="det-body">
+              <h3>Minelab Gold Monster 1000</h3>
+              <p class="retail">Retail $999</p>
+              <p class="bundle">Bundle tier: $3,500 total</p>
+              <p>
+                A proven VLF gold machine for chasing small gold in mineralized soil. Simple to swing, easy to learn, and
+                a favorite for creek-side hunts and camp weekends — take it straight from the box to the claim.
+              </p>
+            </div>
+          </div>
+          <div class="det-card">
+            <div class="det-img">
+              <img
+                src="../../public/images/flyers/deep-dive-minelab-gm2000%20copy.webp"
+                alt="Minelab Gold Monster 2000"
+              />
+            </div>
+            <div class="det-body">
+              <h3>Minelab Gold Monster 2000</h3>
+              <p class="retail">Retail $1,999</p>
+              <p class="bundle">Bundle tier: $4,000 total</p>
+              <p>
+                Step up when you want more sensitivity and refinement for the tiniest targets in tough ground. Built for
+                serious gold hunters who spend real time behind the coil — premium tier in this bundle.
+              </p>
+            </div>
+          </div>
+          <div class="det-card">
+            <div class="det-img">
+              <img src="../../public/images/flyers/goldmaster24k-img1.png" alt="Garrett GoldMaster 24k" />
+            </div>
+            <div class="det-body">
+              <h3>Garrett GoldMaster 24k</h3>
+              <p class="retail">Retail $910</p>
+              <p class="bundle">Bundle tier: $3,500 total</p>
+              <p>
+                Garrett’s VLF platform tuned for gold — responsive, rugged, and ready for long days on the ground. Same
+                $3,500 bundle tier as the GM1000; pick the brand and feel that fits you.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="masterclass">
+          <strong style="color: var(--gold-2)">Bonus training included:</strong> This bundle also includes
+          <strong>free hands-on training</strong> at one of Kevin Hoagland’s Metal Detecting Masterclass events. Visit
+          <a href="https://goldtrails.gold">goldtrails.gold</a> for schedules and details.
+        </div>
+
+        <div class="chart-wrap">
+          <div class="chart-head">Low-cost camping · High-value perks</div>
+          <div class="chart-sub">LDMA campgrounds vs. typical alternatives†</div>
+          <table class="chart" aria-label="Camping comparison">
+            <thead>
+              <tr>
+                <th aria-hidden="true"></th>
+                <th>LDMA</th>
+                <th>Standard</th>
+                <th>Luxury</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Nightly rates</td>
+                <td class="ldma-col">~$6–$15*</td>
+                <td>$59+</td>
+                <td>$75–$91+</td>
+              </tr>
+              <tr>
+                <td>Things to do</td>
+                <td class="ldma-col">
+                  Gold mining, fishing, ATV adventures, campfires, potlucks, outings &amp; events, hiking, arts &amp;
+                  crafts, and more.
+                </td>
+                <td>Picnic areas, close to downtown, typical RV amenities, etc.</td>
+                <td>Pool &amp; spa, pickleball, shuffleboard, billiards, exercise room, dances, bocce, etc.</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="chart-note">
+            †Illustrative comparison; rates vary by location and season. LDMA nightly figures reflect member camping
+            pricing as promoted on myldma.com.
+          </div>
+        </div>
+
+        <div class="chart-wrap chart-impact">
+          <div class="chart-head">Bundle vs. buying separately</div>
+          <div class="impact-body">
+            <div class="impact-compare">
+              <div class="impact-side impact-side--bundle">
+                <p class="impact-eyebrow">This lifetime bundle</p>
+                <p class="impact-price">$3,500 – $4,000</p>
+                <p class="impact-detail">
+                  <strong>$3,500</strong> tier: GM1000 or Garrett 24k · <strong>$4,000</strong> tier: GM2000. LDMA + GPAA +
+                  Companion + Transferability + Pre‑Paid Transfer + detector.
+                </p>
+              </div>
+              <div class="impact-divider" aria-hidden="true">vs</div>
+              <div class="impact-side impact-side--retail">
+                <p class="impact-eyebrow">Same items at retail</p>
+                <p class="impact-price impact-price--retail">$10,409 – $11,498</p>
+                <p class="impact-detail">
+                  LDMA ($3,750) + GPAA ($2,499) + Companion/Transfer/Pre‑Paid ($3,250) + detector ($910–$1,999).
+                </p>
+              </div>
+            </div>
+            <div class="impact-savings">
+              <span class="impact-savings-label">Estimated savings vs. retail</span>
+              <span class="impact-savings-num">$6,900 – $7,500</span>
+              <span class="impact-savings-foot">
+                *Retail totals vary by detector ($10,409 / $10,498 / $11,498). Savings rounded; one bundle price covers
+                everything.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="box" style="font-size: 10px">
+          <h2 style="margin-bottom: 4px">Learn more</h2>
+          <ul style="margin: 0; padding-left: 14px">
+            <li><strong>myldma.com/memberships</strong> — LDMA membership benefits and this offer.</li>
+            <li><strong>gpaalifetime.com</strong> — GPAA Lifetime program details.</li>
+          </ul>
+        </div>
+
+        <div class="cta-row">
+          <div class="cta-main">
+            <div class="qr">
+              <img src="../../public/images/memberships-qr.png" alt="QR code: https://myldma.com/memberships" />
+            </div>
+            <div class="cta-text">
+              <div class="u">myldma.com/memberships</div>
+              <div class="p">(888) 465-3717</div>
+            </div>
+          </div>
+          <p class="back-disclaimer">
+            Bundled offers shown above are available for a limited time while supplies last. See myldma.com for current
+            availability and offers. $120 annual maintenance applies after the first year. Full contract sent after
+            purchase for signature. 30‑day cancellation policy. LDMA reserves all rights.
+          </p>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

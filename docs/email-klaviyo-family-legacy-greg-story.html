@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>LDMA — Build your family legacy</title>
+  <!--
+    KLAVIYO — Family Legacy intro (story-driven, Greg Miller)
+    ---------------------------------------------------------
+    Use as Email #1 in a short member campaign (pairs with
+    docs/email-klaviyo-family-legacy-dominic-followup.html).
+
+    Audience: Active LDMA members (especially those who received the
+    Gold Prospectors Magazine insert / family-legacy flyer).
+
+    Suggested subject: A note about your LDMA membership—and your family
+    Suggested preview text (also in hidden preheader below):
+      Companion for your next trip. A legacy plan for the generation after you.
+
+    CTA: https://myldma.com/family-legacy (overview + sign-in path)
+    Optional second link: https://myldma.com/members/login
+
+    Klaviyo merge syntax:
+      {{ first_name|default:'there' }}
+      {% unsubscribe_link %}
+  -->
+  <style>
+    @media only screen and (max-width: 600px) {
+      .content-pad { padding-left: 20px !important; padding-right: 20px !important; }
+      .headline { font-size: 20px !important; }
+      .body-text { font-size: 16px !important; }
+      .hero-img { height: auto !important; max-height: 200px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#F5F6F0; font-family: Arial, Helvetica, sans-serif; color:#1C2526;">
+  <div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">
+    Companion for your next trip. A legacy plan for the generation after you.
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6F0;">
+    <tr>
+      <td align="center" style="padding:20px 16px 24px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background-color:#FFFFFF; border-radius:12px; overflow:hidden; border:1px solid #E0DCC8;">
+
+          <tr>
+            <td style="padding:20px 28px 16px; text-align:center; border-bottom:1px solid #EEE9DC;">
+              <a href="https://myldma.com/" style="text-decoration:none; display:inline-block;">
+                <img
+                  src="https://myldma.com/images/global/50th-logo.png"
+                  width="280"
+                  alt="Lost Dutchman's Mining Association — 50th Anniversary"
+                  style="max-width:280px; width:100%; height:auto; border:0; display:block; margin:0 auto;"
+                >
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:0;">
+              <a href="https://myldma.com/family-legacy" style="text-decoration:none;">
+                <img
+                  class="hero-img"
+                  src="https://myldma.com/images/home/hero-george-italian-bar.jpg"
+                  width="600"
+                  alt="LDMA members at Italian Bar — where the adventure began in 1976"
+                  style="display:block; width:100%; max-width:600px; height:auto; border:0;"
+                >
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="content-pad" style="padding:24px 28px 8px; text-align:left;">
+              <p style="margin:0 0 16px; font-size:17px; line-height:1.55; color:#1C2526;">
+                Hi {{ first_name|default:'there' }},
+              </p>
+              <h1 class="headline" style="margin:0 0 14px; font-size:22px; line-height:1.35; font-weight:bold; color:#1C2526;">
+                The best LDMA stories are the ones you tell around camp&mdash;and the ones your family carries forward.
+              </h1>
+              <p class="body-text" style="margin:0 0 14px; font-size:17px; line-height:1.55; color:#1C2526;">
+                If you recently opened your <strong>Gold Prospectors Magazine</strong>, you may have seen a short note about optional add-ons that help you share this membership in a bigger way. Many members have been with us for years and never needed to think about that&mdash;until life, travel, or family plans change.
+              </p>
+              <p class="body-text" style="margin:0 0 14px; font-size:17px; line-height:1.55; color:#1C2526;">
+                I wanted to reach out personally because these options are easier to understand as a <strong>story with two chapters</strong>, not a stack of product names on a page.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="content-pad" style="padding:0 28px 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6F0; border-radius:10px; border:1px solid #E0DCC8;">
+                <tr>
+                  <td style="padding:20px 22px;">
+                    <p style="margin:0 0 12px; font-size:16px; font-weight:bold; color:#1C2526;">Picture this&hellip;</p>
+                    <p class="body-text" style="margin:0 0 14px; font-size:16px; line-height:1.55; color:#333333;">
+                      You&rsquo;re planning a trip. One person arrives early, another comes later. Someone wants to stop by camp for a few days while you&rsquo;re tied up at home. The gold, the river, the clubhouse fire&mdash;those moments are what LDMA has always been about.
+                    </p>
+                    <p class="body-text" style="margin:0; font-size:16px; line-height:1.55; color:#333333;">
+                      <strong style="color:#B8860B;">Chapter one&mdash;for today:</strong> a <strong>Companion</strong> add-on lets an eligible spouse or family member visit camps and prospect on their own schedule.<br><br>
+                      <strong style="color:#B8860B;">Chapter two&mdash;for later:</strong> <strong>Transferability</strong> (and optionally pre-paying the transfer fee) helps you pass the membership on when the time comes&mdash;so the tradition does not end with a single membership card.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="content-pad" style="padding:0 28px 8px; text-align:left;">
+              <p style="margin:0 0 10px; font-size:15px; font-weight:bold; color:#1C2526;">Three optional add-ons (available to LDMA members)</p>
+              <ul style="margin:0 0 16px; padding:0 0 0 20px; font-size:16px; line-height:1.6; color:#333333;">
+                <li style="margin:0 0 10px;"><strong>Companion Add-On</strong> &mdash; more flexibility when family travels on different schedules.</li>
+                <li style="margin:0 0 10px;"><strong>Transferability Add-On</strong> &mdash; designate who receives your membership in the future.</li>
+                <li style="margin:0;"><strong>Pre-Paid Transfer Fee Add-On</strong> &mdash; handle the transfer fee now so your family has one less burden later.</li>
+              </ul>
+              <p class="body-text" style="margin:0 0 14px; font-size:16px; line-height:1.55; color:#444444;">
+                What you qualify for depends on what is already on your membership. That is why we do not quote one price in this note&mdash;your personalized options are built from your account.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="content-pad" style="padding:4px 28px 20px; text-align:center;">
+              <a
+                href="https://myldma.com/family-legacy"
+                style="display:inline-block; background-color:#B8860B; color:#FFFFFF; font-size:18px; font-weight:bold; padding:16px 32px; text-decoration:none; border-radius:8px;"
+              >See what&rsquo;s available for you</a>
+              <p class="body-text" style="margin:12px 0 0; font-size:14px; line-height:1.45; color:#555555;">
+                Sign in at <a href="https://myldma.com/members/login" style="color:#B8860B; font-weight:bold;">myldma.com/members</a> with your <strong>member number</strong> (on the address block of your magazine cover). Questions? Call <a href="tel:+18884653717" style="color:#B8860B; font-weight:bold; text-decoration:none;">(888) 465-3717</a>.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="content-pad" style="padding:0 28px 24px; text-align:left;">
+              <p class="body-text" style="margin:0 0 12px; font-size:16px; line-height:1.55; color:#1C2526;">
+                However long you have been digging with us&mdash;since Italian Bar, Stanton, or your own home camp&mdash;thank you for being part of this fifty-year story.
+              </p>
+              <p class="body-text" style="margin:0; font-size:16px; line-height:1.55; color:#1C2526;">
+                Keep digging,<br>
+                <span style="color:#B8860B; font-weight:bold;">Greg Miller</span><br>
+                <span style="font-size:14px; color:#555555;">Lost Dutchman&rsquo;s Mining Association</span>
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:16px 28px 20px; text-align:center; font-size:12px; line-height:1.5; color:#666666; border-top:1px solid #EEE9DC; background-color:#FAFAF8;">
+              <p style="margin:0 0 6px;">
+                Lost Dutchman&rsquo;s Mining Association &middot; 43105 Business Park Drive, Temecula, CA 92590
+              </p>
+              <p style="margin:0 0 6px;">
+                <a href="mailto:hello@myldma.com" style="color:#B8860B;">hello@myldma.com</a> &middot; <a href="tel:+18884653717" style="color:#B8860B;">(888) 465-3717</a>
+              </p>
+              <p style="margin:0 0 6px;">&copy; 2026 LDMA. All rights reserved.</p>
+              <p style="margin:0;">
+                <a href="{% unsubscribe_link %}" style="color:#B8860B;">Unsubscribe</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
