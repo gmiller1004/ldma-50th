@@ -158,6 +158,19 @@ The Events page shows base event products. Upgrades can be:
 
 ---
 
+## Member vs non-member variants (`custom.price_level`)
+
+Each event variant should have the variant metafield **`custom.price_level`** set to either `member` or `non member` (exposed to the Storefront API). The Events page uses this to show the right options when someone is logged in vs browsing as a guest.
+
+| Variant option (example) | `price_level` should be |
+|--------------------------|-------------------------|
+| LDMA Member … | `member` |
+| Non-LDMA (General Admission) … | `non member` |
+
+**If the variant picker is missing for logged-in members** but the product has multiple “LDMA Member” options, check Shopify: one member variant may be tagged `non member` by mistake. Example: **Gold Diggins Duisenburg** had “LDMA Member Basic Registration” set to `non member` while Blue Bucket had both member variants correct — same option names, different metafields.
+
+---
+
 ## Storefront API Access
 
 **Product tags** enable event-type and camp filtering. The Events page requests `tags` and `metafields` in the GraphQL query. **You must enable the Storefront API scope** for tags to work.

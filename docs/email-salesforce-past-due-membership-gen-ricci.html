@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>LDMA — Your membership needs attention</title>
+  <!--
+    SALESFORCE — Past-due membership outreach (Gen Ricci)
+    -----------------------------------------------------
+    Audience: In-Active and Suspended members (3+ months past due on
+    membership dues and/or maintenance dues). First-touch reminder;
+    more direct follow-ups can follow.
+
+    From: Gen Ricci, Member Relations Specialist
+    Merge field: {!Contact.FirstName}
+      (Lightning templates on Contact may also use {!recipient.FirstName}
+       or {!Contact.FirstName} depending on template type—verify in preview.)
+
+    Suggested subject lines:
+      - Your LDMA membership requires immediate attention
+      - Action needed: bring your LDMA membership current
+      - {!Contact.FirstName}, let's get your LDMA account back on track
+
+    Configure in Salesforce:
+      - Reply-to: Gen's inbox (so replies route to Member Relations)
+      - Sender display name: Gen Ricci | LDMA Member Relations
+  -->
+  <style>
+    @media only screen and (max-width: 600px) {
+      .content-pad { padding-left: 20px !important; padding-right: 20px !important; }
+      .headline { font-size: 20px !important; }
+      .body-text { font-size: 16px !important; }
+      .contact-btn { display: block !important; margin: 0 0 10px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#F5F6F0; font-family: Arial, Helvetica, sans-serif; color:#1C2526;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6F0;">
+    <tr>
+      <td align="center" style="padding:20px 16px 24px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background-color:#FFFFFF; border-radius:12px; overflow:hidden; border:1px solid #E0DCC8;">
+
+          <tr>
+            <td style="padding:20px 28px 16px; text-align:center; border-bottom:1px solid #EEE9DC;">
+              <a href="https://myldma.com/" style="text-decoration:none; display:inline-block;">
+                <img
+                  src="https://myldma.com/images/global/50th-logo.png"
+                  width="280"
+                  alt="Lost Dutchman's Mining Association — 50th Anniversary"
+                  style="max-width:280px; width:100%; height:auto; border:0; display:block; margin:0 auto;"
+                >
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="content-pad" style="padding:24px 28px 8px; text-align:left;">
+              <p style="margin:0 0 10px; font-size:12px; font-weight:bold; letter-spacing:0.06em; text-transform:uppercase; color:#8B4513;">
+                Action required
+              </p>
+              <h1 class="headline" style="margin:0 0 14px; font-size:22px; line-height:1.35; font-weight:bold; color:#1C2526;">
+                Hi {!Contact.FirstName}&mdash;your LDMA membership needs immediate attention
+              </h1>
+              <p class="body-text" style="margin:0 0 14px; font-size:17px; line-height:1.55; color:#1C2526;">
+                I am reaching out from Member Relations because your account is not in good standing. Outstanding membership and/or maintenance dues require prompt attention so we can keep your membership active.
+              </p>
+              <p class="body-text" style="margin:0 0 14px; font-size:17px; line-height:1.55; color:#1C2526;">
+                Without payment arrangements, your membership is at risk of <strong>cancellation</strong>. That means losing access to LDMA campgrounds and claims, member pricing on events and services, and the community you have been part of&mdash;often for many years.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Urgency callout -->
+          <tr>
+            <td class="content-pad" style="padding:0 28px 16px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFF4F0; border-radius:10px; border:1px solid #E8C4B8;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 10px; font-size:16px; font-weight:bold; color:#1C2526;">Please do not wait on this</p>
+                    <p class="body-text" style="margin:0; font-size:15px; line-height:1.55; color:#333333;">
+                      If a membership is canceled for non-payment, it <strong>cannot simply be reinstated</strong>. You would need to start over as a new member&mdash;and <strong>forfeit everything you have paid in to date</strong> under your current membership. We want to help you avoid that outcome.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="content-pad" style="padding:0 28px 16px; text-align:left;">
+              <p class="body-text" style="margin:0 0 14px; font-size:17px; line-height:1.55; color:#1C2526;">
+                I understand that life gets in the way. If you need flexibility, <strong>contact me directly</strong> and we can discuss payment arrangements to bring your account current.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Contact options -->
+          <tr>
+            <td class="content-pad" style="padding:8px 28px 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F6F0; border-radius:10px; border:1px solid #E0DCC8;">
+                <tr>
+                  <td style="padding:20px 22px; text-align:center;">
+                    <p style="margin:0 0 14px; font-size:16px; font-weight:bold; color:#1C2526;">How to reach me</p>
+                    <p class="body-text" style="margin:0 0 16px; font-size:15px; line-height:1.55; color:#333333;">
+                      <strong>Reply to this email</strong>, or use any option below. I am here to help.
+                    </p>
+                    <a
+                      class="contact-btn"
+                      href="tel:+19514460731"
+                      style="display:inline-block; background-color:#B8860B; color:#FFFFFF; font-size:16px; font-weight:bold; padding:14px 24px; text-decoration:none; border-radius:8px; margin:0 6px 10px;"
+                    >Call or text Gen: (951) 446-0731</a>
+                    <a
+                      class="contact-btn"
+                      href="tel:+18884653717"
+                      style="display:inline-block; background-color:#1C2526; color:#FFFFFF; font-size:16px; font-weight:bold; padding:14px 24px; text-decoration:none; border-radius:8px; margin:0 6px 10px;"
+                    >LDMA main line: (888) 465-3717</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Signature -->
+          <tr>
+            <td class="content-pad" style="padding:0 28px 24px; text-align:left;">
+              <p class="body-text" style="margin:0 0 14px; font-size:16px; line-height:1.55; color:#1C2526;">
+                Your membership matters to us. Please reach out as soon as you can so we can resolve this together.
+              </p>
+              <p class="body-text" style="margin:0; font-size:16px; line-height:1.55; color:#1C2526;">
+                Sincerely,<br>
+                <span style="color:#B8860B; font-weight:bold;">Gen Ricci</span><br>
+                <span style="font-size:14px; color:#555555;">Member Relations Specialist<br>Lost Dutchman&rsquo;s Mining Association</span>
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:16px 28px 20px; text-align:center; font-size:12px; line-height:1.5; color:#666666; border-top:1px solid #EEE9DC; background-color:#FAFAF8;">
+              <p style="margin:0 0 6px;">
+                Lost Dutchman&rsquo;s Mining Association &middot; 43105 Business Park Drive, Temecula, CA 92590
+              </p>
+              <p style="margin:0;">
+                <a href="mailto:hello@myldma.com" style="color:#B8860B;">hello@myldma.com</a> &middot; <a href="tel:+18884653717" style="color:#B8860B;">(888) 465-3717</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

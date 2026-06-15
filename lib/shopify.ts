@@ -841,6 +841,59 @@ export async function getProductByHandle(
   }
 }
 
+/** Fetch a single product by Shopify product GID or numeric id. */
+export async function getProductById(
+  productId: string
+): Promise<ProductWithSellingPlans | null> {
+  const id = productId.startsWith("gid://")
+    ? productId
+    : `gid://shopify/Product/${productId}`;
+
+  try {
+    const result = await shopifyFetch<{
+      product: (ShopProduct & {
+        collections?: { edges: Array<{ node: { handle: string } }> };
+      }) | null;
+    }>({
+      query: `
+        ${SHOP_PRODUCT_FRAGMENT}
+        query GetProductById($id: ID!) {
+          product(id: $id) {
+            ...ShopProductFields
+            collections(first: 5) {
+              edges {
+                node { handle }
+              }
+            }
+          }
+        }
+      `,
+      variables: { id },
+    });
+
+    const product = result?.product;
+    if (!product) return null;
+    return product;
+  } catch (e) {
+    console.error("getProductById error:", e);
+    return null;
+  }
+}
+
+/** Pick the first variant whose price matches target (USD, whole dollars). */
+export function shopifyVariantMatchingPrice(
+  product: ShopProduct,
+  targetPrice: number
+): ShopProductVariant | null {
+  for (const { node } of product.variants.edges) {
+    const amount = parseFloat(node.price.amount);
+    if (Number.isFinite(amount) && Math.abs(amount - targetPrice) < 0.01) {
+      return node;
+    }
+  }
+  return null;
+}
+
 /** Fetch a product by handle with variant price_level metafields (for VIP upsell modal). */
 export async function getProductByHandleWithVariantMetafields(
   handle: string
