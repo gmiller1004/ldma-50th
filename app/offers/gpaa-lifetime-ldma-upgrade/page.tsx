@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import { getProductById, shopifyVariantMatchingPrice } from "@/lib/shopify";
 import {
+  buildGpaaUpgradeOptions,
   GPAA_LIFETIME_UPGRADE_PRODUCT_GID,
   GPAA_LIFETIME_UPGRADE_PRICE_DUAL,
   GPAA_LIFETIME_UPGRADE_PRICE_DUAL_LEGACY,
 } from "@/lib/gpaa-lifetime-upgrade-config";
-import {
-  buildGpaaUpgradeOptions,
-  GpaaLifetimeUpgradeContent,
-} from "./GpaaLifetimeUpgradeContent";
+import { GpaaLifetimeUpgradeContent } from "./GpaaLifetimeUpgradeContent";
 
 export const metadata: Metadata = {
   title: "GPAA Lifetime → Dual LDMA Upgrade | Exclusive Offer",
@@ -20,6 +18,8 @@ export const metadata: Metadata = {
     googleBot: { index: false, follow: false },
   },
 };
+
+export const dynamic = "force-dynamic";
 
 export default async function GpaaLifetimeLdmaUpgradePage() {
   const product = await getProductById(GPAA_LIFETIME_UPGRADE_PRODUCT_GID);

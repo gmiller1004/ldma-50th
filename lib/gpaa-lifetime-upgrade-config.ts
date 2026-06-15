@@ -18,3 +18,51 @@ export const GPAA_LIFETIME_UPGRADE_PRICE_DUAL_LEGACY = 900;
 export const GPAA_LIFETIME_UPGRADE_LDMA_RETAIL = 4750;
 export const GPAA_LIFETIME_UPGRADE_LEGACY_RETAIL = 3250;
 export const GPAA_LIFETIME_UPGRADE_PAYDIRT_VALUE = 250;
+
+export type GpaaUpgradeOfferOption = {
+  anchorId: string;
+  price: number;
+  retailCompare?: number;
+  title: string;
+  subtitle: string;
+  bullets: string[];
+  variantId: string | null;
+  highlight?: boolean;
+};
+
+/** Offer cards for the hidden upgrade page (variant ids resolved server-side). */
+export function buildGpaaUpgradeOptions(
+  variant500: string | null,
+  variant900: string | null
+): GpaaUpgradeOfferOption[] {
+  return [
+    {
+      anchorId: "dual-500",
+      price: GPAA_LIFETIME_UPGRADE_PRICE_DUAL,
+      retailCompare: GPAA_LIFETIME_UPGRADE_LDMA_RETAIL,
+      title: "Dual Lifetime upgrade",
+      subtitle: "GPAA + LDMA Lifetime, paydirt bag included.",
+      bullets: [
+        "Dual GPAA/LDMA Lifetime Membership",
+        `$${GPAA_LIFETIME_UPGRADE_PAYDIRT_VALUE} Digger's Concentrates paydirt bag`,
+        "Maintenance begins January 2027",
+      ],
+      variantId: variant500,
+    },
+    {
+      anchorId: "dual-900",
+      price: GPAA_LIFETIME_UPGRADE_PRICE_DUAL_LEGACY,
+      retailCompare: GPAA_LIFETIME_UPGRADE_LDMA_RETAIL + GPAA_LIFETIME_UPGRADE_LEGACY_RETAIL,
+      title: "Dual upgrade + Legacy bundle",
+      subtitle: `Everything in the $${GPAA_LIFETIME_UPGRADE_PRICE_DUAL} offer, plus Companion, Transferability, and Pre-Paid Transfer Fee.`,
+      bullets: [
+        "Companion Add-On • eligible family can use camps and claims on their schedule",
+        "Transferability • name who receives your dual membership in the future",
+        "Pre-Paid Transfer Fee • transfer fee covered now for your family",
+        `Legacy bundle alone retails for $${GPAA_LIFETIME_UPGRADE_LEGACY_RETAIL.toLocaleString()}`,
+      ],
+      variantId: variant900,
+      highlight: true,
+    },
+  ];
+}

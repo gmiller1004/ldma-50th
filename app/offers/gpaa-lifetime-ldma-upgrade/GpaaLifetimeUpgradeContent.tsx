@@ -7,27 +7,16 @@ import { Loader2, Phone } from "lucide-react";
 import { addMembershipToCart } from "@/app/actions/cart";
 import { useCart } from "@/context/CartContext";
 import {
-  GPAA_LIFETIME_UPGRADE_LEGACY_RETAIL,
+  buildGpaaUpgradeOptions,
   GPAA_LIFETIME_UPGRADE_LDMA_RETAIL,
   GPAA_LIFETIME_UPGRADE_PAYDIRT_IMAGE,
   GPAA_LIFETIME_UPGRADE_PAYDIRT_VALUE,
   GPAA_LIFETIME_UPGRADE_PRICE_DUAL,
-  GPAA_LIFETIME_UPGRADE_PRICE_DUAL_LEGACY,
+  type GpaaUpgradeOfferOption,
 } from "@/lib/gpaa-lifetime-upgrade-config";
 
-type OfferOption = {
-  anchorId: string;
-  price: number;
-  retailCompare?: number;
-  title: string;
-  subtitle: string;
-  bullets: string[];
-  variantId: string | null;
-  highlight?: boolean;
-};
-
 type Props = {
-  options: OfferOption[];
+  options: GpaaUpgradeOfferOption[];
 };
 
 export function GpaaLifetimeUpgradeContent({ options }: Props) {
@@ -35,7 +24,7 @@ export function GpaaLifetimeUpgradeContent({ options }: Props) {
   const [addingAnchor, setAddingAnchor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleAdd(option: OfferOption) {
+  async function handleAdd(option: GpaaUpgradeOfferOption) {
     if (!option.variantId) {
       setError("Online checkout is temporarily unavailable. Please call (888) 465-3717.");
       return;
@@ -197,38 +186,4 @@ export function GpaaLifetimeUpgradeContent({ options }: Props) {
       </main>
     </div>
   );
-}
-
-/** Default offer cards when Shopify variants are loaded server-side. */
-export function buildGpaaUpgradeOptions(variant500: string | null, variant900: string | null): OfferOption[] {
-  return [
-    {
-      anchorId: "dual-500",
-      price: GPAA_LIFETIME_UPGRADE_PRICE_DUAL,
-      retailCompare: GPAA_LIFETIME_UPGRADE_LDMA_RETAIL,
-      title: "Dual Lifetime upgrade",
-      subtitle: "GPAA + LDMA Lifetime, paydirt bag included.",
-      bullets: [
-        "Dual GPAA/LDMA Lifetime Membership",
-        `$${GPAA_LIFETIME_UPGRADE_PAYDIRT_VALUE} Digger's Concentrates paydirt bag`,
-        "Maintenance begins January 2027",
-      ],
-      variantId: variant500,
-    },
-    {
-      anchorId: "dual-900",
-      price: GPAA_LIFETIME_UPGRADE_PRICE_DUAL_LEGACY,
-      retailCompare: GPAA_LIFETIME_UPGRADE_LDMA_RETAIL + GPAA_LIFETIME_UPGRADE_LEGACY_RETAIL,
-      title: "Dual upgrade + Legacy bundle",
-      subtitle: `Everything in the $${GPAA_LIFETIME_UPGRADE_PRICE_DUAL} offer, plus Companion, Transferability, and Pre-Paid Transfer Fee.`,
-      bullets: [
-        "Companion Add-On • eligible family can use camps and claims on their schedule",
-        "Transferability • name who receives your dual membership in the future",
-        "Pre-Paid Transfer Fee • transfer fee covered now for your family",
-        `Legacy bundle alone retails for $${GPAA_LIFETIME_UPGRADE_LEGACY_RETAIL.toLocaleString()}`,
-      ],
-      variantId: variant900,
-      highlight: true,
-    },
-  ];
 }
