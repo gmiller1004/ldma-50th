@@ -1,10 +1,20 @@
 /**
- * Build a shareable Shopify cart URL: /cart/{variantId}:{qty},...
- * This matches the classic storefront permalink format (same as manual Mailchimp links).
- * Often more reliable in email than Storefront API checkoutUrl → checkouts/cn redirects on some themes.
+ * Build a shareable cart permalink on the headless storefront:
+ *   https://myldma.com/cart/{variantId}:{qty},...
+ *
+ * Legacy myldmastore.myshopify.com/cart/… links return 410 — use this instead.
+ * Handled by app/cart/[...lines]/route.ts (creates cart → Shopify checkout).
  *
  * Optional discount query: set MEMBERSHIP_CART_PERMALINK_DISCOUNT (e.g. companion299).
  */
+
+function getCartPermalinkOrigin(): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+    process.env.NEXT_PUBLIC_CART_PERMALINK_ORIGIN?.replace(/\/$/, "") ||
+    "https://myldma.com"
+  );
+}
 
 /** Last segment of a Shopify GID or numeric id string. */
 export function gidToNumericId(gid: string): string {
@@ -27,8 +37,7 @@ export function buildShopifyCartPermalink(
   lines: Array<{ variantId: string; quantity: number }>,
   discountCode?: string
 ): string {
-  const domain = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN?.trim();
-  if (!domain || lines.length === 0) return "";
+  if (lines.length === 0) return "";
 
   const segment = lines
     .map((l) => {
@@ -38,7 +47,7 @@ export function buildShopifyCartPermalink(
     })
     .join(",");
 
-  const base = `https://${domain}/cart/${segment}`;
+  const base = `${getCartPermalinkOrigin()}/cart/${segment}`;
   // Explicit "" = no ?discount= (e.g. Klaviyo templates that must omit codes)
   if (discountCode === "") {
     return base;
