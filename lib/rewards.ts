@@ -199,6 +199,17 @@ export async function awardPointsForCaretakerCheckIn(
   await addPoints(contactId, total, "caretaker_check_in", "check_in", checkInId);
 }
 
+/** Award points when a member reservation is checked in (50 per night, idempotent per reservation). */
+export async function awardPointsForReservationCheckIn(
+  contactId: string,
+  nights: number,
+  reservationId: string
+): Promise<void> {
+  if (nights <= 0) return;
+  const total = nights * POINTS.caretaker_check_in_per_night;
+  await addPoints(contactId, total, "caretaker_check_in", "reservation", reservationId);
+}
+
 /** Adjust points when caretaker edits checkout (delta can be negative). */
 export async function adjustPointsForCaretakerCheckIn(
   contactId: string,

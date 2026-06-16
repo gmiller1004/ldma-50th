@@ -7,6 +7,8 @@
  * - Shipping_Same_As_Billing__c: when updating shipping, set false so updates aren't overridden
  */
 
+import { normalizePhoneDigits } from "@/lib/member-contact-search";
+
 export type MemberLookupResult = {
   valid: boolean;
   active: boolean;
@@ -55,6 +57,212 @@ export type MemberLookupResult = {
   error?: string;
 };
 
+export type MemberLookupMatch = {
+  contactId: string;
+  memberNumber: string | null;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+};
+
+export type CaretakerMemberSearchResult =
+  | { status: "found"; member: MemberLookupResult; memberNumber: string | null }
+  | { status: "multiple"; matches: MemberLookupMatch[] }
+  | { status: "not_found"; error: string };
+
+const CONTACT_LOOKUP_SELECT =
+  "Id, Customer_Number__c, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c, Legacy_Offer_Request_Date__c, Legacy_Offer_Status__c, Is_Transferable__c, Is_Companion__c, Is_PrePay_Transfer__c, Companion_Transferable__c, Companion__c, Companion__r.Name, Is_LDMA_Admin__c, Is_LDMA_Caretaker__c, Caretaker_Admin__c, Caretaker_At_Camp__c, Membership_Dues_Owed_Contact__c, Membership_Balance__c";
+
+function escapeSoqlString(value: string): string {
+  return String(value).replace(/'/g, "\\'");
+}
+
+function memberNumberFromContact(c: Record<string, unknown>): string | null {
+  const raw = c.Customer_Number__c;
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+  if (typeof raw === "number" && !Number.isNaN(raw)) return String(raw);
+  return null;
+}
+
+function displayNameFromContact(c: Record<string, unknown>): string {
+  const name = [c.FirstName, c.LastName].filter((p) => typeof p === "string" && p.trim()).join(" ").trim();
+  const memberNumber = memberNumberFromContact(c);
+  if (name) return name;
+  if (memberNumber) return `Member #${memberNumber}`;
+  return "LDMA Member";
+}
+
+function contactToMatch(c: Record<string, unknown>): MemberLookupMatch {
+  return {
+    contactId: c.Id as string,
+    memberNumber: memberNumberFromContact(c),
+    displayName: displayNameFromContact(c),
+    email: typeof c.Email === "string" && c.Email.trim() ? c.Email.trim() : null,
+    phone: typeof c.Phone === "string" && c.Phone.trim() ? c.Phone.trim() : null,
+  };
+}
+
+function mapContactRecord(c: Record<string, unknown>): MemberLookupResult {
+  const hasEmail = typeof c.Email === "string" && c.Email.length > 0;
+  if (!hasEmail) {
+    return {
+      valid: true,
+      active: false,
+      contactId: c.Id as string,
+      error: "No email on file. Please call to update your contact information.",
+    };
+  }
+
+  const membershipType = (c.Active_Membership_Type__c as string) || "";
+  const membershipTypeText = (c.Active_Membership_Type_Text_Copy__c as string) || "";
+  const isNewMember = c.Is_New_LDMA_Member__c === true;
+  const active =
+    membershipType === "LDMA" || membershipTypeText === "LDMA" || isNewMember;
+
+  const maintenanceExempt =
+    String((c.Maintenance_Exempt__c as string) || "").toUpperCase() === "YES";
+  const isOnAutoPay = c.Is_On_Auto_Pay__c === true || c.LDMA_Auto_Pay_Shopify__c === true;
+
+  const companionTransferable = c.Companion_Transferable__c === true;
+  const companionRel = c.Companion__r as Record<string, unknown> | undefined;
+  const companionNameFromLookup =
+    companionRel && typeof companionRel.Name === "string" && companionRel.Name.trim()
+      ? (companionRel.Name as string).trim()
+      : undefined;
+  const companion =
+    companionNameFromLookup ??
+    (typeof c.Companion__c === "string" && c.Companion__c.trim()
+      ? (c.Companion__c as string).trim()
+      : undefined);
+
+  const hideMaintenance =
+    membershipType !== "LDMA" && membershipTypeText !== "LDMA" && isNewMember;
+  const showMaintenance =
+    !hideMaintenance &&
+    (membershipType === "LDMA" || membershipTypeText === "LDMA") &&
+    !maintenanceExempt;
+
+  const duesRaw = c.Maintenance_Min_0_Email__c;
+  let duesOwed: number | undefined;
+  if (typeof duesRaw === "number" && !Number.isNaN(duesRaw)) {
+    duesOwed = duesRaw;
+  } else if (typeof duesRaw === "string") {
+    const parsed = parseFloat(duesRaw.replace(/[^0-9.-]/g, ""));
+    if (!Number.isNaN(parsed)) duesOwed = parsed;
+  }
+
+  let maintenancePaidThru: string | undefined;
+  const paidThru = c.Maintenance_Paid_Thru_Date__c;
+  if (paidThru != null) {
+    maintenancePaidThru =
+      typeof paidThru === "string"
+        ? paidThru
+        : paidThru instanceof Date
+          ? paidThru.toISOString().slice(0, 10)
+          : String(paidThru);
+  }
+
+  const isCaretaker = c.Is_LDMA_Caretaker__c === true;
+  const isCaretakerAdmin = c.Caretaker_Admin__c === true;
+  const caretakerAtCamp =
+    typeof c.Caretaker_At_Camp__c === "string" && c.Caretaker_At_Camp__c.trim()
+      ? (c.Caretaker_At_Camp__c as string).trim()
+      : null;
+
+  let membershipDuesOwed: number | null = null;
+  const mdo = c.Membership_Dues_Owed_Contact__c;
+  if (typeof mdo === "number" && !Number.isNaN(mdo)) membershipDuesOwed = mdo;
+  else if (typeof mdo === "string") {
+    const parsed = parseFloat(mdo.replace(/[^0-9.-]/g, ""));
+    if (!Number.isNaN(parsed)) membershipDuesOwed = parsed;
+  }
+  let membershipBalance: number | null = null;
+  const mb = c.Membership_Balance__c;
+  if (typeof mb === "number" && !Number.isNaN(mb)) membershipBalance = mb;
+  else if (typeof mb === "string") {
+    const parsed = parseFloat(mb.replace(/[^0-9.-]/g, ""));
+    if (!Number.isNaN(parsed)) membershipBalance = parsed;
+  }
+
+  const legacyRequestDate = c.Legacy_Offer_Request_Date__c;
+  const legacyOfferRequestDate =
+    legacyRequestDate != null
+      ? typeof legacyRequestDate === "string"
+        ? legacyRequestDate
+        : legacyRequestDate instanceof Date
+          ? legacyRequestDate.toISOString()
+          : String(legacyRequestDate)
+      : null;
+  const legacyOfferStatus =
+    typeof c.Legacy_Offer_Status__c === "string" ? c.Legacy_Offer_Status__c : null;
+
+  return {
+    valid: true,
+    active,
+    contactId: c.Id as string,
+    email: c.Email as string,
+    phone: (c.Phone as string) || undefined,
+    firstName: (c.FirstName as string) || undefined,
+    lastName: (c.LastName as string) || undefined,
+    otherStreet: (c.OtherStreet as string) || undefined,
+    otherCity: (c.OtherCity as string) || undefined,
+    otherState: (c.OtherState as string) || undefined,
+    otherPostalCode: (c.OtherPostalCode as string) || undefined,
+    shippingSameAsBilling: c.Shipping_Same_As_Billing__c === true,
+    duesOwed,
+    maintenancePaidThru,
+    showMaintenance,
+    maintenanceExempt,
+    isOnAutoPay,
+    companionTransferable,
+    companion,
+    legacyOfferRequestDate: legacyOfferRequestDate ?? undefined,
+    legacyOfferStatus: legacyOfferStatus ?? undefined,
+    isTransferable: c.Is_Transferable__c === true,
+    isCompanion: c.Is_Companion__c === true,
+    isPrePayTransfer: c.Is_PrePay_Transfer__c === true,
+    isLdmaAdmin: c.Is_LDMA_Admin__c === true,
+    isCaretaker,
+    isCaretakerAdmin,
+    caretakerAtCamp,
+    membershipDuesOwed: membershipDuesOwed ?? undefined,
+    membershipBalance: membershipBalance ?? undefined,
+  };
+}
+
+async function queryContactRecords(whereClause: string, limit: number): Promise<Record<string, unknown>[]> {
+  const client = await getSalesforceRestClient();
+  if (!client) return [];
+
+  const query = `SELECT ${CONTACT_LOOKUP_SELECT} FROM Contact WHERE ${whereClause} LIMIT ${limit}`;
+  const queryRes = await fetch(
+    `${client.instanceUrl}/services/data/v59.0/query?q=${encodeURIComponent(query)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${client.accessToken}`,
+      },
+    }
+  );
+
+  if (!queryRes.ok) {
+    const err = await queryRes.text();
+    console.error("Salesforce query error:", err);
+    return [];
+  }
+
+  const data = (await queryRes.json()) as { records: unknown[] };
+  return (data.records || []) as Record<string, unknown>[];
+}
+
+function phoneSoqlWhereClause(phone: string): string | null {
+  const digits = normalizePhoneDigits(phone);
+  if (digits.length < 7) return null;
+  const last10 = escapeSoqlString(digits.slice(-10));
+  const phoneNorm =
+    "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(Phone, '(', ''), ')', ''), '-', ''), ' ', ''), '+', '')";
+  return `Phone != null AND ${phoneNorm} LIKE '%${last10}%'`;
+}
+
 export async function lookupMember(memberNumber: string): Promise<MemberLookupResult> {
   const client = await getSalesforceRestClient();
   if (!client) {
@@ -69,29 +277,8 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
   }
 
   try {
-    const escaped = String(memberNumber).replace(/'/g, "\\'");
-    const query = `SELECT Id, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c, Legacy_Offer_Request_Date__c, Legacy_Offer_Status__c, Is_Transferable__c, Is_Companion__c, Is_PrePay_Transfer__c, Companion_Transferable__c, Companion__c, Companion__r.Name, Is_LDMA_Admin__c, Is_LDMA_Caretaker__c, Caretaker_Admin__c, Caretaker_At_Camp__c, Membership_Dues_Owed_Contact__c, Membership_Balance__c FROM Contact WHERE Customer_Number__c = '${escaped}' LIMIT 1`;
-    const queryRes = await fetch(
-      `${client.instanceUrl}/services/data/v59.0/query?q=${encodeURIComponent(query)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${client.accessToken}`,
-        },
-      }
-    );
-
-    if (!queryRes.ok) {
-      const err = await queryRes.text();
-      console.error("Salesforce query error:", err);
-      return {
-        valid: false,
-        active: false,
-        error: "Lookup failed",
-      };
-    }
-
-    const data = (await queryRes.json()) as { records: unknown[] };
-    const records = data.records || [];
+    const escaped = escapeSoqlString(memberNumber);
+    const records = await queryContactRecords(`Customer_Number__c = '${escaped}'`, 1);
     if (records.length === 0) {
       return {
         valid: false,
@@ -99,137 +286,7 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
         error: "Member number not found",
       };
     }
-
-    const c = records[0] as Record<string, unknown>;
-    const hasEmail = typeof c.Email === "string" && c.Email.length > 0;
-    if (!hasEmail) {
-      return {
-        valid: true,
-        active: false,
-        contactId: c.Id as string,
-        error: "No email on file. Please call to update your contact information.",
-      };
-    }
-
-    const membershipType = (c.Active_Membership_Type__c as string) || "";
-    const membershipTypeText = (c.Active_Membership_Type_Text_Copy__c as string) || "";
-    const isNewMember = c.Is_New_LDMA_Member__c === true;
-    const active =
-      membershipType === "LDMA" ||
-      membershipTypeText === "LDMA" ||
-      isNewMember;
-
-    const maintenanceExempt =
-      String((c.Maintenance_Exempt__c as string) || "").toUpperCase() === "YES";
-    const isOnAutoPay =
-      c.Is_On_Auto_Pay__c === true || c.LDMA_Auto_Pay_Shopify__c === true;
-
-    const companionTransferable = c.Companion_Transferable__c === true;
-    const companionRel = c.Companion__r as Record<string, unknown> | undefined;
-    const companionNameFromLookup =
-      companionRel && typeof companionRel.Name === "string" && companionRel.Name.trim()
-        ? (companionRel.Name as string).trim()
-        : undefined;
-    const companion =
-      companionNameFromLookup ??
-      (typeof c.Companion__c === "string" && c.Companion__c.trim()
-        ? (c.Companion__c as string).trim()
-        : undefined);
-
-    // Hide maintenance section: type not LDMA AND is new member
-    const hideMaintenance =
-      membershipType !== "LDMA" && membershipTypeText !== "LDMA" && isNewMember;
-    const showMaintenance =
-      !hideMaintenance &&
-      (membershipType === "LDMA" || membershipTypeText === "LDMA") &&
-      !maintenanceExempt;
-
-    const duesRaw = c.Maintenance_Min_0_Email__c;
-    let duesOwed: number | undefined;
-    if (typeof duesRaw === "number" && !Number.isNaN(duesRaw)) {
-      duesOwed = duesRaw;
-    } else if (typeof duesRaw === "string") {
-      const parsed = parseFloat(duesRaw.replace(/[^0-9.-]/g, ""));
-      if (!Number.isNaN(parsed)) duesOwed = parsed;
-    }
-
-    let maintenancePaidThru: string | undefined;
-    const paidThru = c.Maintenance_Paid_Thru_Date__c;
-    if (paidThru != null) {
-      maintenancePaidThru =
-        typeof paidThru === "string"
-          ? paidThru
-          : paidThru instanceof Date
-            ? paidThru.toISOString().slice(0, 10)
-            : String(paidThru);
-    }
-
-    const isCaretaker = c.Is_LDMA_Caretaker__c === true;
-    const isCaretakerAdmin = c.Caretaker_Admin__c === true;
-    const caretakerAtCamp =
-      typeof c.Caretaker_At_Camp__c === "string" && c.Caretaker_At_Camp__c.trim()
-        ? (c.Caretaker_At_Camp__c as string).trim()
-        : null;
-
-    let membershipDuesOwed: number | null = null;
-    const mdo = c.Membership_Dues_Owed_Contact__c;
-    if (typeof mdo === "number" && !Number.isNaN(mdo)) membershipDuesOwed = mdo;
-    else if (typeof mdo === "string") {
-      const parsed = parseFloat(mdo.replace(/[^0-9.-]/g, ""));
-      if (!Number.isNaN(parsed)) membershipDuesOwed = parsed;
-    }
-    let membershipBalance: number | null = null;
-    const mb = c.Membership_Balance__c;
-    if (typeof mb === "number" && !Number.isNaN(mb)) membershipBalance = mb;
-    else if (typeof mb === "string") {
-      const parsed = parseFloat(mb.replace(/[^0-9.-]/g, ""));
-      if (!Number.isNaN(parsed)) membershipBalance = parsed;
-    }
-
-    const legacyRequestDate = c.Legacy_Offer_Request_Date__c;
-    const legacyOfferRequestDate =
-      legacyRequestDate != null
-        ? typeof legacyRequestDate === "string"
-          ? legacyRequestDate
-          : legacyRequestDate instanceof Date
-            ? legacyRequestDate.toISOString()
-            : String(legacyRequestDate)
-        : null;
-    const legacyOfferStatus =
-      typeof c.Legacy_Offer_Status__c === "string" ? c.Legacy_Offer_Status__c : null;
-
-    return {
-      valid: true,
-      active,
-      contactId: c.Id as string,
-      email: c.Email as string,
-      phone: (c.Phone as string) || undefined,
-      firstName: (c.FirstName as string) || undefined,
-      lastName: (c.LastName as string) || undefined,
-      otherStreet: (c.OtherStreet as string) || undefined,
-      otherCity: (c.OtherCity as string) || undefined,
-      otherState: (c.OtherState as string) || undefined,
-      otherPostalCode: (c.OtherPostalCode as string) || undefined,
-      shippingSameAsBilling: c.Shipping_Same_As_Billing__c === true,
-      duesOwed,
-      maintenancePaidThru,
-      showMaintenance,
-      maintenanceExempt,
-      isOnAutoPay,
-      companionTransferable,
-      companion,
-      legacyOfferRequestDate: legacyOfferRequestDate ?? undefined,
-      legacyOfferStatus: legacyOfferStatus ?? undefined,
-      isTransferable: c.Is_Transferable__c === true,
-      isCompanion: c.Is_Companion__c === true,
-      isPrePayTransfer: c.Is_PrePay_Transfer__c === true,
-      isLdmaAdmin: c.Is_LDMA_Admin__c === true,
-      isCaretaker,
-      isCaretakerAdmin,
-      caretakerAtCamp,
-      membershipDuesOwed: membershipDuesOwed ?? undefined,
-      membershipBalance: membershipBalance ?? undefined,
-    };
+    return mapContactRecord(records[0]);
   } catch (e) {
     console.error("Salesforce lookup error:", e);
     return {
@@ -237,6 +294,105 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
       active: false,
       error: "Lookup failed",
     };
+  }
+}
+
+export async function lookupMemberByContactId(contactId: string): Promise<CaretakerMemberSearchResult> {
+  const client = await getSalesforceRestClient();
+  if (!client) {
+    if (process.env.NODE_ENV === "development") {
+      const member = mockLookup("dev");
+      return { status: "found", member, memberNumber: "dev" };
+    }
+    return { status: "not_found", error: "Salesforce not configured" };
+  }
+
+  try {
+    const escaped = escapeSoqlString(contactId);
+    const records = await queryContactRecords(`Id = '${escaped}'`, 1);
+    if (records.length === 0) {
+      return { status: "not_found", error: "Member not found" };
+    }
+    const member = mapContactRecord(records[0]);
+    if (!member.valid) {
+      return { status: "not_found", error: member.error ?? "Member not found" };
+    }
+    return {
+      status: "found",
+      member,
+      memberNumber: memberNumberFromContact(records[0]),
+    };
+  } catch (e) {
+    console.error("Salesforce contact lookup error:", e);
+    return { status: "not_found", error: "Lookup failed" };
+  }
+}
+
+export async function searchMembersForCaretaker(input: {
+  memberNumber?: string;
+  email?: string;
+  phone?: string;
+}): Promise<CaretakerMemberSearchResult> {
+  const { memberNumber, email, phone } = input;
+  const provided = [memberNumber, email, phone].filter(Boolean).length;
+  if (provided !== 1) {
+    return { status: "not_found", error: "Provide memberNumber, email, or phone" };
+  }
+
+  if (memberNumber) {
+    const member = await lookupMember(memberNumber);
+    if (!member.valid) {
+      return { status: "not_found", error: member.error ?? "Member not found" };
+    }
+    return { status: "found", member, memberNumber };
+  }
+
+  const client = await getSalesforceRestClient();
+  if (!client) {
+    if (process.env.NODE_ENV === "development") {
+      const member = mockLookup(email || phone || "dev");
+      return { status: "found", member, memberNumber: "dev" };
+    }
+    return { status: "not_found", error: "Salesforce not configured" };
+  }
+
+  try {
+    let whereClause: string;
+    if (email) {
+      whereClause = `Email = '${escapeSoqlString(email)}'`;
+    } else if (phone) {
+      const phoneWhere = phoneSoqlWhereClause(phone);
+      if (!phoneWhere) {
+        return { status: "not_found", error: "Enter at least 7 phone digits" };
+      }
+      whereClause = phoneWhere;
+    } else {
+      return { status: "not_found", error: "Provide memberNumber, email, or phone" };
+    }
+
+    const records = await queryContactRecords(whereClause, 10);
+    if (records.length === 0) {
+      return { status: "not_found", error: "No member found for that email or phone" };
+    }
+    if (records.length > 1) {
+      return {
+        status: "multiple",
+        matches: records.map(contactToMatch),
+      };
+    }
+
+    const member = mapContactRecord(records[0]);
+    if (!member.valid) {
+      return { status: "not_found", error: member.error ?? "Member not found" };
+    }
+    return {
+      status: "found",
+      member,
+      memberNumber: memberNumberFromContact(records[0]),
+    };
+  } catch (e) {
+    console.error("Salesforce search error:", e);
+    return { status: "not_found", error: "Lookup failed" };
   }
 }
 

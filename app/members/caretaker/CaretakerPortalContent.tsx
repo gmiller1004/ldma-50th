@@ -15,10 +15,19 @@ import {
   isSameDay,
   getDay,
 } from "date-fns";
-import { campUsesReservations, isHookupSiteType } from "@/lib/reservation-camps";
+import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate } from "@/lib/reservation-camps";
 import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
-import { computeReservationTotalCents, formatCentsAsCurrency } from "@/lib/reservation-pricing";
+import { computeStayPricing, formatCentsAsCurrency } from "@/lib/reservation-pricing";
+import { countNights } from "@/lib/reservation-dates";
 import { ReservationCalendarView } from "@/app/members/caretaker/ReservationCalendarView";
+import {
+  ReservationBillingSection,
+  PaymentDueBadge,
+  type BillingPeriodRow,
+  type SiteBalance,
+} from "@/app/members/caretaker/ReservationBillingSection";
+
+import { parseCaretakerLookupInput } from "@/lib/member-contact-search";
 
 type LookupResult = {
   contactId: string;
@@ -29,6 +38,14 @@ type LookupResult = {
   maintenanceFeesDue: number | null;
   membershipDuesOwed: number | null;
   membershipBalance: number | null;
+};
+
+type LookupMatch = {
+  contactId: string;
+  memberNumber: string | null;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
 };
 
 type CheckIn = {
@@ -58,6 +75,7 @@ type Site = {
   siteType: string;
   sortOrder: number;
   memberRateDaily: number | null;
+  memberRateMonthly: number | null;
   nonMemberRateDaily: number | null;
 };
 
@@ -78,6 +96,16 @@ type Reservation = {
   guestPhone: string | null;
   status: string;
   checkedInAt: string | null;
+  createdAt?: string;
+  invoiceNumber?: string | null;
+  calculatedTotalCents?: number | null;
+  amountOverrideCents?: number | null;
+  overrideReason?: string | null;
+  priceOverrideFlag?: boolean;
+  balanceDueCents?: number;
+  siteFeesPaidCents?: number;
+  siteFeesDueCents?: number;
+  hasOverdueSiteFee?: boolean;
   eventProductHandle?: string | null;
   eventSiteType?: string | null;
 };
@@ -299,6 +327,7 @@ export function CaretakerPortalContent({
   const [resType, setResType] = useState<"member" | "guest">("member");
   const [resMemberNumber, setResMemberNumber] = useState("");
   const [resMemberLookup, setResMemberLookup] = useState<LookupResult | null>(null);
+  const [resMemberLookupMatches, setResMemberLookupMatches] = useState<LookupMatch[]>([]);
   const [resMemberLookupLoading, setResMemberLookupLoading] = useState(false);
   const [resGuestFirstName, setResGuestFirstName] = useState("");
   const [resGuestLastName, setResGuestLastName] = useState("");
@@ -317,6 +346,17 @@ export function CaretakerPortalContent({
   const [cancellingReservation, setCancellingReservation] = useState<Reservation | null>(null);
   const [resCancelModalOpen, setResCancelModalOpen] = useState(false);
   const [resCancelSubmitting, setResCancelSubmitting] = useState(false);
+  const [resCancelPreview, setResCancelPreview] = useState<{
+    refundCents: number;
+    totalPaidCents: number;
+    earnedCents: number;
+    cancellationFeeCents: number;
+    nightsStayed: number;
+    pricingMode: string;
+    stripeRefundCents: number;
+    cashRefundCents: number;
+  } | null>(null);
+  const [resCancelPreviewLoading, setResCancelPreviewLoading] = useState(false);
   const [checkingInReservation, setCheckingInReservation] = useState<Reservation | null>(null);
   const [resCheckInSubmitting, setResCheckInSubmitting] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
@@ -326,12 +366,32 @@ export function CaretakerPortalContent({
   const [detailsPastDueMaintenanceCents, setDetailsPastDueMaintenanceCents] = useState<number>(0);
   const [detailsPastDueMembershipCents, setDetailsPastDueMembershipCents] = useState<number>(0);
   const [detailsPastDueSubmitting, setDetailsPastDueSubmitting] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsBillingPeriods, setDetailsBillingPeriods] = useState<BillingPeriodRow[]>([]);
+  const [detailsSiteBalance, setDetailsSiteBalance] = useState<SiteBalance | null>(null);
   const [resPastDueMaintenanceCents, setResPastDueMaintenanceCents] = useState<number>(0);
   const [resPastDueMembershipCents, setResPastDueMembershipCents] = useState<number>(0);
   const [resPastDueSubmitting, setResPastDueSubmitting] = useState(false);
-  const [resEventParticipant, setResEventParticipant] = useState(false);
-  const [resEventProductHandle, setResEventProductHandle] = useState("");
-  const [resEventSiteType, setResEventSiteType] = useState<"" | "included_dry" | "upgrade_hookup">("");
+  const [resOverrideTotal, setResOverrideTotal] = useState("");
+  const [resOverrideReason, setResOverrideReason] = useState("");
+  const [detailsPayments, setDetailsPayments] = useState<Array<{
+    id: string;
+    method: string;
+    amountCents: number;
+    paymentType: string;
+    invoiceNumber: string | null;
+    stripeCheckoutSessionId: string | null;
+    stripePaymentIntentId: string | null;
+    createdAt: string;
+  }>>([]);
+  const [paymentsDue, setPaymentsDue] = useState<Array<{
+    reservationId: string;
+    siteName: string | null;
+    guestLabel: string;
+    balanceDueCents: number;
+    nextDueDate: string | null;
+    isOverdue: boolean;
+  }>>([]);
   const [resViewMode, setResViewMode] = useState<"list" | "calendar">("list");
   const [resCalendarStart, setResCalendarStart] = useState(() => new Date().toISOString().slice(0, 10));
   const [archivedReservationsExpanded, setArchivedReservationsExpanded] = useState(false);
@@ -353,10 +413,6 @@ export function CaretakerPortalContent({
       .catch(() => {})
       .finally(() => setListLoading(false));
   }
-
-  useEffect(() => {
-    loadCheckIns();
-  }, []);
 
   const usesReservations = campUsesReservations(campSlug);
 
@@ -387,6 +443,10 @@ export function CaretakerPortalContent({
     if (usesReservations) {
       loadSites();
       loadReservations();
+      fetch("/api/members/caretaker/payments-due")
+        .then((r) => (r.ok ? r.json() : { items: [] }))
+        .then((data) => setPaymentsDue(data.items ?? []))
+        .catch(() => setPaymentsDue([]));
     }
   }, [usesReservations]);
 
@@ -410,26 +470,79 @@ export function CaretakerPortalContent({
     }
   }, [resCheckInDate, resCheckOutDate]);
 
+  async function runCaretakerMemberLookup(
+    body: Record<string, string>,
+    onSuccess: (result: LookupResult) => void,
+    onMatches: (matches: LookupMatch[]) => void,
+    onError: (message: string) => void
+  ) {
+    const res = await fetch("/api/members/caretaker/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      onError(data.error ?? "Lookup failed");
+      return;
+    }
+    if (data.multiple && Array.isArray(data.matches) && data.matches.length > 0) {
+      onMatches(data.matches as LookupMatch[]);
+      return;
+    }
+    if (!data.memberNumber) {
+      onError("No member number on file for this contact");
+      return;
+    }
+    onSuccess(data as LookupResult);
+  }
+
+  function applyReservationMemberLookup(result: LookupResult) {
+    setResMemberLookup(result);
+    setResMemberLookupMatches([]);
+    setResMemberNumber(result.memberNumber);
+    setResPastDueMaintenanceCents(Math.round((result.maintenanceFeesDue ?? 0) * 100));
+    setResPastDueMembershipCents(Math.round((result.membershipDuesOwed ?? 0) * 100));
+  }
+
   async function handleReservationMemberLookup(e: React.FormEvent) {
     e.preventDefault();
     if (!resMemberNumber.trim()) return;
     setResMemberLookupLoading(true);
     setResError(null);
+    setResMemberLookupMatches([]);
     try {
-      const res = await fetch("/api/members/caretaker/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memberNumber: resMemberNumber.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setResError(data.error ?? "Lookup failed");
-        setResMemberLookup(null);
-        return;
-      }
-      setResMemberLookup(data);
-      setResPastDueMaintenanceCents(Math.round((data?.maintenanceFeesDue ?? 0) * 100));
-      setResPastDueMembershipCents(Math.round((data?.membershipDuesOwed ?? 0) * 100));
+      const fields = parseCaretakerLookupInput(resMemberNumber);
+      await runCaretakerMemberLookup(
+        fields,
+        applyReservationMemberLookup,
+        setResMemberLookupMatches,
+        (message) => {
+          setResError(message);
+          setResMemberLookup(null);
+        }
+      );
+    } catch {
+      setResError("Lookup failed");
+      setResMemberLookup(null);
+    } finally {
+      setResMemberLookupLoading(false);
+    }
+  }
+
+  async function handleReservationMemberPick(match: LookupMatch) {
+    setResMemberLookupLoading(true);
+    setResError(null);
+    try {
+      await runCaretakerMemberLookup(
+        { contactId: match.contactId },
+        applyReservationMemberLookup,
+        setResMemberLookupMatches,
+        (message) => {
+          setResError(message);
+          setResMemberLookup(null);
+        }
+      );
     } catch {
       setResError("Lookup failed");
       setResMemberLookup(null);
@@ -439,33 +552,44 @@ export function CaretakerPortalContent({
   }
 
   const today = new Date().toISOString().slice(0, 10);
+  const earliestCheckIn = caretakerEarliestCheckInDate(today);
   const resNights =
     resCheckInDate && resCheckOutDate && resCheckInDate < resCheckOutDate
-      ? Math.max(1, Math.ceil((new Date(resCheckOutDate).getTime() - new Date(resCheckInDate).getTime()) / (24 * 60 * 60 * 1000)))
+      ? countNights(resCheckInDate, resCheckOutDate)
       : 0;
   const resSelectedSite = sites.find((s) => s.id === resSiteId);
   const resTotalCents =
     resNights > 0 && resSelectedSite
-      ? computeReservationTotalCents(
-          resNights,
-          null,
-          resType === "member",
-          resSelectedSite.memberRateDaily,
-          resSelectedSite.nonMemberRateDaily
-        )
+      ? computeStayPricing({
+          checkInDate: resCheckInDate,
+          checkOutDate: resCheckOutDate,
+          isMember: resType === "member",
+          rates: {
+            memberRateDaily: resSelectedSite.memberRateDaily,
+            memberRateMonthly: resSelectedSite.memberRateMonthly,
+            nonMemberRateDaily: resSelectedSite.nonMemberRateDaily,
+          },
+        }).totalCents
       : 0;
-  const resCheckInIsToday = resCheckInDate === today;
+  const resAllowsCash = resCheckInDate ? caretakerAllowsCashCheckIn(resCheckInDate, today) : false;
+  const resEffectiveTotalCents = (() => {
+    if (!resOverrideTotal.trim()) return resTotalCents;
+    const n = Math.round(parseFloat(resOverrideTotal) * 100);
+    return Number.isNaN(n) ? resTotalCents : n;
+  })();
 
-  const resEventIncludedDry = resEventParticipant && resEventSiteType === "included_dry";
-  const resEventUpgradeHookup = resEventParticipant && resEventSiteType === "upgrade_hookup";
-  const availableSitesForDropdown = sites.filter((s) => {
-    if (!availableSiteIds.includes(s.id)) return false;
-    if (!resEventParticipant || !resEventSiteType) return true;
-    if (resEventSiteType === "included_dry") return !isHookupSiteType(s.siteType);
-    if (resEventSiteType === "upgrade_hookup") return isHookupSiteType(s.siteType);
-    return true;
-  });
-  const resSiteIdValidForEvent = !resSiteId || availableSitesForDropdown.some((s) => s.id === resSiteId);
+  function appendPriceOverrideFields(body: Record<string, unknown>) {
+    if (resOverrideTotal.trim()) {
+      const overrideCents = Math.round(parseFloat(resOverrideTotal) * 100);
+      if (!Number.isNaN(overrideCents) && overrideCents !== resTotalCents) {
+        body.amountOverrideCents = overrideCents;
+        body.overrideReason = resOverrideReason.trim();
+        body.amountCents = overrideCents;
+      }
+    }
+  }
+
+  const availableSitesForDropdown = sites.filter((s) => availableSiteIds.includes(s.id));
 
   useEffect(() => {
     if (resSiteId && !availableSitesForDropdown.some((s) => s.id === resSiteId)) {
@@ -494,11 +618,7 @@ export function CaretakerPortalContent({
         return;
       }
     }
-    if (resEventUpgradeHookup && !resEventProductHandle.trim()) {
-      setResError("Select an event for upgrade reservation");
-      return;
-    }
-    if (resTotalCents < 1) {
+    if (resTotalCents < 1 && resEffectiveTotalCents < 1) {
       setResError("Invalid total");
       return;
     }
@@ -511,10 +631,11 @@ export function CaretakerPortalContent({
         checkOutDate: resCheckOutDate,
         type: resType,
         paymentMethod: "cash",
-        amountCents: resTotalCents,
+        amountCents: resEffectiveTotalCents,
         recipientEmail: resType === "member" ? resMemberLookup!.email!.trim() : resGuestEmail.trim(),
         recipientDisplayName: resType === "member" ? (resMemberLookup!.displayName || `#${resMemberLookup!.memberNumber}`) : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
       };
+      appendPriceOverrideFields(body);
       if (resType === "member" && resMemberLookup) {
         body.memberContactId = resMemberLookup.contactId;
         body.memberNumber = resMemberLookup.memberNumber;
@@ -524,10 +645,6 @@ export function CaretakerPortalContent({
         body.guestLastName = resGuestLastName.trim();
         body.guestEmail = resGuestEmail.trim();
         body.guestPhone = resGuestPhone.trim() || undefined;
-      }
-      if (resEventUpgradeHookup && resEventProductHandle.trim()) {
-        body.eventProductHandle = resEventProductHandle.trim();
-        body.eventSiteType = "upgrade_hookup";
       }
       const res = await fetch("/api/members/caretaker/reservations", {
         method: "POST",
@@ -547,11 +664,6 @@ export function CaretakerPortalContent({
       setResGuestLastName("");
       setResGuestEmail("");
       setResGuestPhone("");
-      if (resEventUpgradeHookup) {
-        setResEventParticipant(false);
-        setResEventProductHandle("");
-        setResEventSiteType("");
-      }
       loadReservations();
     } catch {
       setResError("Failed to create reservation");
@@ -581,11 +693,7 @@ export function CaretakerPortalContent({
         return;
       }
     }
-    if (resEventUpgradeHookup && !resEventProductHandle.trim()) {
-      setResError("Select an event for upgrade reservation");
-      return;
-    }
-    if (resTotalCents < 1) {
+    if (resTotalCents < 1 && resEffectiveTotalCents < 1) {
       setResError("Invalid total");
       return;
     }
@@ -593,7 +701,7 @@ export function CaretakerPortalContent({
     setResSubmitting(true);
     try {
       const checkoutBody: Record<string, unknown> = {
-        amountCents: resTotalCents,
+        amountCents: resEffectiveTotalCents,
         paymentType: "reservation",
         recipientEmail: resType === "member" ? (resMemberLookup?.email?.trim() || resGuestEmail.trim()) : resGuestEmail.trim(),
         recipientDisplayName: resType === "member" ? (resMemberLookup?.displayName || `#${resMemberLookup?.memberNumber}`) : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
@@ -613,10 +721,7 @@ export function CaretakerPortalContent({
         checkoutBody.guestEmail = resGuestEmail.trim();
         checkoutBody.guestPhone = resGuestPhone.trim() || undefined;
       }
-      if (resEventUpgradeHookup && resEventProductHandle.trim()) {
-        checkoutBody.eventProductHandle = resEventProductHandle.trim();
-        checkoutBody.eventSiteType = "upgrade_hookup";
-      }
+      appendPriceOverrideFields(checkoutBody);
       const res = await fetch("/api/members/caretaker/payments/checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -639,73 +744,6 @@ export function CaretakerPortalContent({
     }
   }
 
-  async function handleCreateEventIncludedReservation(e: React.FormEvent) {
-    e.preventDefault();
-    if (!resEventIncludedDry || !resEventProductHandle.trim() || !resSiteId || !resCheckInDate || !resCheckOutDate) {
-      setResError("Select event, site, and dates");
-      return;
-    }
-    if (resType === "member") {
-      if (!resMemberLookup) {
-        setResError("Look up member first");
-        return;
-      }
-    } else {
-      if (!resGuestFirstName.trim() || !resGuestLastName.trim() || !resGuestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resGuestEmail.trim())) {
-        setResError("Enter guest first name, last name, and valid email");
-        return;
-      }
-    }
-    setResError(null);
-    setResSubmitting(true);
-    try {
-      const body: Record<string, unknown> = {
-        siteId: resSiteId,
-        checkInDate: resCheckInDate,
-        checkOutDate: resCheckOutDate,
-        type: resType,
-        eventProductHandle: resEventProductHandle.trim(),
-        eventSiteType: "included_dry",
-      };
-      if (resType === "member" && resMemberLookup) {
-        body.memberContactId = resMemberLookup.contactId;
-        body.memberNumber = resMemberLookup.memberNumber;
-        body.memberDisplayName = resMemberLookup.displayName;
-      } else {
-        body.guestFirstName = resGuestFirstName.trim();
-        body.guestLastName = resGuestLastName.trim();
-        body.guestEmail = resGuestEmail.trim();
-        body.guestPhone = resGuestPhone.trim() || undefined;
-      }
-      const res = await fetch("/api/members/caretaker/reservations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setResError(data.error ?? "Failed to create event reservation");
-        return;
-      }
-      setCreateResModalOpen(false);
-      setResSiteId("");
-      setResMemberLookup(null);
-      setResMemberNumber("");
-      setResGuestFirstName("");
-      setResGuestLastName("");
-      setResGuestEmail("");
-      setResGuestPhone("");
-      setResEventParticipant(false);
-      setResEventProductHandle("");
-      setResEventSiteType("");
-      loadReservations();
-    } catch {
-      setResError("Failed to create event reservation");
-    } finally {
-      setResSubmitting(false);
-    }
-  }
-
   function handleCreateReservation(e: React.FormEvent) {
     e.preventDefault();
     // Form submit from "Pay with cash" or "Pay with card" is handled by those buttons
@@ -716,7 +754,25 @@ export function CaretakerPortalContent({
     setDetailsMemberLookup(null);
     setDetailsPastDueMaintenanceCents(0);
     setDetailsPastDueMembershipCents(0);
+    setDetailsBillingPeriods([]);
+    setDetailsSiteBalance(null);
+    setDetailsPayments([]);
     setDetailsModalOpen(true);
+    setDetailsLoading(true);
+
+    fetch(`/api/members/caretaker/reservations/${r.id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((detail) => {
+        if (detail) {
+          setDetailsReservation((prev) => (prev ? { ...prev, ...detail } : prev));
+          setDetailsBillingPeriods(detail.billingPeriods ?? []);
+          setDetailsSiteBalance(detail.balance ?? null);
+          setDetailsPayments(detail.payments ?? []);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setDetailsLoading(false));
+
     if (r.reservationType === "member" && r.memberNumber) {
       setDetailsMemberLoading(true);
       fetch("/api/members/caretaker/lookup", {
@@ -736,6 +792,24 @@ export function CaretakerPortalContent({
         .catch(() => setDetailsMemberLookup(null))
         .finally(() => setDetailsMemberLoading(false));
     }
+  }
+
+  function refreshDetailsReservation() {
+    if (!detailsReservation) return;
+    setDetailsLoading(true);
+    fetch(`/api/members/caretaker/reservations/${detailsReservation.id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((detail) => {
+        if (detail) {
+          setDetailsReservation((prev) => (prev ? { ...prev, ...detail } : prev));
+          setDetailsBillingPeriods(detail.billingPeriods ?? []);
+          setDetailsSiteBalance(detail.balance ?? null);
+          setDetailsPayments(detail.payments ?? []);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setDetailsLoading(false));
+    loadReservations();
   }
 
   function openResEditModal(r: Reservation) {
@@ -969,9 +1043,12 @@ export function CaretakerPortalContent({
 
   const resEditNights =
     resEditCheckInDate && resEditCheckOutDate && resEditCheckInDate < resEditCheckOutDate
-      ? Math.max(1, Math.ceil((new Date(resEditCheckOutDate).getTime() - new Date(resEditCheckInDate).getTime()) / (24 * 60 * 60 * 1000)))
+      ? countNights(resEditCheckInDate, resEditCheckOutDate)
       : 0;
-  const resEditCheckInIsTodayOrPast = editingReservation && toDateOnly(editingReservation.checkInDate) <= today;
+  const resEditAllowsCash =
+    editingReservation && resEditCheckInDate
+      ? caretakerAllowsCashCheckIn(resEditCheckInDate, today)
+      : false;
 
   async function handleResEditPayCash() {
     if (!editingReservation || resEditPaymentDueCents == null || resEditPaymentDueCents < 1) return;
@@ -1079,14 +1156,26 @@ export function CaretakerPortalContent({
 
   function openResCancelModal(r: Reservation) {
     setCancellingReservation(r);
+    setResCancelPreview(null);
     setResCancelModalOpen(true);
+    setResCancelPreviewLoading(true);
+    fetch(`/api/members/caretaker/reservations/${r.id}/cancel-preview`)
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = await res.json();
+        setResCancelPreview(data.preview ?? null);
+      })
+      .catch(() => setResCancelPreview(null))
+      .finally(() => setResCancelPreviewLoading(false));
   }
 
   async function handleResCancelConfirm() {
     if (!cancellingReservation) return;
     setResCancelSubmitting(true);
     try {
-      const res = await fetch(`/api/members/caretaker/reservations/${cancellingReservation.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/members/caretaker/reservations/${cancellingReservation.id}/cancel`, {
+        method: "POST",
+      });
       if (!res.ok) {
         const data = await res.json();
         setResError(data.error ?? "Cancel failed");
@@ -1094,6 +1183,7 @@ export function CaretakerPortalContent({
       }
       setResCancelModalOpen(false);
       setCancellingReservation(null);
+      setResCancelPreview(null);
       setResError(null);
       loadReservations();
     } catch {
@@ -1363,7 +1453,7 @@ export function CaretakerPortalContent({
   // Reservation system UI (Burnt River)
   if (usesReservations) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 caretaker-themed">
         <section className="p-4 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg">
           <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
             <MapPin className="w-5 h-5" />
@@ -1380,6 +1470,25 @@ export function CaretakerPortalContent({
             Create reservation
           </button>
         </section>
+
+        {paymentsDue.length > 0 && (
+          <section className="p-4 bg-amber-950/20 border border-amber-500/30 rounded-lg">
+            <h2 className="font-semibold text-amber-200 mb-2 text-sm">Payments to collect</h2>
+            <ul className="space-y-2">
+              {paymentsDue.map((item) => (
+                <li key={item.reservationId} className="flex flex-wrap justify-between gap-2 text-sm text-[#e8e0d5]">
+                  <span>
+                    {item.siteName ?? "Site"} — {item.guestLabel}
+                    {item.nextDueDate ? ` · due ${item.nextDueDate}` : ""}
+                  </span>
+                  <span className={item.isOverdue ? "text-red-300 font-medium" : "text-amber-200"}>
+                    {item.isOverdue ? "Overdue " : "Due "}{formatCentsAsCurrency(item.balanceDueCents)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -1448,6 +1557,10 @@ export function CaretakerPortalContent({
                     {r.checkedInAt ? (
                       <span className="ml-1 px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm">Checked in</span>
                     ) : null}
+                    <PaymentDueBadge
+                      balanceDueCents={r.balanceDueCents ?? 0}
+                      hasOverdue={r.hasOverdueSiteFee}
+                    />
                   </div>
                   <div className="flex items-center gap-2">
                     {!r.checkedInAt && (
@@ -1520,7 +1633,7 @@ export function CaretakerPortalContent({
               <form onSubmit={handleCreateReservation} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Check-in date *</label>
-                  <DatePickerWithCalendar value={resCheckInDate} onChange={setResCheckInDate} min={today} placeholder="Select check-in" id="res-check-in" />
+                  <DatePickerWithCalendar value={resCheckInDate} onChange={setResCheckInDate} min={earliestCheckIn} placeholder="Select check-in" id="res-check-in" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Check-out date *</label>
@@ -1538,43 +1651,6 @@ export function CaretakerPortalContent({
                   {resCheckInDate && resCheckOutDate && resCheckInDate < resCheckOutDate && availableSiteIds.length === 0 && (
                     <p className="text-amber-400 text-sm mt-1">No sites available for these dates.</p>
                   )}
-                  {resEventParticipant && resEventSiteType && availableSitesForDropdown.length === 0 && availableSiteIds.length > 0 && (
-                    <p className="text-amber-400 text-sm mt-1">
-                      No {resEventSiteType === "included_dry" ? "dry" : "hookup"} sites available for these dates.
-                    </p>
-                  )}
-                </div>
-                <div className="pt-2 border-t border-[#d4af37]/20">
-                  <label className="flex items-center gap-2 cursor-pointer mb-2">
-                    <input type="checkbox" checked={resEventParticipant} onChange={(e) => { setResEventParticipant(e.target.checked); if (!e.target.checked) { setResEventProductHandle(""); setResEventSiteType(""); } setResError(null); }} />
-                    <span className="text-[#e8e0d5] font-medium">Event participant (e.g. Dirt Fest — free dry site or hookup upgrade)</span>
-                  </label>
-                  {resEventParticipant && (
-                    <div className="ml-6 space-y-2">
-                      <div>
-                        <label className="block text-sm text-[#e8e0d5]/80 mb-1">Event</label>
-                        <select value={resEventProductHandle} onChange={(e) => { setResEventProductHandle(e.target.value); setResError(null); }} className="w-full px-4 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]">
-                          <option value="">Select event</option>
-                          {EVENT_RESERVATION_PRODUCTS.map((ev) => (
-                            <option key={ev.handle} value={ev.handle}>{ev.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <span className="block text-sm text-[#e8e0d5]/80 mb-1">Site type</span>
-                        <div className="flex gap-4">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="resEventSiteType" checked={resEventSiteType === "included_dry"} onChange={() => { setResEventSiteType("included_dry"); setResError(null); }} />
-                            <span className="text-[#e8e0d5]">Included dry (free)</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="resEventSiteType" checked={resEventSiteType === "upgrade_hookup"} onChange={() => { setResEventSiteType("upgrade_hookup"); setResError(null); }} />
-                            <span className="text-[#e8e0d5]">Upgrade to hookup</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Reservation for</label>
@@ -1591,16 +1667,36 @@ export function CaretakerPortalContent({
                   {resType === "member" ? (
                     <div className="space-y-2">
                       <div className="flex gap-2">
-                        <input type="text" value={resMemberNumber} onChange={(e) => setResMemberNumber(e.target.value)} placeholder="Member number" className="flex-1 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" />
+                        <input type="text" value={resMemberNumber} onChange={(e) => { setResMemberNumber(e.target.value); setResMemberLookup(null); setResMemberLookupMatches([]); }} placeholder="Member #, email, or phone" className="flex-1 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" />
                         <button type="button" onClick={handleReservationMemberLookup} disabled={resMemberLookupLoading || !resMemberNumber.trim()} className="px-4 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center gap-2">
                           {resMemberLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Look up
                         </button>
                       </div>
+                      {resMemberLookupMatches.length > 0 && (
+                        <div className="rounded-lg border border-amber-500/40 bg-amber-950/20 p-3 space-y-2">
+                          <p className="text-amber-200/90 text-xs font-medium">Multiple members matched — select one:</p>
+                          {resMemberLookupMatches.map((m) => (
+                            <button
+                              key={m.contactId}
+                              type="button"
+                              onClick={() => handleReservationMemberPick(m)}
+                              disabled={resMemberLookupLoading}
+                              className="w-full text-left px-3 py-2 rounded border border-[#d4af37]/20 bg-[#0f0a06]/80 hover:border-[#d4af37]/50 disabled:opacity-50"
+                            >
+                              <p className="text-[#e8e0d5] text-sm font-medium">{m.displayName}{m.memberNumber ? ` (#${m.memberNumber})` : ""}</p>
+                              <p className="text-[#e8e0d5]/60 text-xs">
+                                {[m.email, m.phone].filter(Boolean).join(" · ") || "No email or phone on file"}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {resMemberLookup && (
                         <div className="text-sm space-y-2">
                           <p className="text-[#e8e0d5]">✓ {resMemberLookup.displayName} (#{resMemberLookup.memberNumber})</p>
                           {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) || (resMemberLookup.membershipDuesOwed != null && resMemberLookup.membershipDuesOwed > 0) ? (
                             <>
+                              <p className="text-[#f0d48f] text-xs font-medium mt-2">Membership & maintenance (Salesforce)</p>
                               <p className="text-amber-400/90">
                                 {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) && `Maintenance past due: ${formatCurrency(resMemberLookup.maintenanceFeesDue)}`}
                                 {(resMemberLookup.maintenanceFeesDue != null && resMemberLookup.maintenanceFeesDue > 0) && (resMemberLookup.membershipDuesOwed != null && resMemberLookup.membershipDuesOwed > 0) && " · "}
@@ -1639,34 +1735,50 @@ export function CaretakerPortalContent({
                     </div>
                   )}
                 </div>
-                {resEventIncludedDry && (
-                  <div className="pt-2 border-t border-[#d4af37]/20">
-                    <p className="text-[#e8e0d5] font-medium">Event included dry site — no charge</p>
-                  </div>
-                )}
-                {!resEventIncludedDry && resTotalCents > 0 && (
-                  <div className="pt-2 border-t border-[#d4af37]/20">
-                    <p className="text-[#e8e0d5] font-medium">Total: {formatCentsAsCurrency(resTotalCents)}</p>
-                    <p className="text-[#e8e0d5]/60 text-xs mt-1">Payment in full required. Cash only when check-in is today.</p>
+                {resTotalCents > 0 && (
+                  <div className="pt-2 border-t border-[#d4af37]/20 space-y-2">
+                    <p className="text-[#e8e0d5] font-medium">
+                      Calculated total: {formatCentsAsCurrency(resTotalCents)}
+                      {resEffectiveTotalCents !== resTotalCents && (
+                        <span className="text-amber-300"> → Charge: {formatCentsAsCurrency(resEffectiveTotalCents)}</span>
+                      )}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={resOverrideTotal}
+                        onChange={(e) => setResOverrideTotal(e.target.value)}
+                        placeholder="Override total $ (optional)"
+                        className="px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                      />
+                      <input
+                        type="text"
+                        value={resOverrideReason}
+                        onChange={(e) => setResOverrideReason(e.target.value)}
+                        placeholder="Override reason (if different)"
+                        className="px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                      />
+                    </div>
+                    <p className="text-[#e8e0d5]/60 text-xs">
+                      {resAllowsCash
+                        ? "Cash allowed for check-in today or within the past 7 days. Card for future check-in."
+                        : "Card payment required for future check-in."}
+                    </p>
                   </div>
                 )}
                 <div className="flex flex-col gap-2 pt-2">
-                  {resEventIncludedDry ? (
-                    <button type="button" onClick={handleCreateEventIncludedReservation} disabled={resSubmitting || !resSiteIdValidForEvent} className="py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
-                      {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Create (event included site)
-                    </button>
-                  ) : (
-                    <div className="flex gap-2">
-                      {resCheckInIsToday && (
-                        <button type="button" onClick={handleCreateReservationCash} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
-                          {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with cash
-                        </button>
-                      )}
-                      <button type="button" onClick={handleCreateReservationCard} disabled={resSubmitting} className={resCheckInIsToday ? "flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2" : "flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2"}>
-                        {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with card
+                  <div className="flex gap-2">
+                    {resAllowsCash && (
+                      <button type="button" onClick={handleCreateReservationCash} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
+                        {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with cash
                       </button>
-                    </div>
-                  )}
+                    )}
+                    <button type="button" onClick={handleCreateReservationCard} disabled={resSubmitting} className={resAllowsCash ? "flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2" : "flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2"}>
+                      {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with card
+                    </button>
+                  </div>
                   <button type="button" onClick={() => setCreateResModalOpen(false)} className="py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
                 </div>
               </form>
@@ -1677,7 +1789,7 @@ export function CaretakerPortalContent({
         {/* Reservation details modal */}
         {detailsModalOpen && detailsReservation && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setDetailsModalOpen(false)}>
-            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-[#f0d48f]">Reservation details</h3>
                 <button type="button" onClick={() => setDetailsModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
@@ -1691,19 +1803,84 @@ export function CaretakerPortalContent({
                   <p className="text-[#e8e0d5]/60 mb-0.5">Dates</p>
                   <ReservationDateRange checkInDate={detailsReservation.checkInDate} checkOutDate={detailsReservation.checkOutDate} nights={detailsReservation.nights} />
                 </div>
-                <div>
-                  <p className="text-[#e8e0d5]/60 mb-0.5">Status</p>
-                  <p className="text-[#e8e0d5]">{detailsReservation.checkedInAt ? "Checked in" : "Reserved"}</p>
+                <div className="flex flex-wrap gap-4">
+                  <div>
+                    <p className="text-[#e8e0d5]/60 mb-0.5">Status</p>
+                    <p className="text-[#e8e0d5]">{detailsReservation.checkedInAt ? "Checked in" : "Reserved"}</p>
+                  </div>
+                  {detailsReservation.createdAt && (
+                    <div>
+                      <p className="text-[#e8e0d5]/60 mb-0.5">Created</p>
+                      <p className="text-[#e8e0d5]">{toDateOnly(detailsReservation.createdAt)}</p>
+                    </div>
+                  )}
+                  {detailsReservation.invoiceNumber && (
+                    <div>
+                      <p className="text-[#e8e0d5]/60 mb-0.5">Invoice</p>
+                      <p className="text-[#e8e0d5] font-mono text-xs">{detailsReservation.invoiceNumber}</p>
+                    </div>
+                  )}
                 </div>
+                {detailsReservation.priceOverrideFlag && (
+                  <div className="rounded border border-amber-500/30 bg-amber-950/20 p-2 text-xs text-amber-100/90">
+                    Price override: charged {formatCentsAsCurrency(detailsReservation.amountOverrideCents ?? 0)} vs calculated {formatCentsAsCurrency(detailsReservation.calculatedTotalCents ?? 0)}
+                    {detailsReservation.overrideReason ? ` — ${detailsReservation.overrideReason}` : ""}
+                  </div>
+                )}
                 {detailsReservation.eventProductHandle ? (
                   <div>
-                    <p className="text-[#e8e0d5]/60 mb-0.5">Event</p>
+                    <p className="text-[#e8e0d5]/60 mb-0.5">Event (legacy)</p>
                     <p className="text-[#e8e0d5]">
                       {EVENT_RESERVATION_PRODUCTS.find((ev) => ev.handle === detailsReservation.eventProductHandle)?.label ?? detailsReservation.eventProductHandle}
                       {detailsReservation.eventSiteType === "upgrade_hookup" ? " (hookup upgrade)" : " (included dry)"}
                     </p>
                   </div>
                 ) : null}
+
+                {detailsLoading ? (
+                  <p className="text-[#e8e0d5]/60 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading billing…</p>
+                ) : detailsSiteBalance ? (
+                  <ReservationBillingSection
+                    key={`${detailsReservation.id}-${detailsSiteBalance.balanceDueCents}`}
+                    reservationId={detailsReservation.id}
+                    checkInDate={toDateOnly(detailsReservation.checkInDate)}
+                    balance={detailsSiteBalance}
+                    billingPeriods={detailsBillingPeriods}
+                    recipientEmail={
+                      detailsReservation.reservationType === "member"
+                        ? detailsMemberLookup?.email?.trim() || ""
+                        : detailsReservation.guestEmail?.trim() || ""
+                    }
+                    recipientDisplayName={
+                      detailsReservation.reservationType === "member"
+                        ? detailsReservation.memberDisplayName || `#${detailsReservation.memberNumber}`
+                        : `${detailsReservation.guestFirstName ?? ""} ${detailsReservation.guestLastName ?? ""}`.trim() || "Guest"
+                    }
+                    onPaymentComplete={refreshDetailsReservation}
+                  />
+                ) : null}
+
+                {detailsPayments.length > 0 && (
+                  <div className="pt-2 border-t border-[#d4af37]/20">
+                    <p className="text-[#f0d48f] font-medium text-sm mb-2">Payments</p>
+                    <ul className="space-y-2 text-xs">
+                      {detailsPayments.map((p) => (
+                        <li key={p.id} className="text-[#e8e0d5]/80">
+                          <span className="text-[#e8e0d5]">{formatCentsAsCurrency(p.amountCents)}</span>
+                          {" · "}{p.method === "card" ? "Card" : "Cash"}
+                          {" · "}{toDateOnly(p.createdAt)}
+                          {p.stripePaymentIntentId && (
+                            <p className="text-[#e8e0d5]/50 font-mono truncate" title={p.stripePaymentIntentId}>PI: {p.stripePaymentIntentId}</p>
+                          )}
+                          {p.method === "cash" && (
+                            <p className="text-[#e8e0d5]/50 font-mono truncate" title={p.id}>ID: {p.id}</p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {detailsReservation.reservationType === "member" ? (
                   <>
                     <div>
@@ -1715,7 +1892,8 @@ export function CaretakerPortalContent({
                       <p className="text-[#e8e0d5]/60">Loading member details…</p>
                     ) : detailsMemberLookup ? (
                       <div className="pt-2 border-t border-[#d4af37]/20 space-y-2">
-                        <p className="text-[#e8e0d5]/60 mb-1">Dues & contact</p>
+                        <p className="text-[#f0d48f] font-medium text-sm">Membership & maintenance (Salesforce)</p>
+                        <p className="text-[#e8e0d5]/60 text-xs">Separate from site fees above.</p>
                         {(detailsMemberLookup.maintenanceFeesDue != null && detailsMemberLookup.maintenanceFeesDue > 0) || (detailsMemberLookup.membershipDuesOwed != null && detailsMemberLookup.membershipDuesOwed > 0) ? (
                           <>
                             {detailsMemberLookup.maintenanceFeesDue != null && detailsMemberLookup.maintenanceFeesDue > 0 && (
@@ -1789,7 +1967,7 @@ export function CaretakerPortalContent({
                 <div className="space-y-4">
                   <p className="text-[#e8e0d5]">Additional amount due: <strong>{formatCentsAsCurrency(resEditPaymentDueCents)}</strong></p>
                   <div className="flex gap-2">
-                    {resEditCheckInIsTodayOrPast && (
+                    {resEditAllowsCash && (
                       <button type="button" onClick={handleResEditPayCash} disabled={resEditSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
                         {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay cash
                       </button>
@@ -1803,7 +1981,7 @@ export function CaretakerPortalContent({
               ) : (
                 <form onSubmit={handleResEditSubmit}>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Check-in date</label>
-                  <DatePickerWithCalendar value={resEditCheckInDate} onChange={setResEditCheckInDate} min={today} id="edit-res-check-in" />
+                  <DatePickerWithCalendar value={resEditCheckInDate} onChange={setResEditCheckInDate} min={earliestCheckIn} id="edit-res-check-in" />
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-2 mt-3">Check-out date</label>
                   <DatePickerWithCalendar value={resEditCheckOutDate} onChange={setResEditCheckOutDate} min={resEditCheckInDate || today} id="edit-res-check-out" />
                   <p className="text-[#e8e0d5]/50 text-xs mb-4 mt-2">Shortening the stay does not issue a refund. Extending requires paying the difference.</p>
@@ -1821,18 +1999,58 @@ export function CaretakerPortalContent({
 
         {/* Cancel reservation modal */}
         {resCancelModalOpen && cancellingReservation && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null))}>
-            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null))}>
+            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-[#f0d48f]">Cancel reservation</h3>
-                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
               </div>
-              <p className="text-[#e8e0d5]/90 text-sm mb-4">
+              <p className="text-[#e8e0d5]/90 text-sm mb-3">
                 Cancel this reservation for {cancellingReservation.siteName} — {cancellingReservation.reservationType === "member" ? cancellingReservation.memberDisplayName : `${cancellingReservation.guestFirstName} ${cancellingReservation.guestLastName}`}?
               </p>
+              {resCancelPreviewLoading ? (
+                <div className="flex items-center gap-2 text-[#e8e0d5]/70 text-sm mb-4">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Calculating refund…
+                </div>
+              ) : resCancelPreview ? (
+                <div className="bg-[#0f0a06]/80 border border-[#d4af37]/15 rounded-lg p-3 mb-4 text-sm space-y-1.5">
+                  <div className="flex justify-between text-[#e8e0d5]/80">
+                    <span>Site fees paid</span>
+                    <span>{formatCentsAsCurrency(resCancelPreview.totalPaidCents)}</span>
+                  </div>
+                  {resCancelPreview.earnedCents > 0 && (
+                    <div className="flex justify-between text-[#e8e0d5]/80">
+                      <span>Earned ({resCancelPreview.nightsStayed} night{resCancelPreview.nightsStayed === 1 ? "" : "s"})</span>
+                      <span>−{formatCentsAsCurrency(resCancelPreview.earnedCents)}</span>
+                    </div>
+                  )}
+                  {resCancelPreview.cancellationFeeCents > 0 && (
+                    <div className="flex justify-between text-[#e8e0d5]/80">
+                      <span>Cancellation fee</span>
+                      <span>−{formatCentsAsCurrency(resCancelPreview.cancellationFeeCents)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-[#f0d48f] font-semibold pt-1 border-t border-[#d4af37]/20">
+                    <span>Refund</span>
+                    <span>{formatCentsAsCurrency(resCancelPreview.refundCents)}</span>
+                  </div>
+                  {resCancelPreview.refundCents > 0 && (
+                    <p className="text-[#e8e0d5]/50 text-xs pt-1">
+                      {resCancelPreview.stripeRefundCents > 0 && `Card: ${formatCentsAsCurrency(resCancelPreview.stripeRefundCents)}`}
+                      {resCancelPreview.stripeRefundCents > 0 && resCancelPreview.cashRefundCents > 0 && " · "}
+                      {resCancelPreview.cashRefundCents > 0 && `Cash: ${formatCentsAsCurrency(resCancelPreview.cashRefundCents)}`}
+                    </p>
+                  )}
+                  {resCancelPreview.pricingMode === "full_refund" && (
+                    <p className="text-[#e8e0d5]/50 text-xs">Full refund — cancelled 7+ days before check-in.</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[#e8e0d5]/50 text-xs mb-4">Refund preview unavailable; cancellation will still apply policy rules.</p>
+              )}
               <div className="flex gap-2">
-                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Keep</button>
-                <button type="button" onClick={handleResCancelConfirm} disabled={resCancelSubmitting} className="flex-1 py-2.5 bg-red-800/80 text-red-100 font-semibold rounded-lg hover:bg-red-700/80 disabled:opacity-50 flex items-center justify-center gap-2">
+                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Keep</button>
+                <button type="button" onClick={handleResCancelConfirm} disabled={resCancelSubmitting || resCancelPreviewLoading} className="flex-1 py-2.5 bg-red-800/80 text-red-100 font-semibold rounded-lg hover:bg-red-700/80 disabled:opacity-50 flex items-center justify-center gap-2">
                   {resCancelSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Yes, cancel
                 </button>
               </div>
@@ -1844,491 +2062,10 @@ export function CaretakerPortalContent({
   }
 
   return (
-    <div className="space-y-8">
-      {/* Member lookup */}
-      <section className="p-4 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg">
-        <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
-          <Search className="w-5 h-5" />
-          Look up member
-        </h2>
-        <form onSubmit={handleLookup} className="flex gap-2 flex-wrap">
-          <input
-            type="text"
-            value={memberNumber}
-            onChange={(e) => setMemberNumber(e.target.value)}
-            placeholder="Member number"
-            className="flex-1 min-w-[120px] px-4 py-2.5 bg-[#1a120b] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] placeholder-[#e8e0d5]/40 focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50"
-          />
-          <button
-            type="submit"
-            disabled={lookupLoading || !memberNumber.trim()}
-            className="px-4 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center gap-2"
-          >
-            {lookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Look up
-          </button>
-        </form>
-        {lookupError && (
-          <p className="mt-2 text-red-400 text-sm">{lookupError}</p>
-        )}
-        {lookupResult && (
-          <div className="mt-4 p-4 bg-[#1a120b] rounded-lg border border-[#d4af37]/20 space-y-2">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-[#d4af37]" />
-                <span className="font-medium text-[#e8e0d5]">{lookupResult.displayName}</span>
-                <span className="text-[#e8e0d5]/60">#{lookupResult.memberNumber}</span>
-              </div>
-              <span
-                className={
-                  lookupResult.isLdmaMember
-                    ? "px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm font-medium"
-                    : "px-2 py-0.5 rounded bg-[#4a3a0f] text-[#e8c547] text-sm font-medium"
-                }
-              >
-                {lookupResult.isLdmaMember ? "LDMA Member" : "No Valid Membership Found"}
-              </span>
-              <button
-                type="button"
-                onClick={() => { setLookupResult(null); setLookupError(null); }}
-                className="ml-auto p-1.5 text-[#e8e0d5]/60 hover:text-[#e8e0d5] rounded"
-                aria-label="Close lookup"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-              <div>
-                <dt className="text-[#e8e0d5]/60">Maintenance fees due</dt>
-                <dd className="text-[#e8e0d5] font-medium">{formatCurrency(lookupResult.maintenanceFeesDue)}</dd>
-              </div>
-              <div>
-                <dt className="text-[#e8e0d5]/60">Membership dues owed</dt>
-                <dd className="text-[#e8e0d5] font-medium">{formatCurrency(lookupResult.membershipDuesOwed)}</dd>
-              </div>
-            </dl>
-            <button
-              type="button"
-              onClick={() => { setNightsInput("1"); setCheckInModalOpen(true); }}
-              className="mt-3 px-4 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f]"
-            >
-              Check in member
-            </button>
-          </div>
-        )}
-      </section>
-
-      {/* Check in guest */}
-      <section className="p-4 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg">
-        <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
-          <UserPlus className="w-5 h-5" />
-          Check in guest
-        </h2>
-        <p className="text-[#e8e0d5]/80 text-sm mb-3">
-          Guest check-in bypasses member lookup. Capture name, email, and phone for marketing; a separate welcome email is sent.
-        </p>
-        <button
-          type="button"
-          onClick={() => { setGuestError(null); setGuestCheckInModalOpen(true); }}
-          className="px-4 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f]"
-        >
-          Check in guest
-        </button>
-      </section>
-
-      {/* Active check-ins */}
-      <section>
-        <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
-          <Calendar className="w-5 h-5" />
-          Active member check-ins
-        </h2>
-        {listLoading ? (
-          <p className="text-[#e8e0d5]/60">Loading…</p>
-        ) : activeCheckIns.length === 0 ? (
-          <p className="text-[#e8e0d5]/60">No active check-ins.</p>
-        ) : (
-          <ul className="space-y-2">
-            {activeCheckIns.map((c) => (
-              <li
-                key={c.id}
-                className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg"
-              >
-                <div>
-                  <span className="font-medium text-[#e8e0d5]">
-                    {c.memberDisplayName || `#${c.memberNumber}`}
-                  </span>
-                  <span className="text-[#e8e0d5]/60 ml-2">#{c.memberNumber}</span>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-[#e8e0d5]/80">
-                  <span>Check-in: {c.checkInDate}</span>
-                  <span>Check-out: {c.checkOutDate}</span>
-                  <span>{c.nights} night{c.nights !== 1 ? "s" : ""}</span>
-                  <span>{c.pointsAwarded} pts</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openEditModal(c)}
-                    className="px-3 py-1.5 text-sm bg-[#d4af37]/20 text-[#d4af37] rounded hover:bg-[#d4af37]/30"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openCancelModal(c)}
-                    className="px-3 py-1.5 text-sm bg-red-950/50 text-red-300 rounded hover:bg-red-900/40 border border-red-800/50"
-                  >
-                    Cancel reservation
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Active guest check-ins */}
-      <section>
-        <h2 className="font-semibold text-[#f0d48f] mb-3 flex items-center gap-2">
-          <UserPlus className="w-5 h-5" />
-          Active guest check-ins
-        </h2>
-        {listLoading ? (
-          <p className="text-[#e8e0d5]/60">Loading…</p>
-        ) : activeGuestCheckIns.length === 0 ? (
-          <p className="text-[#e8e0d5]/60">No active guest check-ins.</p>
-        ) : (
-          <ul className="space-y-2">
-            {activeGuestCheckIns.map((c) => (
-              <li
-                key={c.id}
-                className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg"
-              >
-                <div>
-                  <span className="font-medium text-[#e8e0d5]">
-                    {c.firstName} {c.lastName}
-                  </span>
-                  <span className="text-[#e8e0d5]/60 ml-2">{c.email}</span>
-                  {c.phone ? <span className="text-[#e8e0d5]/50 ml-2 text-sm">{c.phone}</span> : null}
-                </div>
-                <div className="flex items-center gap-4 text-sm text-[#e8e0d5]/80">
-                  <span>Check-in: {c.checkInDate}</span>
-                  <span>Check-out: {c.checkOutDate}</span>
-                  <span>{c.nights} night{c.nights !== 1 ? "s" : ""}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openGuestEditModal(c)}
-                    className="px-3 py-1.5 text-sm bg-[#d4af37]/20 text-[#d4af37] rounded hover:bg-[#d4af37]/30"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openGuestCancelModal(c)}
-                    className="px-3 py-1.5 text-sm bg-red-950/50 text-red-300 rounded hover:bg-red-900/40 border border-red-800/50"
-                  >
-                    Cancel reservation
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Archived check-ins */}
-      <section>
-        <h2 className="font-semibold text-[#e8e0d5]/80 mb-3">Archived member check-ins</h2>
-        {listLoading ? null : archivedCheckIns.length === 0 ? (
-          <p className="text-[#e8e0d5]/60">No archived check-ins.</p>
-        ) : (
-          <ul className="space-y-2">
-            {archivedCheckIns.map((c) => (
-              <li
-                key={c.id}
-                className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/40 border border-[#d4af37]/10 rounded-lg text-[#e8e0d5]/80"
-              >
-                <div>
-                  <span className="font-medium">{c.memberDisplayName || `#${c.memberNumber}`}</span>
-                  <span className="ml-2 opacity-70">#{c.memberNumber}</span>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span>{c.checkInDate} – {c.checkOutDate}</span>
-                  <span>{c.nights} night{c.nights !== 1 ? "s" : ""}</span>
-                  <span>{c.pointsAwarded} pts</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Archived guest check-ins */}
-      <section>
-        <h2 className="font-semibold text-[#e8e0d5]/80 mb-3">Archived guest check-ins</h2>
-        {listLoading ? null : archivedGuestCheckIns.length === 0 ? (
-          <p className="text-[#e8e0d5]/60">No archived guest check-ins.</p>
-        ) : (
-          <ul className="space-y-2">
-            {archivedGuestCheckIns.map((c) => (
-              <li
-                key={c.id}
-                className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/40 border border-[#d4af37]/10 rounded-lg text-[#e8e0d5]/80"
-              >
-                <div>
-                  <span className="font-medium">{c.firstName} {c.lastName}</span>
-                  <span className="ml-2 opacity-70">{c.email}</span>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span>{c.checkInDate} – {c.checkOutDate}</span>
-                  <span>{c.nights} night{c.nights !== 1 ? "s" : ""}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Check-in modal */}
-      {checkInModalOpen && lookupResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setCheckInModalOpen(false)}>
-          <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-[#f0d48f]">Check in member</h3>
-              <button type="button" onClick={() => setCheckInModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-[#e8e0d5]/80 text-sm mb-4">
-              {lookupResult.displayName} (#{lookupResult.memberNumber})
-            </p>
-            <form onSubmit={handleCheckInSubmit}>
-              <label className="block text-sm font-medium text-[#e8e0d5] mb-2">How many nights?</label>
-              <input
-                type="number"
-                min={1}
-                max={365}
-                value={nightsInput}
-                onChange={(e) => setNightsInput(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-4"
-              />
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setCheckInModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">
-                  Cancel
-                </button>
-                <button type="submit" disabled={checkInSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
-                  {checkInSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Check in
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Cancel reservation confirmation modal */}
-      {cancelModalOpen && cancellingCheckIn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !cancelSubmitting && (setCancelModalOpen(false), setCancellingCheckIn(null))}>
-          <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-[#f0d48f]">Cancel reservation</h3>
-              <button type="button" onClick={() => !cancelSubmitting && (setCancelModalOpen(false), setCancellingCheckIn(null))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-[#e8e0d5]/90 text-sm mb-4">
-              Cancel this reservation for {cancellingCheckIn.memberDisplayName || `#${cancellingCheckIn.memberNumber}`}?{" "}
-              <strong className="text-[#e8e0d5]">{cancellingCheckIn.pointsAwarded} points</strong> will be deducted and the reservation will move to archives.
-            </p>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => !cancelSubmitting && (setCancelModalOpen(false), setCancellingCheckIn(null))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">
-                Keep reservation
-              </button>
-              <button type="button" onClick={handleCancelConfirm} disabled={cancelSubmitting} className="flex-1 py-2.5 bg-red-800/80 text-red-100 font-semibold rounded-lg hover:bg-red-700/80 disabled:opacity-50 flex items-center justify-center gap-2">
-                {cancelSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Yes, cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit checkout modal */}
-      {editModalOpen && editingCheckIn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setEditModalOpen(false)}>
-          <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-[#f0d48f]">Edit checkout date</h3>
-              <button type="button" onClick={() => setEditModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-[#e8e0d5]/80 text-sm mb-4">
-              {editingCheckIn.memberDisplayName || `#${editingCheckIn.memberNumber}`}
-            </p>
-            <form onSubmit={handleEditSubmit}>
-              <label className="block text-sm font-medium text-[#e8e0d5] mb-2">New checkout date</label>
-              <input
-                type="date"
-                min={editingCheckIn.checkInDate}
-                value={newCheckOutDate}
-                onChange={(e) => setNewCheckOutDate(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-4"
-              />
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setEditModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">
-                  Cancel
-                </button>
-                <button type="submit" disabled={editSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
-                  {editSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Guest check-in modal */}
-      {guestCheckInModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setGuestCheckInModalOpen(false)}>
-          <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-[#f0d48f]">Check in guest</h3>
-              <button type="button" onClick={() => setGuestCheckInModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            {guestError && <p className="mb-3 text-red-400 text-sm">{guestError}</p>}
-            <form onSubmit={handleGuestCheckInSubmit} className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-[#e8e0d5] mb-1">First name *</label>
-                <input
-                  type="text"
-                  value={guestFirstName}
-                  onChange={(e) => setGuestFirstName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Last name *</label>
-                <input
-                  type="text"
-                  value={guestLastName}
-                  onChange={(e) => setGuestLastName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Email *</label>
-                <input
-                  type="email"
-                  value={guestEmail}
-                  onChange={(e) => setGuestEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Phone (optional)</label>
-                <input
-                  type="tel"
-                  value={guestPhone}
-                  onChange={(e) => setGuestPhone(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Nights</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={guestNightsInput}
-                  onChange={(e) => setGuestNightsInput(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setGuestCheckInModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">
-                  Cancel
-                </button>
-                <button type="submit" disabled={guestCheckInSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
-                  {guestCheckInSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Check in guest
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Guest cancel reservation modal */}
-      {guestCancelModalOpen && cancellingGuestCheckIn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !guestCancelSubmitting && (setGuestCancelModalOpen(false), setCancellingGuestCheckIn(null))}>
-          <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-[#f0d48f]">Cancel guest reservation</h3>
-              <button type="button" onClick={() => !guestCancelSubmitting && (setGuestCancelModalOpen(false), setCancellingGuestCheckIn(null))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-[#e8e0d5]/90 text-sm mb-4">
-              Cancel this reservation for {cancellingGuestCheckIn.firstName} {cancellingGuestCheckIn.lastName}? The reservation will move to archives.
-            </p>
-            {guestError && <p className="mb-2 text-red-400 text-sm">{guestError}</p>}
-            <div className="flex gap-2">
-              <button type="button" onClick={() => !guestCancelSubmitting && (setGuestCancelModalOpen(false), setCancellingGuestCheckIn(null))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">
-                Keep reservation
-              </button>
-              <button type="button" onClick={handleGuestCancelConfirm} disabled={guestCancelSubmitting} className="flex-1 py-2.5 bg-red-800/80 text-red-100 font-semibold rounded-lg hover:bg-red-700/80 disabled:opacity-50 flex items-center justify-center gap-2">
-                {guestCancelSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Yes, cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Guest edit checkout modal */}
-      {guestEditModalOpen && editingGuestCheckIn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setGuestEditModalOpen(false)}>
-          <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-[#f0d48f]">Edit guest checkout date</h3>
-              <button type="button" onClick={() => setGuestEditModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-[#e8e0d5]/80 text-sm mb-4">
-              {editingGuestCheckIn.firstName} {editingGuestCheckIn.lastName}
-            </p>
-            <form onSubmit={handleGuestEditSubmit}>
-              <label className="block text-sm font-medium text-[#e8e0d5] mb-2">New checkout date</label>
-              <input
-                type="date"
-                min={editingGuestCheckIn.checkInDate}
-                value={newGuestCheckOutDate}
-                onChange={(e) => setNewGuestCheckOutDate(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] mb-4"
-              />
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setGuestEditModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">
-                  Cancel
-                </button>
-                <button type="submit" disabled={guestEditSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
-                  {guestEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+    <div className="p-6 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg">
+      <p className="text-[#e8e0d5]">
+        The reservation system is not enabled for this camp. Contact support if you believe this is an error.
+      </p>
     </div>
   );
 }

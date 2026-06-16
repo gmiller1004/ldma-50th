@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/stay-thank-you",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/camp-payment-due",
+      "schedule": "0 7 * * *"
     }
   ]
 }

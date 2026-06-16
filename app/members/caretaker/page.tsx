@@ -4,6 +4,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { MembersNav } from "../MembersNav";
 import { CaretakerPortalContent } from "./CaretakerPortalContent";
 import { CaretakerAdminDashboard } from "./CaretakerAdminDashboard";
+import { CaretakerThemeShell } from "./CaretakerThemeShell";
 
 export default async function CaretakerPortalPage() {
   const access = await getCaretakerAccess();
@@ -22,14 +23,16 @@ export default async function CaretakerPortalPage() {
           ]}
         />
         <MembersNav />
-        <h1 className="font-serif text-3xl font-semibold text-[#f0d48f] mb-2">
-          Director dashboard
-        </h1>
-        <p className="text-[#e8e0d5]/70 mb-8 max-w-3xl">
-          Cross-camp read-only view: pick a Stripe date range, scan KPIs and the grid, then expand a camp for
-          reservations, revenue detail, and caretaker activity.
-        </p>
-        <CaretakerAdminDashboard />
+        <CaretakerThemeShell>
+          <h1 className="font-serif text-3xl font-semibold ct-heading mb-2">
+            Director dashboard
+          </h1>
+          <p className="ct-subtext mb-8 max-w-3xl">
+            Cross-camp read-only view: pick a Stripe date range, scan KPIs and the grid, then expand a camp for
+            reservations, revenue detail, and caretaker activity.
+          </p>
+          <CaretakerAdminDashboard />
+        </CaretakerThemeShell>
       </>
     );
   }
@@ -44,13 +47,15 @@ export default async function CaretakerPortalPage() {
         ]}
       />
       <MembersNav />
-      <h1 className="font-serif text-3xl font-semibold text-[#f0d48f] mb-2">
-        Caretaker Portal: {access.campName}
-      </h1>
-      <p className="text-[#e8e0d5]/70 mb-8">
-        Look up members to verify membership and check them in.
-      </p>
-      <CaretakerPortalContent campSlug={access.campSlug} campName={access.campName} />
+      <CaretakerThemeShell>
+        <h1 className="font-serif text-3xl font-semibold ct-heading mb-2">
+          Caretaker Portal: {access.campName}
+        </h1>
+        <p className="ct-subtext mb-8">
+          Look up members to verify membership and check them in.
+        </p>
+        <CaretakerPortalContent campSlug={access.campSlug} campName={access.campName} />
+      </CaretakerThemeShell>
     </>
   );
 }

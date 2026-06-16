@@ -1,0 +1,3 @@
+camp_slug,pilot_site_name,site_code,notes
+# Optional overrides if auto-mapping is wrong. Auto rules handle most VM names (Lower/Upper/Overflow).
+# vein-mountain-north-carolina,Upper 1,UC-01,caretaker site

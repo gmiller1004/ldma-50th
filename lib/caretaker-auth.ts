@@ -61,12 +61,37 @@ export async function getCaretakerAccess(): Promise<CaretakerAccess | null> {
  * Caretaker_Admin__c users (including admin+caretaker — they use the admin dashboard only).
  */
 export async function getCaretakerContext(): Promise<CaretakerContext | null> {
+  return getCaretakerWriteContext();
+}
+
+/**
+ * Write context for camp caretakers, or admin manual reservation when campSlug is provided.
+ */
+export async function getCaretakerWriteContext(
+  campSlugOverride?: string
+): Promise<CaretakerContext | null> {
   const access = await getCaretakerAccess();
-  if (!access || access.mode !== "camp") return null;
-  return {
-    contactId: access.contactId,
-    memberNumber: access.memberNumber,
-    campSlug: access.campSlug,
-    campName: access.campName,
-  };
+  if (!access) return null;
+
+  if (access.mode === "camp") {
+    return {
+      contactId: access.contactId,
+      memberNumber: access.memberNumber,
+      campSlug: access.campSlug,
+      campName: access.campName,
+    };
+  }
+
+  if (access.mode === "admin" && campSlugOverride) {
+    const camp = getCampBySlug(campSlugOverride);
+    if (!camp) return null;
+    return {
+      contactId: access.contactId,
+      memberNumber: access.memberNumber,
+      campSlug: campSlugOverride,
+      campName: camp.name,
+    };
+  }
+
+  return null;
 }

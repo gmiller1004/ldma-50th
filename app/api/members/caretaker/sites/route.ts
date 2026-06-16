@@ -10,6 +10,7 @@ type SiteRow = {
   site_type: string;
   sort_order: number;
   member_rate_daily: number | null;
+  member_rate_monthly: number | null;
   non_member_rate_daily: number | null;
   notes: string | null;
 };
@@ -22,6 +23,7 @@ function rowToJson(row: SiteRow) {
     siteType: row.site_type,
     sortOrder: row.sort_order,
     memberRateDaily: row.member_rate_daily,
+    memberRateMonthly: row.member_rate_monthly,
     nonMemberRateDaily: row.non_member_rate_daily,
     notes: row.notes,
   };
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
   }
 
   const rows = await sql`
-    SELECT id, camp_slug, name, site_type, sort_order, member_rate_daily, non_member_rate_daily, notes
+    SELECT id, camp_slug, name, site_type, sort_order, member_rate_daily, member_rate_monthly, non_member_rate_daily, notes
     FROM camp_sites
     WHERE camp_slug = ${caretaker.campSlug}
     ORDER BY sort_order ASC, name ASC

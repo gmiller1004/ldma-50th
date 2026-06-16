@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ManualReservationPanel } from "./ManualReservationPanel";
 import { ChevronDown, ChevronRight, HelpCircle, Loader2, Tent } from "lucide-react";
 
 type RosterRow = {
@@ -420,15 +421,39 @@ export function CaretakerAdminDashboard() {
   const [filterSlug, setFilterSlug] = useState<string>("");
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
   const [reservationCache, setReservationCache] = useState<Record<string, ReservationRow[]>>({});
-  const reservationCacheRef = useRef(reservationCache);
-  reservationCacheRef.current = reservationCache;
   const [columnHelpId, setColumnHelpId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [siteAr, setSiteAr] = useState<{
+    camps: Array<{
+      campSlug: string;
+      campName: string;
+      balanceDueCents: number;
+      overdueCents: number;
+      reservationsWithBalance: number;
+      overdueReservations: number;
+    }>;
+    totals: {
+      balanceDueCents: number;
+      overdueCents: number;
+      reservationsWithBalance: number;
+      overdueReservations: number;
+    };
+  } | null>(null);
+  const [priceOverrides, setPriceOverrides] = useState<Array<{
+    id: string;
+    campSlug: string;
+    invoiceNumber: string | null;
+    siteName: string | null;
+    guestLabel: string;
+    calculatedTotalCents: number | null;
+    amountOverrideCents: number | null;
+    overrideReason: string | null;
+    createdAt: string;
+  }>>([]);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     const params = new URLSearchParams();
     if (appliedRevenueFrom) params.set("revenueFrom", appliedRevenueFrom);
     if (appliedRevenueTo) params.set("revenueTo", appliedRevenueTo);
@@ -451,7 +476,10 @@ export function CaretakerAdminDashboard() {
         setCamps(data.camps ?? []);
         setRosterUnmapped(data.rosterUnmapped ?? []);
         setGlobal(data.global ?? null);
-        setRevenuePeriod(data.revenuePeriod ?? { from: null, to: null });
+        const period = data.revenuePeriod ?? { from: null, to: null };
+        setRevenuePeriod(period);
+        setRevFromInput(period.from ?? "");
+        setRevToInput(period.to ?? "");
         setError(null);
       })
       .catch((e) => {
@@ -466,8 +494,29 @@ export function CaretakerAdminDashboard() {
   }, [appliedRevenueFrom, appliedRevenueTo]);
 
   useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/members/caretaker/admin/site-ar", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : null
+      ),
+      fetch("/api/members/caretaker/admin/price-overrides", { cache: "no-store" }).then((r) =>
+        r.ok ? r.json() : null
+      ),
+    ])
+      .then(([ar, overrides]) => {
+        if (cancelled) return;
+        if (ar) setSiteAr(ar);
+        if (overrides?.overrides) setPriceOverrides(overrides.overrides);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!expandedSlug) return;
-    if (Object.hasOwn(reservationCacheRef.current, expandedSlug)) return;
+    if (Object.hasOwn(reservationCache, expandedSlug)) return;
     let cancelled = false;
     fetch(
       `/api/members/caretaker/admin/reservations?campSlug=${encodeURIComponent(expandedSlug)}`,
@@ -495,7 +544,7 @@ export function CaretakerAdminDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [expandedSlug]);
+  }, [expandedSlug, reservationCache]);
 
   const filtered = useMemo(() => {
     if (!filterSlug) return camps;
@@ -519,12 +568,6 @@ export function CaretakerAdminDashboard() {
     return "All dates (Stripe)";
   }, [revenuePeriod]);
 
-  useEffect(() => {
-    if (loading) return;
-    setRevFromInput(revenuePeriod.from ?? "");
-    setRevToInput(revenuePeriod.to ?? "");
-  }, [loading, revenuePeriod.from, revenuePeriod.to]);
-
   if (loading) {
     return (
       <div className="flex items-center gap-3 text-[#e8e0d5]/70 py-12">
@@ -543,8 +586,10 @@ export function CaretakerAdminDashboard() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 caretaker-themed">
       <ColumnHelpSheet helpId={columnHelpId} onClose={() => setColumnHelpId(null)} />
+
+      <ManualReservationPanel />
 
       {rosterUnmapped.length > 0 && (
         <div
@@ -590,6 +635,7 @@ export function CaretakerAdminDashboard() {
           <button
             type="button"
             onClick={() => {
+              setLoading(true);
               setAppliedRevenueFrom(revFromInput.trim());
               setAppliedRevenueTo(revToInput.trim());
             }}
@@ -600,6 +646,7 @@ export function CaretakerAdminDashboard() {
           <button
             type="button"
             onClick={() => {
+              setLoading(true);
               setRevFromInput("");
               setRevToInput("");
               setAppliedRevenueFrom("");
@@ -619,6 +666,7 @@ export function CaretakerAdminDashboard() {
                 from.setDate(from.getDate() - 29);
                 const f = formatLocalIso(from);
                 const t = formatLocalIso(to);
+                setLoading(true);
                 setRevFromInput(f);
                 setRevToInput(t);
                 setAppliedRevenueFrom(f);
@@ -634,6 +682,7 @@ export function CaretakerAdminDashboard() {
                 const y = new Date().getFullYear();
                 const f = `${y}-01-01`;
                 const t = `${y}-12-31`;
+                setLoading(true);
                 setRevFromInput(f);
                 setRevToInput(t);
                 setAppliedRevenueFrom(f);
@@ -679,6 +728,70 @@ export function CaretakerAdminDashboard() {
               value={String(global.totalRosterAssignments)}
               sub="Salesforce caretaker rows"
             />
+          </div>
+        </section>
+      ) : null}
+
+      {siteAr ? (
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium text-[#f0d48f]">Site-fee AR (unpaid billing periods)</h2>
+          <div className="flex flex-wrap gap-3 mb-2">
+            <KpiCard label="Total AR" value={formatUsd(siteAr.totals.balanceDueCents)} />
+            <KpiCard label="Overdue" value={formatUsd(siteAr.totals.overdueCents)} sub={`${siteAr.totals.overdueReservations} reservations`} />
+          </div>
+          <div className="overflow-x-auto rounded border border-[#d4af37]/20">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="text-[#e8e0d5]/60 border-b border-[#d4af37]/20">
+                  <th className="py-2 px-2">Camp</th>
+                  <th className="py-2 px-2">Balance due</th>
+                  <th className="py-2 px-2">Overdue</th>
+                  <th className="py-2 px-2">Reservations</th>
+                </tr>
+              </thead>
+              <tbody>
+                {siteAr.camps
+                  .filter((c) => c.balanceDueCents > 0)
+                  .map((c) => (
+                    <tr key={c.campSlug} className="border-b border-[#d4af37]/10 text-[#e8e0d5]">
+                      <td className="py-2 px-2">{c.campName}</td>
+                      <td className="py-2 px-2">{formatUsd(c.balanceDueCents)}</td>
+                      <td className="py-2 px-2">{formatUsd(c.overdueCents)}</td>
+                      <td className="py-2 px-2">{c.reservationsWithBalance}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {priceOverrides.length > 0 ? (
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium text-[#f0d48f]">Flagged price overrides</h2>
+          <div className="overflow-x-auto rounded border border-amber-500/30">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="text-[#e8e0d5]/60 border-b border-amber-500/20">
+                  <th className="py-2 px-2">Camp</th>
+                  <th className="py-2 px-2">Guest</th>
+                  <th className="py-2 px-2">Calculated</th>
+                  <th className="py-2 px-2">Charged</th>
+                  <th className="py-2 px-2">Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {priceOverrides.slice(0, 20).map((row) => (
+                  <tr key={row.id} className="border-b border-amber-500/10 text-[#e8e0d5]">
+                    <td className="py-2 px-2">{row.campSlug}</td>
+                    <td className="py-2 px-2">{row.guestLabel}</td>
+                    <td className="py-2 px-2">{formatUsd((row.calculatedTotalCents ?? 0))}</td>
+                    <td className="py-2 px-2">{formatUsd((row.amountOverrideCents ?? 0))}</td>
+                    <td className="py-2 px-2 max-w-[200px] truncate" title={row.overrideReason ?? ""}>{row.overrideReason ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
       ) : null}
@@ -1058,12 +1171,12 @@ function CampExpandedPanel({
 
   const [tab, setTab] = useState<"overview" | "reservations" | "revenue" | "caretakers">("overview");
   const [stripePayments, setStripePayments] = useState<StripePaymentRow[] | null>(null);
-  const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
+  const stripeLoading = stripePayments === null && stripeError === null;
 
   useEffect(() => {
     let cancelled = false;
-    setStripeLoading(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset stripe panel while refetching
     setStripePayments(null);
     setStripeError(null);
     const params = new URLSearchParams({ campSlug: camp.slug });
@@ -1085,9 +1198,6 @@ function CampExpandedPanel({
         if (cancelled) return;
         setStripeError(e instanceof Error ? e.message : "Failed to load");
         setStripePayments([]);
-      })
-      .finally(() => {
-        if (!cancelled) setStripeLoading(false);
       });
     return () => {
       cancelled = true;
