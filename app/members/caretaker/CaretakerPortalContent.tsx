@@ -597,6 +597,84 @@ export function CaretakerPortalContent({
     }
   }, [resSiteId, availableSitesForDropdown]);
 
+  async function handleCreateReservationComp() {
+    if (!resSiteId || !resCheckInDate || !resCheckOutDate) {
+      setResError("Select site and dates");
+      return;
+    }
+    if (resType === "member") {
+      if (!resMemberLookup) {
+        setResError("Look up member first");
+        return;
+      }
+    } else if (!resGuestFirstName.trim() || !resGuestLastName.trim() || !resGuestEmail.trim()) {
+      setResError("Enter guest name and email");
+      return;
+    }
+    if (resEffectiveTotalCents !== 0) {
+      setResError("Comp only applies when total is $0");
+      return;
+    }
+    if (resTotalCents > 0 && resOverrideReason.trim().length < 3) {
+      setResError("Override reason required for $0 comp");
+      return;
+    }
+    setResError(null);
+    setResSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {
+        siteId: resSiteId,
+        checkInDate: resCheckInDate,
+        checkOutDate: resCheckOutDate,
+        type: resType,
+        paymentMethod: "none",
+        amountCents: 0,
+        recipientEmail:
+          resType === "member"
+            ? resMemberLookup?.email?.trim() || "noreply@ldma.org"
+            : resGuestEmail.trim(),
+        recipientDisplayName:
+          resType === "member"
+            ? resMemberLookup?.displayName || `#${resMemberLookup?.memberNumber}`
+            : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
+      };
+      appendPriceOverrideFields(body);
+      if (resType === "member" && resMemberLookup) {
+        body.memberContactId = resMemberLookup.contactId;
+        body.memberNumber = resMemberLookup.memberNumber;
+        body.memberDisplayName = resMemberLookup.displayName;
+      } else {
+        body.guestFirstName = resGuestFirstName.trim();
+        body.guestLastName = resGuestLastName.trim();
+        body.guestEmail = resGuestEmail.trim();
+        body.guestPhone = resGuestPhone.trim() || undefined;
+      }
+      const res = await fetch("/api/members/caretaker/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResError(data.error ?? "Failed to create reservation");
+        return;
+      }
+      setCreateResModalOpen(false);
+      setResSiteId("");
+      setResMemberLookup(null);
+      setResMemberNumber("");
+      setResGuestFirstName("");
+      setResGuestLastName("");
+      setResGuestEmail("");
+      setResGuestPhone("");
+      loadReservations();
+    } catch {
+      setResError("Failed to create reservation");
+    } finally {
+      setResSubmitting(false);
+    }
+  }
+
   async function handleCreateReservationCash(e: React.FormEvent) {
     e.preventDefault();
     if (!resSiteId || !resCheckInDate || !resCheckOutDate) {
@@ -618,6 +696,9 @@ export function CaretakerPortalContent({
         return;
       }
     }
+    if (resEffectiveTotalCents === 0) {
+      return handleCreateReservationComp();
+    }
     if (resTotalCents < 1 && resEffectiveTotalCents < 1) {
       setResError("Invalid total");
       return;
@@ -633,7 +714,10 @@ export function CaretakerPortalContent({
         paymentMethod: "cash",
         amountCents: resEffectiveTotalCents,
         recipientEmail: resType === "member" ? resMemberLookup!.email!.trim() : resGuestEmail.trim(),
-        recipientDisplayName: resType === "member" ? (resMemberLookup!.displayName || `#${resMemberLookup!.memberNumber}`) : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
+        recipientDisplayName:
+          resType === "member"
+            ? resMemberLookup!.displayName || `#${resMemberLookup!.memberNumber}`
+            : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
       };
       appendPriceOverrideFields(body);
       if (resType === "member" && resMemberLookup) {
@@ -692,6 +776,9 @@ export function CaretakerPortalContent({
         setResError("Enter guest first name, last name, and valid email");
         return;
       }
+    }
+    if (resEffectiveTotalCents === 0) {
+      return handleCreateReservationComp();
     }
     if (resTotalCents < 1 && resEffectiveTotalCents < 1) {
       setResError("Invalid total");
@@ -1770,14 +1857,22 @@ export function CaretakerPortalContent({
                 )}
                 <div className="flex flex-col gap-2 pt-2">
                   <div className="flex gap-2">
-                    {resAllowsCash && (
-                      <button type="button" onClick={handleCreateReservationCash} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
-                        {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with cash
+                    {resEffectiveTotalCents === 0 ? (
+                      <button type="button" onClick={() => void handleCreateReservationComp()} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
+                        {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Create comp (no payment)
                       </button>
+                    ) : (
+                      <>
+                        {resAllowsCash && (
+                          <button type="button" onClick={handleCreateReservationCash} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
+                            {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with cash
+                          </button>
+                        )}
+                        <button type="button" onClick={handleCreateReservationCard} disabled={resSubmitting} className={resAllowsCash ? "flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2" : "flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2"}>
+                          {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with card
+                        </button>
+                      </>
                     )}
-                    <button type="button" onClick={handleCreateReservationCard} disabled={resSubmitting} className={resAllowsCash ? "flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2" : "flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2"}>
-                      {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with card
-                    </button>
                   </div>
                   <button type="button" onClick={() => setCreateResModalOpen(false)} className="py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
                 </div>

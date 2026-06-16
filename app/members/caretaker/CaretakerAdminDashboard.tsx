@@ -2,6 +2,9 @@
 
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ManualReservationPanel } from "./ManualReservationPanel";
+import { ReservationBillingSection } from "./ReservationBillingSection";
+import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
+import type { PaymentDueItem } from "@/lib/caretaker-site-ar";
 import { ChevronDown, ChevronRight, HelpCircle, Loader2, Tent } from "lucide-react";
 
 type RosterRow = {
@@ -17,14 +20,18 @@ type RosterRow = {
 type CampRow = {
   slug: string;
   name: string;
-  activeMemberCheckIns: number;
-  activeGuestCheckIns: number;
-  memberCheckInsLast30Days: number;
-  guestCheckInsLast30Days: number;
-  activeReservations: number;
   reservationsOnProperty: number;
+  memberReservationsOnProperty: number;
+  guestReservationsOnProperty: number;
+  checkedInReservations: number;
+  activeReservations: number;
+  reservationsCreatedLast30Days: number;
+  balanceDueCents: number;
+  overdueCents: number;
+  reservationsWithBalance: number;
+  overdueReservations: number;
   assignedCaretakers: RosterRow[];
-  checkInsLast30DaysByCaretaker: { caretakerContactId: string; count: number }[];
+  reservationsCreatedLast30DaysByCaretaker: { caretakerContactId: string; count: number }[];
   stripeReservationCents: number;
   stripePastDueCents: number;
   stripeOtherCents: number;
@@ -33,12 +40,15 @@ type CampRow = {
 };
 
 type GlobalMetrics = {
-  totalMembersOnStay: number;
-  totalGuestsOnStay: number;
-  totalMemberCheckIns30d: number;
-  totalGuestCheckIns30d: number;
-  totalOpenReservations: number;
   totalOnSiteReservations: number;
+  totalMemberOnSite: number;
+  totalGuestOnSite: number;
+  totalCheckedIn: number;
+  totalOpenReservations: number;
+  totalReservationsCreated30d: number;
+  totalBalanceDueCents: number;
+  totalOverdueCents: number;
+  totalReservationsWithBalance: number;
   stripeReservationCents: number;
   stripePastDueCents: number;
   stripeOtherCents: number;
@@ -49,12 +59,13 @@ type GlobalMetrics = {
 
 type SortKey =
   | "name"
-  | "membersStay"
-  | "guestsStay"
-  | "mem30"
-  | "gst30"
-  | "openRes"
   | "onSite"
+  | "membersOnSite"
+  | "guestsOnSite"
+  | "checkedIn"
+  | "openRes"
+  | "balanceDue"
+  | "overdue"
   | "assigned"
   | "stripeTotal";
 
@@ -73,6 +84,12 @@ type ReservationRow = {
   status: string;
   checkedInAt: string | null;
   createdAt: string;
+  invoiceNumber?: string | null;
+  balanceDueCents?: number;
+  siteFeesPaidCents?: number;
+  siteFeesDueCents?: number;
+  hasOverdueSiteFee?: boolean;
+  nextSiteFeeDueDate?: string | null;
 };
 
 type StripePaymentRow = {
@@ -89,35 +106,39 @@ type StripePaymentRow = {
 const COLUMN_HELP: Record<string, { title: string; body: string }> = {
   expand: {
     title: "Expand row",
-    body: "Opens this camp in tabs: Overview (at-a-glance), Reservations, Stripe revenue (same date range as the toolbar above), and Caretakers (30-day check-ins by caretaker).",
+    body: "Opens tabs: Overview, Reservations, Balances due (take payment), Stripe revenue, and Caretaker roster.",
   },
   camp: {
     title: "Camp",
-    body: "LDMA directory campground. Counts in the row come from this site’s database; assigned caretakers come from Salesforce (caretaker roster for that camp).",
-  },
-  membersStay: {
-    title: "Members on stay",
-    body: "Number of member check-ins in the caretaker portal where the checkout date is still today or in the future—treated as an active stay at the camp.",
-  },
-  guestsStay: {
-    title: "Guests on stay",
-    body: "Same as members on stay, but for guest check-ins recorded in the caretaker portal.",
-  },
-  memCheck30: {
-    title: "Member check-ins (30 days)",
-    body: "How many member check-ins were created at this camp in the last 30 days (rolling window from right now, UTC).",
-  },
-  gstCheck30: {
-    title: "Guest check-ins (30 days)",
-    body: "How many guest check-ins were created at this camp in the last 30 days (rolling window from right now, UTC).",
-  },
-  openRes: {
-    title: "Open reservations",
-    body: "Reservations that are not cancelled and whose checkout date is today or later—bookings that still have nights remaining or checkout today.",
+    body: "LDMA directory campground. Lodging counts come from camp_reservations; caretakers from Salesforce.",
   },
   onSite: {
     title: "On site today",
-    body: "Reservations in reserved or checked-in status whose stay window includes today (check-in on or before today, check-out on or after today).",
+    body: "Reserved or checked-in stays whose dates include today (members + guests).",
+  },
+  membersOnSite: {
+    title: "Members on site",
+    body: "Member reservations on site today (reserved or checked in).",
+  },
+  guestsOnSite: {
+    title: "Guests on site",
+    body: "Guest reservations on site today (reserved or checked in).",
+  },
+  checkedIn: {
+    title: "Checked in",
+    body: "Active stays with status checked_in (checkout today or later).",
+  },
+  openRes: {
+    title: "Open reservations",
+    body: "Not cancelled; checkout is today or later.",
+  },
+  balanceDue: {
+    title: "Site fees due",
+    body: "Unpaid site-fee billing periods across all active reservations at this camp.",
+  },
+  overdue: {
+    title: "Overdue",
+    body: "Site-fee balance on billing periods past their due date.",
   },
   assigned: {
     title: "Assigned caretakers",
@@ -191,18 +212,20 @@ function sortCampRows(rows: CampRow[], key: SortKey, dir: "asc" | "desc"): CampR
     switch (key) {
       case "name":
         return s * a.name.localeCompare(b.name);
-      case "membersStay":
-        return s * (a.activeMemberCheckIns - b.activeMemberCheckIns);
-      case "guestsStay":
-        return s * (a.activeGuestCheckIns - b.activeGuestCheckIns);
-      case "mem30":
-        return s * (a.memberCheckInsLast30Days - b.memberCheckInsLast30Days);
-      case "gst30":
-        return s * (a.guestCheckInsLast30Days - b.guestCheckInsLast30Days);
-      case "openRes":
-        return s * (a.activeReservations - b.activeReservations);
       case "onSite":
         return s * (a.reservationsOnProperty - b.reservationsOnProperty);
+      case "membersOnSite":
+        return s * (a.memberReservationsOnProperty - b.memberReservationsOnProperty);
+      case "guestsOnSite":
+        return s * (a.guestReservationsOnProperty - b.guestReservationsOnProperty);
+      case "checkedIn":
+        return s * (a.checkedInReservations - b.checkedInReservations);
+      case "openRes":
+        return s * (a.activeReservations - b.activeReservations);
+      case "balanceDue":
+        return s * (a.balanceDueCents - b.balanceDueCents);
+      case "overdue":
+        return s * (a.overdueCents - b.overdueCents);
       case "assigned":
         return s * (a.assignedCaretakers.length - b.assignedCaretakers.length);
       case "stripeTotal":
@@ -309,7 +332,7 @@ function ThCampWithHelp({
   return (
     <th
       scope="col"
-      className="sticky left-14 z-30 min-w-[7.5rem] bg-[#1a1208] p-3 text-left align-bottom font-semibold shadow-[4px_0_12px_-2px_rgba(0,0,0,0.5)] lg:min-w-[9rem]"
+      className="sticky left-14 z-30 min-w-[7.5rem] ct-sticky p-3 text-left align-bottom font-semibold shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)] lg:min-w-[9rem]"
       title={meta.body}
     >
       <div className="flex min-h-[4.25rem] flex-col justify-end pb-7 pl-0.5">
@@ -333,7 +356,7 @@ function ThExpandWithHelp({
   return (
     <th
       scope="col"
-      className="sticky left-0 z-30 w-14 min-w-[3.5rem] bg-[#1a1208] p-2 text-center align-bottom shadow-[4px_0_12px_-2px_rgba(0,0,0,0.5)]"
+      className="sticky left-0 z-30 w-14 min-w-[3.5rem] ct-sticky p-2 text-center align-bottom shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)]"
       title={meta.body}
     >
       <span className="sr-only">Expand row for camp details</span>
@@ -418,28 +441,13 @@ export function CaretakerAdminDashboard() {
   const [revToInput, setRevToInput] = useState("");
   const [appliedRevenueFrom, setAppliedRevenueFrom] = useState("");
   const [appliedRevenueTo, setAppliedRevenueTo] = useState("");
+  const [dashboardRefresh, setDashboardRefresh] = useState(0);
   const [filterSlug, setFilterSlug] = useState<string>("");
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
   const [reservationCache, setReservationCache] = useState<Record<string, ReservationRow[]>>({});
   const [columnHelpId, setColumnHelpId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [siteAr, setSiteAr] = useState<{
-    camps: Array<{
-      campSlug: string;
-      campName: string;
-      balanceDueCents: number;
-      overdueCents: number;
-      reservationsWithBalance: number;
-      overdueReservations: number;
-    }>;
-    totals: {
-      balanceDueCents: number;
-      overdueCents: number;
-      reservationsWithBalance: number;
-      overdueReservations: number;
-    };
-  } | null>(null);
   const [priceOverrides, setPriceOverrides] = useState<Array<{
     id: string;
     campSlug: string;
@@ -491,21 +499,14 @@ export function CaretakerAdminDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [appliedRevenueFrom, appliedRevenueTo]);
+  }, [appliedRevenueFrom, appliedRevenueTo, dashboardRefresh]);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      fetch("/api/members/caretaker/admin/site-ar", { cache: "no-store" }).then((r) =>
-        r.ok ? r.json() : null
-      ),
-      fetch("/api/members/caretaker/admin/price-overrides", { cache: "no-store" }).then((r) =>
-        r.ok ? r.json() : null
-      ),
-    ])
-      .then(([ar, overrides]) => {
+    fetch("/api/members/caretaker/admin/price-overrides", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((overrides) => {
         if (cancelled) return;
-        if (ar) setSiteAr(ar);
         if (overrides?.overrides) setPriceOverrides(overrides.overrides);
       })
       .catch(() => {});
@@ -701,6 +702,23 @@ export function CaretakerAdminDashboard() {
           <h2 className="text-sm font-medium text-[#f0d48f]">All camps — at a glance</h2>
           <div className="flex flex-wrap gap-3">
             <KpiCard
+              label="On site (lodging)"
+              value={String(global.totalOnSiteReservations)}
+              sub={`${global.totalMemberOnSite} members · ${global.totalGuestOnSite} guests`}
+            />
+            <KpiCard label="Checked in" value={String(global.totalCheckedIn)} />
+            <KpiCard label="Open reservations" value={String(global.totalOpenReservations)} />
+            <KpiCard
+              label="Site fees due"
+              value={formatUsd(global.totalBalanceDueCents)}
+              sub={`${global.totalReservationsWithBalance} reservations · ${formatUsd(global.totalOverdueCents)} overdue`}
+            />
+            <KpiCard
+              label="Reservations (30d)"
+              value={String(global.totalReservationsCreated30d)}
+              sub="New bookings created"
+            />
+            <KpiCard
               label="Stripe — combined"
               value={formatUsd(global.stripeTotalCents)}
               sub={`${global.stripePaymentCount} card payment${global.stripePaymentCount === 1 ? "" : "s"} · ${revenueRangeDescription}`}
@@ -708,60 +726,10 @@ export function CaretakerAdminDashboard() {
             <KpiCard label="Stripe — reservations" value={formatUsd(global.stripeReservationCents)} />
             <KpiCard label="Stripe — past due" value={formatUsd(global.stripePastDueCents)} />
             <KpiCard
-              label="On site (lodging)"
-              value={String(global.totalOnSiteReservations)}
-              sub="Reservations including today"
-            />
-            <KpiCard label="Open reservations" value={String(global.totalOpenReservations)} />
-            <KpiCard
-              label="Check-ins (30d)"
-              value={String(global.totalMemberCheckIns30d + global.totalGuestCheckIns30d)}
-              sub="Member + guest"
-            />
-            <KpiCard
-              label="On stay (check-ins)"
-              value={String(global.totalMembersOnStay + global.totalGuestsOnStay)}
-              sub="Member + guest active stays"
-            />
-            <KpiCard
               label="Roster assignments"
               value={String(global.totalRosterAssignments)}
               sub="Salesforce caretaker rows"
             />
-          </div>
-        </section>
-      ) : null}
-
-      {siteAr ? (
-        <section className="space-y-2">
-          <h2 className="text-sm font-medium text-[#f0d48f]">Site-fee AR (unpaid billing periods)</h2>
-          <div className="flex flex-wrap gap-3 mb-2">
-            <KpiCard label="Total AR" value={formatUsd(siteAr.totals.balanceDueCents)} />
-            <KpiCard label="Overdue" value={formatUsd(siteAr.totals.overdueCents)} sub={`${siteAr.totals.overdueReservations} reservations`} />
-          </div>
-          <div className="overflow-x-auto rounded border border-[#d4af37]/20">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="text-[#e8e0d5]/60 border-b border-[#d4af37]/20">
-                  <th className="py-2 px-2">Camp</th>
-                  <th className="py-2 px-2">Balance due</th>
-                  <th className="py-2 px-2">Overdue</th>
-                  <th className="py-2 px-2">Reservations</th>
-                </tr>
-              </thead>
-              <tbody>
-                {siteAr.camps
-                  .filter((c) => c.balanceDueCents > 0)
-                  .map((c) => (
-                    <tr key={c.campSlug} className="border-b border-[#d4af37]/10 text-[#e8e0d5]">
-                      <td className="py-2 px-2">{c.campName}</td>
-                      <td className="py-2 px-2">{formatUsd(c.balanceDueCents)}</td>
-                      <td className="py-2 px-2">{formatUsd(c.overdueCents)}</td>
-                      <td className="py-2 px-2">{c.reservationsWithBalance}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
           </div>
         </section>
       ) : null}
@@ -827,13 +795,14 @@ export function CaretakerAdminDashboard() {
             onChange={(e) => setSortKey(e.target.value as SortKey)}
           >
             <option value="name">Camp name</option>
+            <option value="balanceDue">Site fees due</option>
+            <option value="overdue">Overdue</option>
             <option value="stripeTotal">Stripe total (range)</option>
             <option value="onSite">On site today</option>
             <option value="openRes">Open reservations</option>
-            <option value="mem30">Member check-ins (30d)</option>
-            <option value="gst30">Guest check-ins (30d)</option>
-            <option value="membersStay">Members on stay</option>
-            <option value="guestsStay">Guests on stay</option>
+            <option value="checkedIn">Checked in</option>
+            <option value="membersOnSite">Members on site</option>
+            <option value="guestsOnSite">Guests on site</option>
             <option value="assigned">Caretaker roster count</option>
           </select>
         </label>
@@ -851,52 +820,59 @@ export function CaretakerAdminDashboard() {
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-[#d4af37]/20">
-        <table className="w-full min-w-[1000px] border-collapse text-left text-sm sm:text-[0.9375rem]">
+        <table className="ct-admin-table w-full min-w-[1000px] border-collapse text-left text-sm sm:text-[0.9375rem]">
           <thead>
-            <tr className="border-b border-[#d4af37]/25 bg-[#1a1208]/90 text-[#d4af37]/95">
+            <tr className="border-b border-[#d4af37]/25">
               <ThExpandWithHelp columnHelpId={columnHelpId} onColumnHelp={setColumnHelpId} />
               <ThCampWithHelp columnHelpId={columnHelpId} onColumnHelp={setColumnHelpId} />
               <ThWithHelp
-                helpId="membersStay"
+                helpId="onSite"
                 columnHelpId={columnHelpId}
                 onColumnHelp={setColumnHelpId}
-                title="Members on stay"
-                subtitle="Active member check-ins"
+                title="On site"
+                subtitle="Today · all types"
               />
               <ThWithHelp
-                helpId="guestsStay"
+                helpId="membersOnSite"
                 columnHelpId={columnHelpId}
                 onColumnHelp={setColumnHelpId}
-                title="Guests on stay"
-                subtitle="Active guest check-ins"
+                title="Members"
+                subtitle="On site today"
               />
               <ThWithHelp
-                helpId="memCheck30"
+                helpId="guestsOnSite"
                 columnHelpId={columnHelpId}
                 onColumnHelp={setColumnHelpId}
-                title="Member check-ins"
-                subtitle="Last 30 days"
+                title="Guests"
+                subtitle="On site today"
               />
               <ThWithHelp
-                helpId="gstCheck30"
+                helpId="checkedIn"
                 columnHelpId={columnHelpId}
                 onColumnHelp={setColumnHelpId}
-                title="Guest check-ins"
-                subtitle="Last 30 days"
+                title="Checked in"
+                subtitle="Active stays"
               />
               <ThWithHelp
                 helpId="openRes"
                 columnHelpId={columnHelpId}
                 onColumnHelp={setColumnHelpId}
-                title="Open reservations"
-                subtitle="Not cancelled, checkout today or later"
+                title="Open"
+                subtitle="Future + today"
               />
               <ThWithHelp
-                helpId="onSite"
+                helpId="balanceDue"
                 columnHelpId={columnHelpId}
                 onColumnHelp={setColumnHelpId}
-                title="On site today"
-                subtitle="Reserved or checked in, stay includes today"
+                title="Site fees due"
+                subtitle="Unpaid periods"
+              />
+              <ThWithHelp
+                helpId="overdue"
+                columnHelpId={columnHelpId}
+                onColumnHelp={setColumnHelpId}
+                title="Overdue"
+                subtitle="Past due date"
               />
               <ThWithHelp
                 helpId="stripeCol"
@@ -927,8 +903,8 @@ export function CaretakerAdminDashboard() {
               const open = expandedSlug === row.slug;
               return (
                 <Fragment key={row.slug}>
-                  <tr className="border-b border-[#d4af37]/10 bg-[#0d0905]/90 hover:bg-[#15100a]/75 transition-colors">
-                    <td className="sticky left-0 z-20 bg-[#0d0905]/95 p-1 text-center align-middle shadow-[4px_0_12px_-2px_rgba(0,0,0,0.4)]">
+                  <tr className="ct-row-main border-b border-[#d4af37]/10 transition-colors">
+                    <td className="ct-sticky sticky left-0 z-20 p-1 text-center align-middle shadow-[4px_0_12px_-2px_rgba(0,0,0,0.12)]">
                       <button
                         type="button"
                         onClick={() => toggleExpand(row.slug)}
@@ -943,25 +919,30 @@ export function CaretakerAdminDashboard() {
                         )}
                       </button>
                     </td>
-                    <td className="sticky left-14 z-20 bg-[#0d0905]/95 p-3 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.4)]">
+                    <td className="ct-sticky sticky left-14 z-20 p-3 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.12)]">
                       <button
                         type="button"
                         onClick={() => toggleExpand(row.slug)}
-                        className="text-left font-medium text-[#f0d48f] hover:underline decoration-[#d4af37]/50"
+                        className="text-left font-medium ct-cell-gold hover:underline decoration-[#d4af37]/50"
                       >
                         {row.name}
                       </button>
                     </td>
-                    <td className="p-3 text-center tabular-nums">{row.activeMemberCheckIns}</td>
-                    <td className="p-3 text-center tabular-nums">{row.activeGuestCheckIns}</td>
-                    <td className="p-3 text-center tabular-nums">{row.memberCheckInsLast30Days}</td>
-                    <td className="p-3 text-center tabular-nums">{row.guestCheckInsLast30Days}</td>
-                    <td className="p-3 text-center tabular-nums">{row.activeReservations}</td>
                     <td className="p-3 text-center tabular-nums">{row.reservationsOnProperty}</td>
-                    <td className="p-3 text-right tabular-nums text-[#f0d48f]/95 font-medium">
+                    <td className="p-3 text-center tabular-nums">{row.memberReservationsOnProperty}</td>
+                    <td className="p-3 text-center tabular-nums">{row.guestReservationsOnProperty}</td>
+                    <td className="p-3 text-center tabular-nums">{row.checkedInReservations}</td>
+                    <td className="p-3 text-center tabular-nums">{row.activeReservations}</td>
+                    <td className="p-3 text-right tabular-nums ct-cell-gold font-medium">
+                      {row.balanceDueCents > 0 ? formatUsd(row.balanceDueCents) : "—"}
+                    </td>
+                    <td className={`p-3 text-right tabular-nums font-medium ${row.overdueCents > 0 ? "ct-cell-overdue" : "ct-cell-muted"}`}>
+                      {row.overdueCents > 0 ? formatUsd(row.overdueCents) : "—"}
+                    </td>
+                    <td className="p-3 text-right tabular-nums ct-cell-gold font-medium">
                       {formatUsd(row.stripeTotalCents)}
                     </td>
-                    <td className="p-3 text-[#e8e0d5]/85">
+                    <td className="p-3 ct-cell-muted">
                       {row.assignedCaretakers.length === 0 ? (
                         <span className="text-[#e8e0d5]/45">—</span>
                       ) : (
@@ -979,8 +960,8 @@ export function CaretakerAdminDashboard() {
                     </td>
                   </tr>
                   {open ? (
-                    <tr key={`${row.slug}-detail`} className="border-b border-[#d4af37]/15 bg-[#080604]/90">
-                      <td colSpan={10} className="p-0">
+                    <tr key={`${row.slug}-detail`} className="ct-row-detail border-b border-[#d4af37]/15">
+                      <td colSpan={11} className="p-0">
                         <CampExpandedPanel
                           camp={row}
                           reservations={reservationCache[row.slug]}
@@ -989,6 +970,7 @@ export function CaretakerAdminDashboard() {
                           revenueFrom={appliedRevenueFrom}
                           revenueTo={appliedRevenueTo}
                           revenueRangeLabel={revenueRangeDescription}
+                          onBalancesPaid={() => setDashboardRefresh((n) => n + 1)}
                         />
                       </td>
                     </tr>
@@ -1148,6 +1130,190 @@ function StripeRevenueTotals({
   );
 }
 
+function CampBalancesTab({
+  campSlug,
+  onPaid,
+}: {
+  campSlug: string;
+  onPaid: () => void;
+}) {
+  const [items, setItems] = useState<PaymentDueItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detail, setDetail] = useState<{
+    checkInDate: string;
+    balance: { balanceDueCents: number; totalDueCents: number; totalPaidCents: number };
+    billingPeriods: Array<{
+      id: string;
+      periodIndex: number;
+      periodStart: string;
+      periodEnd: string;
+      nights: number;
+      amountDueCents: number;
+      amountPaidCents: number;
+      dueDate: string;
+      status: string;
+      pricingBasis: string;
+    }>;
+    recipientEmail: string;
+    recipientDisplayName: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/members/caretaker/payments-due?campSlug=${encodeURIComponent(campSlug)}`, {
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(typeof j.error === "string" ? j.error : res.statusText);
+        }
+        return res.json() as Promise<{ items?: PaymentDueItem[] }>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setItems(data.items ?? []);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load balances");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [campSlug]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setDetail(null);
+      return;
+    }
+    let cancelled = false;
+    setDetailLoading(true);
+    fetch(
+      `/api/members/caretaker/reservations/${selectedId}?campSlug=${encodeURIComponent(campSlug)}`,
+      { cache: "no-store" }
+    )
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to load reservation");
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const payments = Array.isArray(data.payments) ? data.payments : [];
+        const paymentEmail =
+          typeof payments[0]?.memberEmail === "string" ? payments[0].memberEmail.trim() : "";
+        const email = data.guestEmail?.trim() || paymentEmail || "";
+        const displayName =
+          data.reservationType === "member"
+            ? data.memberDisplayName || data.memberNumber || "Member"
+            : [data.guestFirstName, data.guestLastName].filter(Boolean).join(" ").trim() || "Guest";
+        setDetail({
+          checkInDate: data.checkInDate,
+          balance: data.balance,
+          billingPeriods: data.billingPeriods ?? [],
+          recipientEmail: email,
+          recipientDisplayName: displayName,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setDetail(null);
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, campSlug]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 py-4 text-sm ct-cell-muted">
+        <Loader2 className="h-4 w-4 animate-spin text-[#d4af37]" />
+        Loading balances…
+      </div>
+    );
+  }
+  if (error) {
+    return <p className="text-sm text-red-300/90">{error}</p>;
+  }
+  if (items.length === 0) {
+    return (
+      <p className="py-2 text-sm ct-cell-muted">
+        No site-fee balances due in the next 7 days (and no overdue) for this camp.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs ct-cell-muted">
+        Due within 7 days or overdue. Select a row to record cash or card payment.
+      </p>
+      <ul className="space-y-2">
+        {items.map((item) => (
+          <li key={item.reservationId} className="rounded border border-[#d4af37]/20 ct-panel-surface">
+            <button
+              type="button"
+              onClick={() =>
+                setSelectedId((cur) => (cur === item.reservationId ? null : item.reservationId))
+              }
+              className="w-full text-left px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 hover:bg-[#d4af37]/5"
+            >
+              <span>
+                <span className="font-medium ct-cell-gold">{item.guestLabel}</span>
+                {item.siteName ? (
+                  <span className="ct-cell-muted text-sm"> · {item.siteName}</span>
+                ) : null}
+              </span>
+              <span className={item.isOverdue ? "ct-cell-overdue font-medium" : "ct-cell-gold font-medium"}>
+                {item.isOverdue ? "Overdue " : "Due "}
+                {formatCentsAsCurrency(item.balanceDueCents)}
+              </span>
+            </button>
+            {selectedId === item.reservationId && (
+              <div className="px-3 pb-3 border-t border-[#d4af37]/15">
+                {detailLoading || !detail ? (
+                  <div className="flex items-center gap-2 py-3 text-sm ct-cell-muted">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading…
+                  </div>
+                ) : !detail.recipientEmail ? (
+                  <p className="text-sm text-amber-300/90 py-2">
+                    No email on file — add guest/member email in Salesforce before card checkout.
+                  </p>
+                ) : (
+                  <ReservationBillingSection
+                    reservationId={item.reservationId}
+                    checkInDate={detail.checkInDate}
+                    balance={detail.balance}
+                    billingPeriods={detail.billingPeriods}
+                    recipientEmail={detail.recipientEmail}
+                    recipientDisplayName={detail.recipientDisplayName}
+                    campSlug={campSlug}
+                    onPaymentComplete={() => {
+                      setSelectedId(null);
+                      onPaid();
+                    }}
+                  />
+                )}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function CampExpandedPanel({
   camp,
   reservations,
@@ -1156,6 +1322,7 @@ function CampExpandedPanel({
   revenueFrom,
   revenueTo,
   revenueRangeLabel,
+  onBalancesPaid,
 }: {
   camp: CampRow;
   reservations: ReservationRow[] | undefined;
@@ -1164,12 +1331,13 @@ function CampExpandedPanel({
   revenueFrom: string;
   revenueTo: string;
   revenueRangeLabel: string;
+  onBalancesPaid: () => void;
 }) {
   const idToName = new Map(
     camp.assignedCaretakers.map((r) => [r.contactId, rosterName(r)] as const)
   );
 
-  const [tab, setTab] = useState<"overview" | "reservations" | "revenue" | "caretakers">("overview");
+  const [tab, setTab] = useState<"overview" | "reservations" | "balances" | "revenue" | "caretakers">("overview");
   const [stripePayments, setStripePayments] = useState<StripePaymentRow[] | null>(null);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const stripeLoading = stripePayments === null && stripeError === null;
@@ -1212,6 +1380,7 @@ function CampExpandedPanel({
   const tabs = [
     { id: "overview" as const, label: "Overview" },
     { id: "reservations" as const, label: "Reservations" },
+    { id: "balances" as const, label: "Balances due" },
     { id: "revenue" as const, label: "Revenue" },
     { id: "caretakers" as const, label: "Caretakers" },
   ];
@@ -1239,31 +1408,35 @@ function CampExpandedPanel({
         <div className="space-y-4 text-sm text-[#e8e0d5]/85">
           <p className="text-[#f0d48f] font-serif text-lg">{camp.name}</p>
           <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
-              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Members on stay</dt>
-              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.activeMemberCheckIns}</dd>
-            </div>
-            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
-              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Guests on stay</dt>
-              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.activeGuestCheckIns}</dd>
-            </div>
-            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
-              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Member check-ins (30d)</dt>
-              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.memberCheckInsLast30Days}</dd>
-            </div>
-            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
-              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Guest check-ins (30d)</dt>
-              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.guestCheckInsLast30Days}</dd>
-            </div>
-            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
-              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Open reservations</dt>
-              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.activeReservations}</dd>
-            </div>
-            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3">
+            <div className="rounded border border-[#d4af37]/15 ct-panel-surface p-3">
               <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">On site today</dt>
-              <dd className="tabular-nums text-lg text-[#f0d48f]">{camp.reservationsOnProperty}</dd>
+              <dd className="tabular-nums text-lg ct-cell-gold">{camp.reservationsOnProperty}</dd>
+              <dd className="text-[11px] ct-cell-muted">
+                {camp.memberReservationsOnProperty} members · {camp.guestReservationsOnProperty} guests
+              </dd>
             </div>
-            <div className="rounded border border-[#d4af37]/15 bg-[#0f0a06]/50 p-3 sm:col-span-2 lg:col-span-3">
+            <div className="rounded border border-[#d4af37]/15 ct-panel-surface p-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Checked in</dt>
+              <dd className="tabular-nums text-lg ct-cell-gold">{camp.checkedInReservations}</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 ct-panel-surface p-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Open reservations</dt>
+              <dd className="tabular-nums text-lg ct-cell-gold">{camp.activeReservations}</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 ct-panel-surface p-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Site fees due</dt>
+              <dd className="tabular-nums text-lg ct-cell-gold">{formatUsd(camp.balanceDueCents)}</dd>
+              <dd className="text-[11px] ct-cell-muted">{camp.reservationsWithBalance} reservations</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 ct-panel-surface p-3">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Overdue</dt>
+              <dd className="tabular-nums text-lg ct-cell-overdue">{formatUsd(camp.overdueCents)}</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 ct-panel-surface p-3 sm:col-span-2 lg:col-span-1">
+              <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">Bookings (30d)</dt>
+              <dd className="tabular-nums text-lg ct-cell-gold">{camp.reservationsCreatedLast30Days}</dd>
+            </div>
+            <div className="rounded border border-[#d4af37]/15 ct-panel-surface p-3 sm:col-span-2 lg:col-span-3">
               <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">
                 Stripe (same range as dashboard)
               </dt>
@@ -1278,6 +1451,10 @@ function CampExpandedPanel({
             </div>
           </dl>
         </div>
+      ) : null}
+
+      {tab === "balances" ? (
+        <CampBalancesTab campSlug={camp.slug} onPaid={onBalancesPaid} />
       ) : null}
 
       {tab === "reservations" ? (
@@ -1300,6 +1477,7 @@ function CampExpandedPanel({
                     <th className="p-2 font-semibold">Check in</th>
                     <th className="p-2 font-semibold">Check out</th>
                     <th className="p-2 text-center font-semibold">Nights</th>
+                    <th className="p-2 font-semibold">Balance</th>
                     <th className="p-2 font-semibold">Status</th>
                     <th className="p-2 font-semibold">Type</th>
                     <th className="p-2 font-semibold">Booked</th>
@@ -1313,6 +1491,15 @@ function CampExpandedPanel({
                       <td className="p-2 tabular-nums">{r.checkInDate.slice(0, 10)}</td>
                       <td className="p-2 tabular-nums">{r.checkOutDate.slice(0, 10)}</td>
                       <td className="p-2 text-center tabular-nums">{r.nights}</td>
+                      <td className="p-2 tabular-nums">
+                        {(r.balanceDueCents ?? 0) > 0 ? (
+                          <span className={r.hasOverdueSiteFee ? "text-amber-400" : "ct-cell-gold"}>
+                            {formatCentsAsCurrency(r.balanceDueCents ?? 0)}
+                          </span>
+                        ) : (
+                          <span className="ct-cell-muted">Paid</span>
+                        )}
+                      </td>
                       <td className="p-2 capitalize">{r.status.replace(/_/g, " ")}</td>
                       <td className="p-2 capitalize">{r.reservationType}</td>
                       <td className="p-2 tabular-nums text-[#e8e0d5]/70">
@@ -1468,11 +1655,11 @@ function CampExpandedPanel({
               </ul>
             )}
           </div>
-          {camp.checkInsLast30DaysByCaretaker.length > 0 ? (
+          {camp.reservationsCreatedLast30DaysByCaretaker.length > 0 ? (
             <div>
-              <h3 className="mb-2 font-serif text-lg text-[#f0d48f]">Member check-ins (30 days) by caretaker</h3>
-              <ul className="space-y-1 text-sm text-[#e8e0d5]/85">
-                {camp.checkInsLast30DaysByCaretaker.map((b) => (
+              <h3 className="mb-2 font-serif text-lg text-[#f0d48f]">Reservations created (30 days) by caretaker</h3>
+              <ul className="space-y-1 text-sm ct-cell-muted">
+                {camp.reservationsCreatedLast30DaysByCaretaker.map((b) => (
                   <li key={b.caretakerContactId}>
                     <span className="text-[#d4af37]/90">
                       {idToName.get(b.caretakerContactId) ?? b.caretakerContactId}
@@ -1484,7 +1671,7 @@ function CampExpandedPanel({
               </ul>
             </div>
           ) : (
-            <p className="text-sm text-[#e8e0d5]/55">No member check-ins in the last 30 days for this camp.</p>
+            <p className="text-sm ct-cell-muted">No reservations created in the last 30 days for this camp.</p>
           )}
         </div>
       ) : null}

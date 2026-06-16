@@ -269,41 +269,46 @@ export async function POST(request: NextRequest) {
   const rates = siteRatesFromRow(siteRow);
   const isMember = type === "member";
   const totalDueCents = computeStayTotalCents({ checkInDate, checkOutDate, isMember, rates });
-  if (totalDueCents < 1) {
-    return NextResponse.json({ error: "Site rates are not configured for this site" }, { status: 400 });
-  }
 
-  const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
-  if (!paymentMethod) {
-    return NextResponse.json(
-      { error: "Payment required. For same-day or recent check-in pay cash; otherwise use card checkout." },
-      { status: 400 }
-    );
-  }
-  if (!caretakerAllowsCashCheckIn(checkInDate, today)) {
-    return NextResponse.json(
-      { error: "Cash payment is only allowed when check-in is today or within the past 7 days. Use card for future check-in." },
-      { status: 400 }
-    );
-  }
-
-  const pricingParsed = parseReservationPricingBody(body, totalDueCents);
+  const pricingParsed = parseReservationPricingBody(body, totalDueCents < 1 ? 0 : totalDueCents);
   if (!pricingParsed.ok) {
     return NextResponse.json({ error: pricingParsed.error }, { status: 400 });
   }
   const pricing = await withReservationInvoice(caretaker.campSlug, pricingParsed.pricing);
   const payCents = pricingParsed.paymentAmountCents;
+  const isComp = pricing.effectiveTotalCents === 0;
+
+  if (!isComp && totalDueCents < 1) {
+    return NextResponse.json({ error: "Site rates are not configured for this site" }, { status: 400 });
+  }
+
+  const paymentMethod =
+    body.paymentMethod === "cash" ? "cash" : body.paymentMethod === "none" ? "none" : null;
+  if (!isComp) {
+    if (!paymentMethod || paymentMethod === "none") {
+      return NextResponse.json(
+        { error: "Payment required. For same-day or recent check-in pay cash; otherwise use card checkout." },
+        { status: 400 }
+      );
+    }
+    if (!caretakerAllowsCashCheckIn(checkInDate, today)) {
+      return NextResponse.json(
+        { error: "Cash payment is only allowed when check-in is today or within the past 7 days. Use card for future check-in." },
+        { status: 400 }
+      );
+    }
+  }
 
   const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
   const recipientDisplayName =
     typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest";
-  if (payCents < 0 || payCents > pricing.effectiveTotalCents) {
+  if (!isComp && (payCents < 0 || payCents > pricing.effectiveTotalCents)) {
     return NextResponse.json(
       { error: `Payment must be between $0.00 and $${(pricing.effectiveTotalCents / 100).toFixed(2)}` },
       { status: 400 }
     );
   }
-  if (!recipientEmail || !EMAIL_REGEX.test(recipientEmail)) {
+  if (!isComp && (!recipientEmail || !EMAIL_REGEX.test(recipientEmail))) {
     return NextResponse.json({ error: "Valid recipient email required for payment" }, { status: 400 });
   }
 

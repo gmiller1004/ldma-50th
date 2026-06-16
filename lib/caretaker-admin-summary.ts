@@ -6,6 +6,7 @@ import { sql, hasDb } from "@/lib/db";
 import { directoryCamps } from "@/lib/directory-camps";
 import { caretakerCampToSlug } from "@/lib/caretaker-camps";
 import { getSalesforceRestClient } from "@/lib/salesforce";
+import { fetchSiteArByCamp } from "@/lib/caretaker-site-ar";
 
 const SF_VERSION = process.env.SALESFORCE_API_VERSION || "v59.0";
 
@@ -22,17 +23,23 @@ export type CaretakerRosterRow = {
 export type CampAdminMetrics = {
   slug: string;
   name: string;
-  activeMemberCheckIns: number;
-  activeGuestCheckIns: number;
-  memberCheckInsLast30Days: number;
-  guestCheckInsLast30Days: number;
-  activeReservations: number;
-  /** reserved or checked_in with stay overlapping today */
+  /** Reserved or checked-in stays including today */
   reservationsOnProperty: number;
+  memberReservationsOnProperty: number;
+  guestReservationsOnProperty: number;
+  /** Active checked-in (not just reserved) */
+  checkedInReservations: number;
+  /** Not cancelled, checkout today or later */
+  activeReservations: number;
+  /** Created in last 30 days */
+  reservationsCreatedLast30Days: number;
+  /** Unpaid site-fee billing periods */
+  balanceDueCents: number;
+  overdueCents: number;
+  reservationsWithBalance: number;
+  overdueReservations: number;
   assignedCaretakers: CaretakerRosterRow[];
-  /** Member check-ins in last 30d grouped by caretaker contact who created the row */
-  checkInsLast30DaysByCaretaker: { caretakerContactId: string; count: number }[];
-  /** Stripe card revenue in the requested period (from camp_payments), cents */
+  reservationsCreatedLast30DaysByCaretaker: { caretakerContactId: string; count: number }[];
   stripeReservationCents: number;
   stripePastDueCents: number;
   stripeOtherCents: number;
@@ -40,25 +47,25 @@ export type CampAdminMetrics = {
   stripePaymentCount: number;
 };
 
-/** Rolled-up numbers across all directory camps (same period as Stripe fields on each camp). */
 export type CaretakerAdminGlobalMetrics = {
-  totalMembersOnStay: number;
-  totalGuestsOnStay: number;
-  totalMemberCheckIns30d: number;
-  totalGuestCheckIns30d: number;
-  totalOpenReservations: number;
   totalOnSiteReservations: number;
+  totalMemberOnSite: number;
+  totalGuestOnSite: number;
+  totalCheckedIn: number;
+  totalOpenReservations: number;
+  totalReservationsCreated30d: number;
+  totalBalanceDueCents: number;
+  totalOverdueCents: number;
+  totalReservationsWithBalance: number;
   stripeReservationCents: number;
   stripePastDueCents: number;
   stripeOtherCents: number;
   stripeTotalCents: number;
   stripePaymentCount: number;
-  /** Sum of roster rows (same person at two camps counts twice). */
   totalRosterAssignments: number;
 };
 
 export type CaretakerAdminSummaryParams = {
-  /** Filter Stripe aggregates on `camp_payments.created_at` (inclusive, date in DB). */
   revenueFrom?: string | null;
   revenueTo?: string | null;
 };
@@ -81,7 +88,6 @@ type StripeAggRow = {
   cnt: number;
 };
 
-/** Per-camp Stripe totals for directory slugs only; all keys present even when zero. */
 async function fetchStripeAggregatesByCamp(
   dbSql: NonNullable<typeof sql>,
   from: string | null,
@@ -219,42 +225,46 @@ async function campDbMetrics(
   today: string,
   since30: string
 ): Promise<{
-  activeMemberCheckIns: number;
-  activeGuestCheckIns: number;
-  memberCheckInsLast30Days: number;
-  guestCheckInsLast30Days: number;
-  activeReservations: number;
   reservationsOnProperty: number;
-  checkInsLast30DaysByCaretaker: { caretakerContactId: string; count: number }[];
+  memberReservationsOnProperty: number;
+  guestReservationsOnProperty: number;
+  checkedInReservations: number;
+  activeReservations: number;
+  reservationsCreatedLast30Days: number;
+  reservationsCreatedLast30DaysByCaretaker: { caretakerContactId: string; count: number }[];
 }> {
-  const mRows = await dbSql`
-    SELECT COUNT(*)::int AS c FROM caretaker_check_ins
-    WHERE camp_slug = ${slug} AND check_out_date >= ${today}
+  const onSite = await dbSql`
+    SELECT COUNT(*)::int AS c FROM camp_reservations
+    WHERE camp_slug = ${slug} AND status IN ('reserved', 'checked_in')
+      AND check_in_date <= ${today} AND check_out_date >= ${today}
   `;
-  const gRows = await dbSql`
-    SELECT COUNT(*)::int AS c FROM caretaker_guest_check_ins
-    WHERE camp_slug = ${slug} AND check_out_date >= ${today}
+  const membersOnSite = await dbSql`
+    SELECT COUNT(*)::int AS c FROM camp_reservations
+    WHERE camp_slug = ${slug} AND status IN ('reserved', 'checked_in')
+      AND reservation_type = 'member'
+      AND check_in_date <= ${today} AND check_out_date >= ${today}
   `;
-  const m30 = await dbSql`
-    SELECT COUNT(*)::int AS c FROM caretaker_check_ins
-    WHERE camp_slug = ${slug} AND created_at >= ${since30}
+  const guestsOnSite = await dbSql`
+    SELECT COUNT(*)::int AS c FROM camp_reservations
+    WHERE camp_slug = ${slug} AND status IN ('reserved', 'checked_in')
+      AND reservation_type = 'guest'
+      AND check_in_date <= ${today} AND check_out_date >= ${today}
   `;
-  const g30 = await dbSql`
-    SELECT COUNT(*)::int AS c FROM caretaker_guest_check_ins
-    WHERE camp_slug = ${slug} AND created_at >= ${since30}
+  const checkedIn = await dbSql`
+    SELECT COUNT(*)::int AS c FROM camp_reservations
+    WHERE camp_slug = ${slug} AND status = 'checked_in' AND check_out_date >= ${today}
   `;
   const resActive = await dbSql`
     SELECT COUNT(*)::int AS c FROM camp_reservations
     WHERE camp_slug = ${slug} AND status != 'cancelled' AND check_out_date >= ${today}
   `;
-  const resOnSite = await dbSql`
+  const res30 = await dbSql`
     SELECT COUNT(*)::int AS c FROM camp_reservations
-    WHERE camp_slug = ${slug} AND status IN ('reserved', 'checked_in')
-      AND check_in_date <= ${today} AND check_out_date >= ${today}
+    WHERE camp_slug = ${slug} AND created_at >= ${since30}
   `;
   const byCt = await dbSql`
     SELECT created_by_contact_id AS caretaker_contact_id, COUNT(*)::int AS count
-    FROM caretaker_check_ins
+    FROM camp_reservations
     WHERE camp_slug = ${slug} AND created_at >= ${since30}
     GROUP BY created_by_contact_id
     ORDER BY count DESC
@@ -268,20 +278,19 @@ async function campDbMetrics(
   }[];
 
   return {
-    activeMemberCheckIns: num(mRows)?.c ?? 0,
-    activeGuestCheckIns: num(gRows)?.c ?? 0,
-    memberCheckInsLast30Days: num(m30)?.c ?? 0,
-    guestCheckInsLast30Days: num(g30)?.c ?? 0,
+    reservationsOnProperty: num(onSite)?.c ?? 0,
+    memberReservationsOnProperty: num(membersOnSite)?.c ?? 0,
+    guestReservationsOnProperty: num(guestsOnSite)?.c ?? 0,
+    checkedInReservations: num(checkedIn)?.c ?? 0,
     activeReservations: num(resActive)?.c ?? 0,
-    reservationsOnProperty: num(resOnSite)?.c ?? 0,
-    checkInsLast30DaysByCaretaker: byCaretaker.map((r) => ({
+    reservationsCreatedLast30Days: num(res30)?.c ?? 0,
+    reservationsCreatedLast30DaysByCaretaker: byCaretaker.map((r) => ({
       caretakerContactId: r.caretaker_contact_id,
       count: Number(r.count) || 0,
     })),
   };
 }
 
-/** Full payload for GET /api/members/caretaker/admin/summary */
 export async function buildCaretakerAdminSummary(
   params: CaretakerAdminSummaryParams = {}
 ): Promise<{
@@ -321,23 +330,27 @@ export async function buildCaretakerAdminSummary(
       ? await fetchStripeAggregatesByCamp(sql, revenueFrom, revenueTo)
       : null;
 
+  const arByCamp = await fetchSiteArByCamp();
+  const arMap = new Map(arByCamp.map((a) => [a.campSlug, a]));
+
   const camps: CampAdminMetrics[] = [];
 
   for (const camp of directoryCamps) {
     const slug = camp.slug;
     const assigned = bySlug.get(slug) ?? [];
+    const ar = arMap.get(slug);
     let metrics: Awaited<ReturnType<typeof campDbMetrics>>;
     if (hasDb() && sql) {
       metrics = await campDbMetrics(sql, slug, today, since30);
     } else {
       metrics = {
-        activeMemberCheckIns: 0,
-        activeGuestCheckIns: 0,
-        memberCheckInsLast30Days: 0,
-        guestCheckInsLast30Days: 0,
-        activeReservations: 0,
         reservationsOnProperty: 0,
-        checkInsLast30DaysByCaretaker: [],
+        memberReservationsOnProperty: 0,
+        guestReservationsOnProperty: 0,
+        checkedInReservations: 0,
+        activeReservations: 0,
+        reservationsCreatedLast30Days: 0,
+        reservationsCreatedLast30DaysByCaretaker: [],
       };
     }
     const st = stripeByCamp?.get(slug) ?? {
@@ -351,6 +364,10 @@ export async function buildCaretakerAdminSummary(
       name: camp.name,
       assignedCaretakers: assigned,
       ...metrics,
+      balanceDueCents: ar?.balanceDueCents ?? 0,
+      overdueCents: ar?.overdueCents ?? 0,
+      reservationsWithBalance: ar?.reservationsWithBalance ?? 0,
+      overdueReservations: ar?.overdueReservations ?? 0,
       stripeReservationCents: st.reservationCents,
       stripePastDueCents: st.pastDueCents,
       stripeOtherCents: st.otherCents,
@@ -361,12 +378,15 @@ export async function buildCaretakerAdminSummary(
 
   const global: CaretakerAdminGlobalMetrics = camps.reduce(
     (acc, c) => ({
-      totalMembersOnStay: acc.totalMembersOnStay + c.activeMemberCheckIns,
-      totalGuestsOnStay: acc.totalGuestsOnStay + c.activeGuestCheckIns,
-      totalMemberCheckIns30d: acc.totalMemberCheckIns30d + c.memberCheckInsLast30Days,
-      totalGuestCheckIns30d: acc.totalGuestCheckIns30d + c.guestCheckInsLast30Days,
-      totalOpenReservations: acc.totalOpenReservations + c.activeReservations,
       totalOnSiteReservations: acc.totalOnSiteReservations + c.reservationsOnProperty,
+      totalMemberOnSite: acc.totalMemberOnSite + c.memberReservationsOnProperty,
+      totalGuestOnSite: acc.totalGuestOnSite + c.guestReservationsOnProperty,
+      totalCheckedIn: acc.totalCheckedIn + c.checkedInReservations,
+      totalOpenReservations: acc.totalOpenReservations + c.activeReservations,
+      totalReservationsCreated30d: acc.totalReservationsCreated30d + c.reservationsCreatedLast30Days,
+      totalBalanceDueCents: acc.totalBalanceDueCents + c.balanceDueCents,
+      totalOverdueCents: acc.totalOverdueCents + c.overdueCents,
+      totalReservationsWithBalance: acc.totalReservationsWithBalance + c.reservationsWithBalance,
       stripeReservationCents: acc.stripeReservationCents + c.stripeReservationCents,
       stripePastDueCents: acc.stripePastDueCents + c.stripePastDueCents,
       stripeOtherCents: acc.stripeOtherCents + c.stripeOtherCents,
@@ -375,12 +395,15 @@ export async function buildCaretakerAdminSummary(
       totalRosterAssignments: acc.totalRosterAssignments + c.assignedCaretakers.length,
     }),
     {
-      totalMembersOnStay: 0,
-      totalGuestsOnStay: 0,
-      totalMemberCheckIns30d: 0,
-      totalGuestCheckIns30d: 0,
-      totalOpenReservations: 0,
       totalOnSiteReservations: 0,
+      totalMemberOnSite: 0,
+      totalGuestOnSite: 0,
+      totalCheckedIn: 0,
+      totalOpenReservations: 0,
+      totalReservationsCreated30d: 0,
+      totalBalanceDueCents: 0,
+      totalOverdueCents: 0,
+      totalReservationsWithBalance: 0,
       stripeReservationCents: 0,
       stripePastDueCents: 0,
       stripeOtherCents: 0,

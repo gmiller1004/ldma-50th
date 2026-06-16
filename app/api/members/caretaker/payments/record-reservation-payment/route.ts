@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCaretakerContext } from "@/lib/caretaker-auth";
+import { getCaretakerWriteContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
@@ -14,7 +14,21 @@ import {
  * Record a cash (or external) payment against an existing reservation; waterfall across billing periods.
  */
 export async function POST(request: NextRequest) {
-  const caretaker = await getCaretakerContext();
+  let body: {
+    reservationId?: string;
+    amountCents?: number;
+    recipientEmail?: string;
+    recipientDisplayName?: string;
+    campSlug?: string;
+  };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const campSlugOverride = typeof body.campSlug === "string" ? body.campSlug.trim() : undefined;
+  const caretaker = await getCaretakerWriteContext(campSlugOverride);
   if (!caretaker) {
     return NextResponse.json({ error: "Caretaker access required" }, { status: 403 });
   }
@@ -23,18 +37,6 @@ export async function POST(request: NextRequest) {
   }
   if (!hasDb() || !sql) {
     return NextResponse.json({ error: "Database not available" }, { status: 503 });
-  }
-
-  let body: {
-    reservationId?: string;
-    amountCents?: number;
-    recipientEmail?: string;
-    recipientDisplayName?: string;
-  };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   const reservationId = typeof body.reservationId === "string" ? body.reservationId.trim() : "";

@@ -46,6 +46,7 @@ export function ReservationBillingSection({
   recipientEmail,
   recipientDisplayName,
   onPaymentComplete,
+  campSlug,
 }: {
   reservationId: string;
   checkInDate: string;
@@ -54,6 +55,8 @@ export function ReservationBillingSection({
   recipientEmail: string;
   recipientDisplayName: string;
   onPaymentComplete: () => void;
+  /** Required for director dashboard (admin paying on any camp). */
+  campSlug?: string;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const allowsCash = caretakerAllowsCashCheckIn(checkInDate, today);
@@ -77,6 +80,7 @@ export function ReservationBillingSection({
           amountCents: pay,
           recipientEmail: recipientEmail.trim(),
           recipientDisplayName,
+          ...(campSlug ? { campSlug } : {}),
         }),
       });
       const data = await res.json();
@@ -107,6 +111,7 @@ export function ReservationBillingSection({
           reservationId,
           recipientEmail: recipientEmail.trim(),
           recipientDisplayName,
+          ...(campSlug ? { campSlug } : {}),
         }),
       });
       const data = await res.json();

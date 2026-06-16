@@ -157,7 +157,7 @@ export function ManualReservationPanel() {
     }
   }
 
-  function buildBaseBody(paymentMethod: "cash" | "card"): Record<string, unknown> {
+  function buildBaseBody(paymentMethod: "cash" | "card" | "none"): Record<string, unknown> {
     const body: Record<string, unknown> = {
       campSlug,
       siteId,
@@ -201,11 +201,43 @@ export function ManualReservationPanel() {
       setError("Enter guest name and email");
       return false;
     }
-    if (calculatedTotalCents < 1 && effectiveTotalCents < 1) {
+    if (effectiveTotalCents === 0) {
+      if (calculatedTotalCents > 0 && overrideReason.trim().length < 3) {
+        setError("Override reason required for $0 comp");
+        return false;
+      }
+    } else if (calculatedTotalCents < 1 && effectiveTotalCents < 1) {
       setError("Invalid total — set rates or override");
       return false;
     }
     return true;
+  }
+
+  async function createComp() {
+    if (!validate()) return;
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const body = buildBaseBody("none");
+      body.paymentMethod = "none";
+      body.amountCents = 0;
+      const res = await fetch("/api/members/caretaker/admin/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Create failed");
+        return;
+      }
+      setSuccess(`Comp reservation created${data.invoiceNumber ? ` (${data.invoiceNumber})` : ""}.`);
+    } catch {
+      setError("Create failed");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function payCash() {
@@ -265,6 +297,7 @@ export function ManualReservationPanel() {
         checkoutBody.guestPhone = guestPhone.trim() || undefined;
       }
       appendOverride(checkoutBody);
+      checkoutBody.campSlug = campSlug;
 
       const res = await fetch("/api/members/caretaker/payments/checkout-session", {
         method: "POST",
@@ -449,7 +482,7 @@ export function ManualReservationPanel() {
         </div>
       )}
 
-      {calculatedTotalCents > 0 && (
+      {nights > 0 && (
         <div className="grid gap-2 sm:grid-cols-2 pt-2 border-t border-[#d4af37]/15">
           <p className="sm:col-span-2 text-sm text-[#e8e0d5]">
             Calculated: {formatCentsAsCurrency(calculatedTotalCents)}
@@ -480,24 +513,37 @@ export function ManualReservationPanel() {
       {success && <p className="text-[#6dd472] text-sm">{success}</p>}
 
       <div className="flex flex-wrap gap-2">
-        {allowsCash && (
+        {effectiveTotalCents === 0 ? (
           <button
             type="button"
-            onClick={payCash}
+            onClick={createComp}
             disabled={submitting}
             className="px-4 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50"
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Pay cash
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Create comp (no payment)
           </button>
+        ) : (
+          <>
+            {allowsCash && (
+              <button
+                type="button"
+                onClick={payCash}
+                disabled={submitting}
+                className="px-4 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50"
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Pay cash
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={payCard}
+              disabled={submitting}
+              className="px-4 py-2 border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg text-sm disabled:opacity-50"
+            >
+              Pay card
+            </button>
+          </>
         )}
-        <button
-          type="button"
-          onClick={payCard}
-          disabled={submitting}
-          className="px-4 py-2 border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg text-sm disabled:opacity-50"
-        >
-          Pay card
-        </button>
       </div>
       {!allowsCash && checkInDate && (
         <p className="text-[#e8e0d5]/50 text-xs">Cash only when check-in is today or within the past 7 days.</p>

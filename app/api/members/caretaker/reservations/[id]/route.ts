@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCaretakerContext } from "@/lib/caretaker-auth";
+import { getCaretakerContext, getCaretakerWriteContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations, caretakerAllowsCashCheckIn } from "@/lib/reservation-camps";
 import { lookupMember } from "@/lib/salesforce";
@@ -88,10 +88,11 @@ function toDateOnlyStr(val: string | Date | null | undefined): string {
  * Reservation detail with billing periods and balance.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const caretaker = await getCaretakerContext();
+  const campSlugOverride = request.nextUrl.searchParams.get("campSlug")?.trim() || undefined;
+  const caretaker = await getCaretakerWriteContext(campSlugOverride);
   if (!caretaker) {
     return NextResponse.json({ error: "Caretaker access required" }, { status: 403 });
   }

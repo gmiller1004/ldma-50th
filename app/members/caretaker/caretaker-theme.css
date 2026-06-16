@@ -103,3 +103,68 @@
   border-color: var(--ct-gold-accent);
   color: var(--ct-gold);
 }
+
+/* Director dashboard table — theme-aware (replaces hardcoded #1a1208 / #0d0905) */
+.ct-admin-table {
+  color: var(--ct-text);
+}
+
+.ct-admin-table thead tr {
+  background-color: var(--ct-surface);
+  color: var(--ct-gold-accent);
+  border-color: var(--ct-border);
+}
+
+.ct-admin-table tbody tr.ct-row-main {
+  background-color: var(--ct-surface-alt);
+  border-color: var(--ct-border);
+}
+
+.ct-admin-table tbody tr.ct-row-main:hover {
+  background-color: color-mix(in srgb, var(--ct-gold-accent) 8%, var(--ct-surface-alt));
+}
+
+.ct-admin-table tbody tr.ct-row-detail {
+  background-color: color-mix(in srgb, var(--ct-page) 92%, var(--ct-surface));
+}
+
+.ct-admin-table .ct-sticky {
+  background-color: var(--ct-surface-alt);
+}
+
+.ct-admin-table tbody tr.ct-row-main:hover .ct-sticky {
+  background-color: color-mix(in srgb, var(--ct-gold-accent) 8%, var(--ct-surface-alt));
+}
+
+.ct-admin-table .ct-th-label {
+  color: var(--ct-gold-accent);
+}
+
+.ct-admin-table .ct-th-sub {
+  color: var(--ct-text-faint);
+}
+
+.ct-admin-table .ct-cell-muted {
+  color: var(--ct-text-muted);
+}
+
+.ct-admin-table .ct-cell-gold {
+  color: var(--ct-gold);
+}
+
+.ct-admin-table .ct-cell-overdue {
+  color: var(--ct-warn-text);
+}
+
+.ct-panel-surface {
+  background-color: var(--ct-surface-alt);
+  border-color: var(--ct-border);
+  color: var(--ct-text);
+}
+
+.ct-input {
+  background-color: var(--ct-page);
+  border: 1px solid var(--ct-border);
+  color: var(--ct-text);
+  border-radius: 0.5rem;
+}

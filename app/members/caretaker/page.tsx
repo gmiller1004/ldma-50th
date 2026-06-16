@@ -28,8 +28,8 @@ export default async function CaretakerPortalPage() {
             Director dashboard
           </h1>
           <p className="ct-subtext mb-8 max-w-3xl">
-            Cross-camp read-only view: pick a Stripe date range, scan KPIs and the grid, then expand a camp for
-            reservations, revenue detail, and caretaker activity.
+            Cross-camp view: occupancy and site-fee balances by camp, collect payments on balances due,
+            Stripe revenue by date range, and manual reservations.
           </p>
           <CaretakerAdminDashboard />
         </CaretakerThemeShell>
