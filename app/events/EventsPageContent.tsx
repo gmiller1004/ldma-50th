@@ -176,6 +176,19 @@ function getEventDates(product: EventProduct): EventDates {
   return result;
 }
 
+function startOfTodayLocal(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+/** Hide after the event's last calendar day (end_date, or start_date when no end). */
+function isPastEvent(product: EventProduct): boolean {
+  const { startDate, endDate } = getEventDates(product);
+  const lastDay = endDate ?? startDate;
+  if (!lastDay) return false;
+  return lastDay.getTime() < startOfTodayLocal().getTime();
+}
+
 const TITLE_MONTH: Record<string, number> = {
   jan: 0,
   january: 0,
@@ -596,7 +609,7 @@ export function EventsPageContent({
 
   const eventsWithVariant: EventWithVariant[] = useMemo(() => {
     const withVariants = events.filter(
-      (e) => (e.variants?.edges?.length ?? 0) > 0
+      (e) => (e.variants?.edges?.length ?? 0) > 0 && !isPastEvent(e)
     ) as EventWithVariant[];
     return withVariants.map((e) =>
       filterEventVariantsByMember(e, isMemberLoggedIn)
