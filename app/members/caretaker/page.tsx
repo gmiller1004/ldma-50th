@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
-import { getCaretakerAccess } from "@/lib/caretaker-auth";
+import { getAdminViewCampSlug, getCaretakerAccess } from "@/lib/caretaker-auth";
+import { getCampBySlug } from "@/lib/directory-camps";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { MembersNav } from "../MembersNav";
 import { CaretakerPortalContent } from "./CaretakerPortalContent";
 import { CaretakerAdminDashboard } from "./CaretakerAdminDashboard";
 import { CaretakerThemeShell } from "./CaretakerThemeShell";
+import { AdminCaretakerViewBanner } from "./CaretakerAdminViewControls";
 
 export default async function CaretakerPortalPage() {
   const access = await getCaretakerAccess();
@@ -13,6 +15,34 @@ export default async function CaretakerPortalPage() {
   }
 
   if (access.mode === "admin") {
+    const viewCampSlug = await getAdminViewCampSlug();
+    const viewCamp = viewCampSlug ? getCampBySlug(viewCampSlug) : undefined;
+    if (viewCampSlug && viewCamp) {
+      return (
+        <>
+          <Breadcrumbs
+            items={[
+              { label: "Home", href: "/" },
+              { label: "Members", href: "/members" },
+              { label: "Director dashboard" },
+              { label: viewCamp.name },
+            ]}
+          />
+          <MembersNav />
+          <CaretakerThemeShell>
+            <AdminCaretakerViewBanner campName={viewCamp.name} />
+            <h1 className="font-serif text-3xl font-semibold ct-heading mb-2">
+              Caretaker Portal: {viewCamp.name}
+            </h1>
+            <p className="ct-subtext mb-8">
+              Director view — check in members, manage reservations, and collect payments for this camp.
+            </p>
+            <CaretakerPortalContent campSlug={viewCampSlug} campName={viewCamp.name} />
+          </CaretakerThemeShell>
+        </>
+      );
+    }
+
     return (
       <>
         <Breadcrumbs

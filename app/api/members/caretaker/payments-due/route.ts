@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCaretakerAccess } from "@/lib/caretaker-auth";
+import { getAdminViewCampSlug, getCaretakerAccess } from "@/lib/caretaker-auth";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { fetchPaymentsDueForCamp } from "@/lib/caretaker-site-ar";
 import { getValidCampSlugs } from "@/lib/directory-camps";
@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
 
   let campSlug: string;
   if (access.mode === "admin") {
-    const slug = request.nextUrl.searchParams.get("campSlug")?.trim() ?? "";
+    const slug =
+      request.nextUrl.searchParams.get("campSlug")?.trim() ?? (await getAdminViewCampSlug()) ?? "";
     if (!slug || !getValidCampSlugs().includes(slug)) {
       return NextResponse.json({ error: "Valid campSlug query param required" }, { status: 400 });
     }

@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { verifySessionToken } from "@/lib/session";
 import { lookupMember, updateContact } from "@/lib/salesforce";
 import { caretakerCampToSlug } from "@/lib/caretaker-camps";
+import { getAdminViewCampSlug } from "@/lib/caretaker-auth";
+import { getCampBySlug } from "@/lib/directory-camps";
 import { getAvatarUrl } from "@/lib/avatars";
 import {
   getCommentDigestEnabled,
@@ -95,6 +97,10 @@ export async function GET() {
       : hasMappedCampCaretaker
         ? "camp"
         : null;
+    const adminViewCampSlug = isCaretakerAdmin ? await getAdminViewCampSlug() : undefined;
+    const adminViewCampName = adminViewCampSlug
+      ? getCampBySlug(adminViewCampSlug)?.name ?? null
+      : null;
 
     return NextResponse.json({
       authenticated: true,
@@ -128,6 +134,8 @@ export async function GET() {
       isCaretaker: member.isCaretaker ?? false,
       isCaretakerAdmin,
       caretakerPortalMode,
+      caretakerAdminViewCamp: adminViewCampSlug ?? null,
+      caretakerAdminViewCampName: adminViewCampName,
       caretakerAtCamp: member.caretakerAtCamp ?? null,
     });
   } catch (e) {

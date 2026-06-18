@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ManualReservationPanel } from "./ManualReservationPanel";
 import { AdminCampReservationsTab } from "./AdminCampReservationsTab";
+import { ViewAsCaretakerButton } from "./CaretakerAdminViewControls";
 import { ReservationBillingSection } from "./ReservationBillingSection";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
 import type { PaymentDueItem } from "@/lib/caretaker-site-ar";
@@ -926,13 +927,20 @@ export function CaretakerAdminDashboard() {
                       </button>
                     </td>
                     <td className="ct-sticky sticky left-14 z-20 p-3 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.12)]">
-                      <button
-                        type="button"
-                        onClick={() => toggleExpand(row.slug)}
-                        className="text-left font-medium ct-cell-gold hover:underline decoration-[#d4af37]/50"
-                      >
-                        {row.name}
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(row.slug)}
+                          className="text-left font-medium ct-cell-gold hover:underline decoration-[#d4af37]/50"
+                        >
+                          {row.name}
+                        </button>
+                        <ViewAsCaretakerButton
+                          campSlug={row.slug}
+                          campName={row.name}
+                          variant="compact"
+                        />
+                      </div>
                     </td>
                     <td className="p-3 text-center tabular-nums">{row.reservationsOnProperty}</td>
                     <td className="p-3 text-center tabular-nums">{row.memberReservationsOnProperty}</td>
@@ -1415,7 +1423,10 @@ function CampExpandedPanel({
 
       {tab === "overview" ? (
         <div className="space-y-4 text-sm text-[#e8e0d5]/85">
-          <p className="text-[#f0d48f] font-serif text-lg">{camp.name}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[#f0d48f] font-serif text-lg">{camp.name}</p>
+            <ViewAsCaretakerButton campSlug={camp.slug} campName={camp.name} />
+          </div>
           <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded border border-[#d4af37]/15 ct-panel-surface p-3">
               <dt className="text-[11px] uppercase tracking-wide text-[#d4af37]/75">On site today</dt>

@@ -10,6 +10,8 @@ export function MembersNav() {
   const [isLdmaAdmin, setIsLdmaAdmin] = useState(false);
   const [showCaretakerPortal, setShowCaretakerPortal] = useState(false);
   const [caretakerNavLabel, setCaretakerNavLabel] = useState("Caretaker Portal");
+  const [adminViewCampName, setAdminViewCampName] = useState<string | null>(null);
+  const [exitingDirectorView, setExitingDirectorView] = useState(false);
 
   useEffect(() => {
     fetch("/api/members/me", { cache: "no-store" })
@@ -20,15 +22,38 @@ export function MembersNav() {
           const mode = data.caretakerPortalMode;
           const show = mode === "admin" || mode === "camp";
           setShowCaretakerPortal(show);
-          setCaretakerNavLabel(mode === "admin" ? "Director dashboard" : "Caretaker Portal");
+          const viewName =
+            typeof data.caretakerAdminViewCampName === "string"
+              ? data.caretakerAdminViewCampName
+              : null;
+          setAdminViewCampName(viewName);
+          if (viewName) {
+            setCaretakerNavLabel(`${viewName} (caretaker view)`);
+          } else {
+            setCaretakerNavLabel(mode === "admin" ? "Director dashboard" : "Caretaker Portal");
+          }
         }
       })
       .catch(() => {
         setIsLdmaAdmin(false);
         setShowCaretakerPortal(false);
+        setAdminViewCampName(null);
         setCaretakerNavLabel("Caretaker Portal");
       });
   }, []);
+
+  async function returnToDirectorDashboard() {
+    setExitingDirectorView(true);
+    try {
+      await fetch("/api/members/caretaker/admin/view-camp", { method: "DELETE" });
+      router.push("/members/caretaker");
+      router.refresh();
+    } catch {
+      alert("Could not return to director dashboard");
+    } finally {
+      setExitingDirectorView(false);
+    }
+  }
 
   async function handleLogout() {
     await fetch("/api/members/logout", { method: "POST" });
@@ -67,7 +92,20 @@ export function MembersNav() {
           Blog Admin
         </Link>
       )}
-      {showCaretakerPortal && (
+      {showCaretakerPortal && adminViewCampName ? (
+        <>
+          <button
+            type="button"
+            onClick={returnToDirectorDashboard}
+            disabled={exitingDirectorView}
+            className="flex items-center gap-2 text-[#e8e0d5]/80 hover:text-[#d4af37] transition-colors disabled:opacity-50"
+          >
+            <Tent className="w-4 h-4" />
+            Director dashboard
+          </button>
+          <span className="text-[#e8e0d5]/45">{caretakerNavLabel}</span>
+        </>
+      ) : showCaretakerPortal ? (
         <Link
           href="/members/caretaker"
           className="flex items-center gap-2 text-[#e8e0d5]/80 hover:text-[#d4af37] transition-colors"
@@ -75,7 +113,7 @@ export function MembersNav() {
           <Tent className="w-4 h-4" />
           {caretakerNavLabel}
         </Link>
-      )}
+      ) : null}
       <button
         type="button"
         onClick={handleLogout}

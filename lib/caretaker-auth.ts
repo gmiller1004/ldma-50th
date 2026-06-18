@@ -2,7 +2,10 @@ import { cookies } from "next/headers";
 import { verifySessionToken } from "@/lib/session";
 import { lookupMember } from "@/lib/salesforce";
 import { caretakerCampToSlug } from "@/lib/caretaker-camps";
-import { getCampBySlug } from "@/lib/directory-camps";
+import { getCampBySlug, getValidCampSlugs } from "@/lib/directory-camps";
+
+/** When set, Caretaker_Admin__c users operate as that camp's caretaker in the portal. */
+export const CARETAKER_ADMIN_CAMP_COOKIE = "caretaker_admin_camp_slug";
 
 export type CaretakerContext = {
   contactId: string;
@@ -57,15 +60,23 @@ export async function getCaretakerAccess(): Promise<CaretakerAccess | null> {
 }
 
 /**
- * Camp-scoped caretaker for write APIs. Null for non-caretakers, unmapped camps, and
- * Caretaker_Admin__c users (including admin+caretaker — they use the admin dashboard only).
+ * Camp-scoped caretaker for portal and write APIs. Directors get context when viewing a camp
+ * (cookie or explicit campSlug); camp caretakers use their assigned camp.
  */
 export async function getCaretakerContext(): Promise<CaretakerContext | null> {
   return getCaretakerWriteContext();
 }
 
+/** Camp slug when a director is viewing the caretaker portal for a specific camp. */
+export async function getAdminViewCampSlug(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  const slug = cookieStore.get(CARETAKER_ADMIN_CAMP_COOKIE)?.value?.trim();
+  if (!slug || !getValidCampSlugs().includes(slug)) return undefined;
+  return slug;
+}
+
 /**
- * Write context for camp caretakers, or admin manual reservation when campSlug is provided.
+ * Write context for camp caretakers, or admin acting on a camp (view-camp cookie or campSlug).
  */
 export async function getCaretakerWriteContext(
   campSlugOverride?: string
@@ -82,13 +93,15 @@ export async function getCaretakerWriteContext(
     };
   }
 
-  if (access.mode === "admin" && campSlugOverride) {
-    const camp = getCampBySlug(campSlugOverride);
+  if (access.mode === "admin") {
+    const slug = campSlugOverride ?? (await getAdminViewCampSlug());
+    if (!slug) return null;
+    const camp = getCampBySlug(slug);
     if (!camp) return null;
     return {
       contactId: access.contactId,
       memberNumber: access.memberNumber,
-      campSlug: campSlugOverride,
+      campSlug: slug,
       campName: camp.name,
     };
   }
