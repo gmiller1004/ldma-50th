@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ManualReservationPanel } from "./ManualReservationPanel";
+import { AdminCampReservationsTab } from "./AdminCampReservationsTab";
 import { ReservationBillingSection } from "./ReservationBillingSection";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
 import type { PaymentDueItem } from "@/lib/caretaker-site-ar";
@@ -177,18 +178,6 @@ const COLUMN_HELP: Record<string, { title: string; body: string }> = {
 function rosterName(r: RosterRow): string {
   const parts = [r.firstName, r.lastName].filter(Boolean);
   return parts.length ? parts.join(" ") : r.email || r.customerNumber || r.contactId;
-}
-
-function reservationGuestLabel(r: ReservationRow): string {
-  const parts = [r.guestFirstName, r.guestLastName].filter(Boolean);
-  return parts.length ? parts.join(" ") : r.guestEmail || "Guest";
-}
-
-function reservationPartyLabel(r: ReservationRow): string {
-  if (r.reservationType === "member") {
-    return r.memberDisplayName || r.memberNumber || "Member";
-  }
-  return reservationGuestLabel(r);
 }
 
 function formatUsd(cents: number): string {
@@ -559,6 +548,23 @@ export function CaretakerAdminDashboard() {
 
   const toggleExpand = (slug: string) => {
     setExpandedSlug((cur) => (cur === slug ? null : slug));
+  };
+
+  const refreshReservationsForCamp = (campSlug: string) => {
+    fetch(
+      `/api/members/caretaker/admin/reservations?campSlug=${encodeURIComponent(campSlug)}`,
+      { cache: "no-store" }
+    )
+      .then(async (res) => {
+        if (!res.ok) return [];
+        const j = (await res.json()) as { reservations?: ReservationRow[] };
+        return j.reservations ?? [];
+      })
+      .then((list) => {
+        setReservationCache((prev) => ({ ...prev, [campSlug]: list }));
+      })
+      .catch(() => {});
+    setDashboardRefresh((n) => n + 1);
   };
 
   const revenueRangeDescription = useMemo(() => {
@@ -971,6 +977,7 @@ export function CaretakerAdminDashboard() {
                           revenueTo={appliedRevenueTo}
                           revenueRangeLabel={revenueRangeDescription}
                           onBalancesPaid={() => setDashboardRefresh((n) => n + 1)}
+                          onReservationsUpdated={() => refreshReservationsForCamp(row.slug)}
                         />
                       </td>
                     </tr>
@@ -1323,6 +1330,7 @@ function CampExpandedPanel({
   revenueTo,
   revenueRangeLabel,
   onBalancesPaid,
+  onReservationsUpdated,
 }: {
   camp: CampRow;
   reservations: ReservationRow[] | undefined;
@@ -1332,6 +1340,7 @@ function CampExpandedPanel({
   revenueTo: string;
   revenueRangeLabel: string;
   onBalancesPaid: () => void;
+  onReservationsUpdated: () => void;
 }) {
   const idToName = new Map(
     camp.assignedCaretakers.map((r) => [r.contactId, rosterName(r)] as const)
@@ -1460,60 +1469,11 @@ function CampExpandedPanel({
       {tab === "reservations" ? (
         <div>
           <h3 className="mb-3 font-serif text-lg text-[#f0d48f]">Reservation history</h3>
-          {reservations === undefined ? (
-            <div className="flex items-center gap-2 py-4 text-sm text-[#e8e0d5]/60">
-              <Loader2 className="h-4 w-4 animate-spin text-[#d4af37]" />
-              Loading reservations…
-            </div>
-          ) : reservations.length === 0 ? (
-            <p className="py-2 text-sm text-[#e8e0d5]/55">No reservations on record for this camp.</p>
-          ) : (
-            <div className="overflow-x-auto rounded border border-[#d4af37]/15">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead>
-                  <tr className="bg-[#1a1208]/80 text-[#d4af37]/90">
-                    <th className="p-2 font-semibold">Site</th>
-                    <th className="p-2 font-semibold">Guest / member</th>
-                    <th className="p-2 font-semibold">Check in</th>
-                    <th className="p-2 font-semibold">Check out</th>
-                    <th className="p-2 text-center font-semibold">Nights</th>
-                    <th className="p-2 font-semibold">Balance</th>
-                    <th className="p-2 font-semibold">Status</th>
-                    <th className="p-2 font-semibold">Type</th>
-                    <th className="p-2 font-semibold">Booked</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reservations.map((r) => (
-                    <tr key={r.id} className="border-t border-[#d4af37]/10 text-[#e8e0d5]/90">
-                      <td className="p-2">{r.siteName ?? "—"}</td>
-                      <td className="p-2">{reservationPartyLabel(r)}</td>
-                      <td className="p-2 tabular-nums">{r.checkInDate.slice(0, 10)}</td>
-                      <td className="p-2 tabular-nums">{r.checkOutDate.slice(0, 10)}</td>
-                      <td className="p-2 text-center tabular-nums">{r.nights}</td>
-                      <td className="p-2 tabular-nums">
-                        {(r.balanceDueCents ?? 0) > 0 ? (
-                          <span className={r.hasOverdueSiteFee ? "text-amber-400" : "ct-cell-gold"}>
-                            {formatCentsAsCurrency(r.balanceDueCents ?? 0)}
-                          </span>
-                        ) : (
-                          <span className="ct-cell-muted">Paid</span>
-                        )}
-                      </td>
-                      <td className="p-2 capitalize">{r.status.replace(/_/g, " ")}</td>
-                      <td className="p-2 capitalize">{r.reservationType}</td>
-                      <td className="p-2 tabular-nums text-[#e8e0d5]/70">
-                        {r.createdAt ? r.createdAt.slice(0, 10) : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="border-t border-[#d4af37]/10 px-2 py-1.5 text-[11px] text-[#e8e0d5]/45">
-                Showing up to 300 reservations, newest checkout first.
-              </p>
-            </div>
-          )}
+          <AdminCampReservationsTab
+            campSlug={camp.slug}
+            reservations={reservations}
+            onUpdated={onReservationsUpdated}
+          />
         </div>
       ) : null}
 

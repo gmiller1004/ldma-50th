@@ -95,3 +95,16 @@ export async function getCaretakerWriteContext(
 
   return null;
 }
+
+/** campSlug query param lets Caretaker_Admin__c users act on a specific camp. */
+export function campSlugQueryParam(request: { nextUrl: URL }): string | undefined {
+  const slug = request.nextUrl.searchParams.get("campSlug")?.trim();
+  return slug || undefined;
+}
+
+export async function getCaretakerWriteContextFromRequest(
+  request: { nextUrl: URL },
+  campSlugOverride?: string
+): Promise<CaretakerContext | null> {
+  return getCaretakerWriteContext(campSlugOverride ?? campSlugQueryParam(request));
+}

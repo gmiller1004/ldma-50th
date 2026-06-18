@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCaretakerContext } from "@/lib/caretaker-auth";
+import { getCaretakerWriteContextFromRequest } from "@/lib/caretaker-auth";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { buildCancelPreview } from "@/lib/cancel-reservation";
 
@@ -8,10 +8,10 @@ import { buildCancelPreview } from "@/lib/cancel-reservation";
  * Refund preview before cancelling.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const caretaker = await getCaretakerContext();
+  const caretaker = await getCaretakerWriteContextFromRequest(request);
   if (!caretaker) {
     return NextResponse.json({ error: "Caretaker access required" }, { status: 403 });
   }

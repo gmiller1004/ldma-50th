@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCaretakerContext, getCaretakerWriteContext } from "@/lib/caretaker-auth";
+import { getCaretakerWriteContextFromRequest } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations, caretakerAllowsCashCheckIn } from "@/lib/reservation-camps";
 import { lookupMember } from "@/lib/salesforce";
@@ -91,8 +91,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const campSlugOverride = request.nextUrl.searchParams.get("campSlug")?.trim() || undefined;
-  const caretaker = await getCaretakerWriteContext(campSlugOverride);
+  const caretaker = await getCaretakerWriteContextFromRequest(request);
   if (!caretaker) {
     return NextResponse.json({ error: "Caretaker access required" }, { status: 403 });
   }
@@ -142,7 +141,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const caretaker = await getCaretakerContext();
+    const caretaker = await getCaretakerWriteContextFromRequest(request);
     if (!caretaker) {
       return NextResponse.json({ error: "Caretaker access required" }, { status: 403 });
     }
@@ -500,10 +499,10 @@ export async function PATCH(
  * @deprecated Prefer POST .../cancel — kept for compatibility; runs refund-aware cancellation.
  */
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const caretaker = await getCaretakerContext();
+  const caretaker = await getCaretakerWriteContextFromRequest(request);
   if (!caretaker) {
     return NextResponse.json({ error: "Caretaker access required" }, { status: 403 });
   }

@@ -15,7 +15,7 @@ export function normalizePhoneDigits(phone: string): string {
 
 /**
  * Detect lookup field from a single search box value.
- * Email if contains @; phone if 7+ digits after normalization; else member number.
+ * Email if contains @; phone if 10+ digits or formatted like a phone number; else member number.
  */
 export function parseCaretakerLookupInput(raw: string): CaretakerLookupFields {
   const trimmed = raw.trim();
@@ -26,7 +26,10 @@ export function parseCaretakerLookupInput(raw: string): CaretakerLookupFields {
   }
 
   const digits = normalizePhoneDigits(trimmed);
-  if (digits.length >= 7) {
+  const looksLikePhone =
+    /[()+\-.\s]/.test(trimmed) || digits.length >= 10;
+
+  if (looksLikePhone && digits.length >= 7) {
     return { phone: trimmed };
   }
 

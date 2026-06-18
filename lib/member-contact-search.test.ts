@@ -26,6 +26,14 @@ describe("parseCaretakerLookupInput", () => {
     });
   });
 
+  it("treats 7-digit member numbers as member number not phone", () => {
+    assert.deepEqual(parseCaretakerLookupInput("2954589"), { memberNumber: "2954589" });
+  });
+
+  it("treats 10+ digit strings as phone", () => {
+    assert.deepEqual(parseCaretakerLookupInput("8884653717"), { phone: "8884653717" });
+  });
+
   it("treats short numeric strings as member numbers", () => {
     assert.deepEqual(parseCaretakerLookupInput("12345"), { memberNumber: "12345" });
   });
