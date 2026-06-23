@@ -21,11 +21,28 @@ type PaymentRow = {
   method: string;
   amount_cents: number;
   stripe_payment_intent_id: string | null;
+  stripe_checkout_session_id: string | null;
   member_email: string;
   recipient_display_name: string;
   member_contact_id: string | null;
   member_number: string | null;
 };
+
+async function resolvePaymentIntentId(
+  stripe: Stripe,
+  payment: PaymentRow
+): Promise<string | null> {
+  if (payment.stripe_payment_intent_id) return payment.stripe_payment_intent_id;
+  if (!payment.stripe_checkout_session_id) return null;
+  try {
+    const session = await stripe.checkout.sessions.retrieve(payment.stripe_checkout_session_id);
+    const pi = session.payment_intent;
+    return typeof pi === "string" ? pi : pi?.id ?? null;
+  } catch (e) {
+    console.error("[cancel] Could not resolve payment intent from checkout session:", e);
+    return null;
+  }
+}
 
 async function paymentTotals(reservationId: string) {
   if (!sql) return { paid: 0, refunded: 0, cardPaid: 0, cashPaid: 0 };
@@ -137,6 +154,30 @@ export async function executeCancellation(input: {
 }): Promise<{ ok: true; preview: CancelPreview } | { ok: false; error: string }> {
   if (!hasDb() || !sql) return { ok: false, error: "Database not available" };
 
+  try {
+    return await executeCancellationInner(input);
+  } catch (e) {
+    console.error("[cancel] executeCancellation failed:", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/payment_type|refunded_payment_id|cancelled_at|cancellation_refund/i.test(msg)) {
+      return {
+        ok: false,
+        error:
+          "Cancellation database schema is out of date. Run scripts/migrate-camp-cancellation-refunds.sql and try again.",
+      };
+    }
+    return { ok: false, error: "Cancellation failed" };
+  }
+}
+
+async function executeCancellationInner(input: {
+  reservationId: string;
+  campSlug: string;
+  createdByContactId: string;
+  cancelDate?: string;
+}): Promise<{ ok: true; preview: CancelPreview } | { ok: false; error: string }> {
+  if (!sql) return { ok: false, error: "Database not available" };
+
   const preview = await buildCancelPreview(input.reservationId, input.campSlug, input.cancelDate);
   if (!preview) return { ok: false, error: "Reservation not found or already cancelled" };
 
@@ -163,8 +204,8 @@ export async function executeCancellation(input: {
 
   if (preview.refundCents > 0) {
     const payRows = await sql`
-      SELECT id, method, amount_cents, stripe_payment_intent_id, member_email, recipient_display_name,
-             member_contact_id, member_number
+      SELECT id, method, amount_cents, stripe_payment_intent_id, stripe_checkout_session_id,
+             member_email, recipient_display_name, member_contact_id, member_number
       FROM camp_payments
       WHERE reservation_id = ${input.reservationId} AND payment_type = 'reservation'
       ORDER BY created_at DESC
@@ -182,9 +223,17 @@ export async function executeCancellation(input: {
     const secretKey = process.env.STRIPE_RESTRICTED_KEY || process.env.STRIPE_SECRET_KEY;
     const stripe = secretKey ? new Stripe(secretKey) : null;
 
+    if (preview.stripeRefundCents > 0 && !stripe) {
+      return { ok: false, error: "Stripe is not configured; cannot process card refund" };
+    }
+
     for (const p of payments) {
       if (stripeRemaining <= 0) break;
-      if (p.method !== "card" || !p.stripe_payment_intent_id) continue;
+      if (p.method !== "card") continue;
+
+      const paymentIntentId = stripe ? await resolvePaymentIntentId(stripe, p) : p.stripe_payment_intent_id;
+      if (!paymentIntentId) continue;
+
       const already = await refundedForPayment(p.id);
       const available = Math.max(0, p.amount_cents - already);
       const apply = Math.min(stripeRemaining, available);
@@ -194,13 +243,15 @@ export async function executeCancellation(input: {
       if (stripe) {
         try {
           const refund = await stripe.refunds.create({
-            payment_intent: p.stripe_payment_intent_id,
+            payment_intent: paymentIntentId,
             amount: apply,
           });
           stripeRefundId = refund.id;
         } catch (e) {
           console.error("[cancel] Stripe refund failed:", e);
-          return { ok: false, error: "Stripe refund failed" };
+          const stripeMsg =
+            e instanceof Error && "message" in e ? e.message : "Stripe refund failed";
+          return { ok: false, error: `Stripe refund failed: ${stripeMsg}` };
         }
       }
 
@@ -214,11 +265,19 @@ export async function executeCancellation(input: {
         VALUES (
           ${input.campSlug}, 'refund', 'card', ${apply}, ${input.reservationId},
           ${p.member_contact_id}, ${p.member_number}, ${recipientEmail}, ${recipientName},
-          ${p.stripe_payment_intent_id}, ${stripeRefundId}, ${p.id},
+          ${paymentIntentId}, ${stripeRefundId}, ${p.id},
           ${input.createdByContactId}, NOW()
         )
       `;
       stripeRemaining -= apply;
+    }
+
+    if (stripeRemaining > 0) {
+      return {
+        ok: false,
+        error:
+          "Could not refund the full card amount — payment may be missing a Stripe ID or already refunded in Stripe.",
+      };
     }
 
     if (preview.cashRefundCents > 0) {

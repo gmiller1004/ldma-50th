@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { directoryCamps } from "@/lib/directory-camps";
 import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate } from "@/lib/reservation-camps";
-import { computeStayPricing, formatCentsAsCurrency } from "@/lib/reservation-pricing";
+import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
 import { countNights } from "@/lib/reservation-dates";
+import { suggestedReservationPaymentCents } from "@/lib/reservation-billing";
+import { scalePeriodDraftsToTotal } from "@/lib/reservation-price-override";
+import { resolveCreateReservationPricing } from "@/lib/reservation-create-metadata";
 import { parseCaretakerLookupInput } from "@/lib/member-contact-search";
 
 type Site = {
@@ -50,7 +53,8 @@ export function ManualReservationPanel() {
   const [guestLastName, setGuestLastName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
-  const [overrideTotal, setOverrideTotal] = useState("");
+  const [stayTotalOverride, setStayTotalOverride] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
   const [overrideReason, setOverrideReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,10 +81,58 @@ export function ManualReservationPanel() {
         }).totalCents
       : 0;
   const effectiveTotalCents = (() => {
-    if (!overrideTotal.trim()) return calculatedTotalCents;
-    const n = Math.round(parseFloat(overrideTotal) * 100);
-    return Number.isNaN(n) ? calculatedTotalCents : n;
+    const r = resolveCreateReservationPricing(Math.max(0, calculatedTotalCents), {
+      stayTotalOverrideDollars: stayTotalOverride,
+      overrideReason,
+      paymentAmountDollars: paymentAmount,
+    });
+    return r.ok ? r.stayTotalCents : calculatedTotalCents;
   })();
+  const collectCents = (() => {
+    const r = resolveCreateReservationPricing(Math.max(0, calculatedTotalCents), {
+      stayTotalOverrideDollars: stayTotalOverride,
+      overrideReason,
+      paymentAmountDollars: paymentAmount,
+    });
+    return r.ok ? r.collectCents : effectiveTotalCents;
+  })();
+  const balanceAfterCents = Math.max(0, effectiveTotalCents - collectCents);
+
+  const suggestedFirstPeriodCents = useMemo(() => {
+    if (!selectedSite || nights < 1 || effectiveTotalCents < 1) return null;
+    let drafts = generateBillingPeriods({
+      checkInDate,
+      checkOutDate,
+      isMember: resType === "member",
+      rates: {
+        memberRateDaily: selectedSite.memberRateDaily,
+        memberRateMonthly: selectedSite.memberRateMonthly,
+        nonMemberRateDaily: selectedSite.nonMemberRateDaily,
+      },
+    });
+    if (effectiveTotalCents !== calculatedTotalCents && calculatedTotalCents > 0) {
+      drafts = scalePeriodDraftsToTotal(drafts, effectiveTotalCents);
+    }
+    return suggestedReservationPaymentCents(
+      drafts.map((d) => ({
+        status: "unpaid",
+        amountDueCents: d.amountDueCents,
+        amountPaidCents: 0,
+      })),
+      effectiveTotalCents
+    );
+  }, [selectedSite, nights, checkInDate, checkOutDate, resType, effectiveTotalCents, calculatedTotalCents]);
+
+  function applyPricingFields(body: Record<string, unknown>): string | null {
+    const resolved = resolveCreateReservationPricing(Math.max(0, calculatedTotalCents), {
+      stayTotalOverrideDollars: stayTotalOverride,
+      overrideReason,
+      paymentAmountDollars: paymentAmount,
+    });
+    if (!resolved.ok) return resolved.error;
+    Object.assign(body, resolved.fields);
+    return null;
+  }
   const allowsCash = checkInDate ? caretakerAllowsCashCheckIn(checkInDate, today) : false;
 
   useEffect(() => {
@@ -146,17 +198,6 @@ export function ManualReservationPanel() {
     }
   }
 
-  function appendOverride(body: Record<string, unknown>) {
-    if (overrideTotal.trim()) {
-      const overrideCents = Math.round(parseFloat(overrideTotal) * 100);
-      if (!Number.isNaN(overrideCents) && overrideCents !== calculatedTotalCents) {
-        body.amountOverrideCents = overrideCents;
-        body.overrideReason = overrideReason.trim();
-        body.amountCents = overrideCents;
-      }
-    }
-  }
-
   function buildBaseBody(paymentMethod: "cash" | "card" | "none"): Record<string, unknown> {
     const body: Record<string, unknown> = {
       campSlug,
@@ -165,7 +206,6 @@ export function ManualReservationPanel() {
       checkOutDate,
       type: resType,
       paymentMethod,
-      amountCents: effectiveTotalCents,
       recipientEmail:
         resType === "member" ? memberLookup?.email?.trim() : guestEmail.trim(),
       recipientDisplayName:
@@ -183,7 +223,6 @@ export function ManualReservationPanel() {
       body.guestEmail = guestEmail.trim();
       body.guestPhone = guestPhone.trim() || undefined;
     }
-    appendOverride(body);
     return body;
   }
 
@@ -206,8 +245,13 @@ export function ManualReservationPanel() {
         setError("Override reason required for $0 comp");
         return false;
       }
-    } else if (calculatedTotalCents < 1 && effectiveTotalCents < 1) {
-      setError("Invalid total — set rates or override");
+    } else if (effectiveTotalCents < 1) {
+      setError("Invalid stay total");
+      return false;
+    }
+    const pricingCheck = applyPricingFields({});
+    if (pricingCheck && effectiveTotalCents > 0) {
+      setError(pricingCheck);
       return false;
     }
     return true;
@@ -220,8 +264,17 @@ export function ManualReservationPanel() {
     setSuccess(null);
     try {
       const body = buildBaseBody("none");
+      const resolved = resolveCreateReservationPricing(Math.max(0, calculatedTotalCents), {
+        stayTotalOverrideDollars: "0",
+        overrideReason,
+        paymentAmountDollars: "0",
+      });
+      if (!resolved.ok) {
+        setError(resolved.error);
+        return;
+      }
+      Object.assign(body, resolved.fields);
       body.paymentMethod = "none";
-      body.amountCents = 0;
       const res = await fetch("/api/members/caretaker/admin/reservations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -246,10 +299,16 @@ export function ManualReservationPanel() {
     setError(null);
     setSuccess(null);
     try {
+      const body = buildBaseBody("cash");
+      const pricingErr = applyPricingFields(body);
+      if (pricingErr) {
+        setError(pricingErr);
+        return;
+      }
       const res = await fetch("/api/members/caretaker/admin/reservations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildBaseBody("cash")),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -272,7 +331,6 @@ export function ManualReservationPanel() {
     try {
       const checkoutBody: Record<string, unknown> = {
         campSlug,
-        amountCents: effectiveTotalCents,
         paymentType: "reservation",
         recipientEmail:
           resType === "member" ? memberLookup!.email!.trim() : guestEmail.trim(),
@@ -296,7 +354,11 @@ export function ManualReservationPanel() {
         checkoutBody.guestEmail = guestEmail.trim();
         checkoutBody.guestPhone = guestPhone.trim() || undefined;
       }
-      appendOverride(checkoutBody);
+      const pricingErr = applyPricingFields(checkoutBody);
+      if (pricingErr) {
+        setError(pricingErr);
+        return;
+      }
       checkoutBody.campSlug = campSlug;
 
       const res = await fetch("/api/members/caretaker/payments/checkout-session", {
@@ -485,27 +547,62 @@ export function ManualReservationPanel() {
       {nights > 0 && (
         <div className="grid gap-2 sm:grid-cols-2 pt-2 border-t border-[#d4af37]/15">
           <p className="sm:col-span-2 text-sm text-[#e8e0d5]">
-            Calculated: {formatCentsAsCurrency(calculatedTotalCents)}
+            Calculated stay total: {formatCentsAsCurrency(calculatedTotalCents)}
             {effectiveTotalCents !== calculatedTotalCents && (
-              <span className="text-amber-300"> → Charge: {formatCentsAsCurrency(effectiveTotalCents)}</span>
+              <span className="text-amber-300">
+                {" "}
+                → Stay total: {formatCentsAsCurrency(effectiveTotalCents)}
+              </span>
             )}
           </p>
-          <input
-            type="number"
-            min={0}
-            step={0.01}
-            placeholder="Override total $"
-            value={overrideTotal}
-            onChange={(e) => setOverrideTotal(e.target.value)}
-            className={inputClass}
-          />
+          <label className="block text-xs text-[#e8e0d5]/80">
+            Collect now $
+            <input
+              type="number"
+              min={0}
+              max={effectiveTotalCents / 100}
+              step={0.01}
+              placeholder={(collectCents / 100).toFixed(2)}
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              className={`${inputClass} mt-1`}
+            />
+            {suggestedFirstPeriodCents != null &&
+              suggestedFirstPeriodCents > 0 &&
+              suggestedFirstPeriodCents < effectiveTotalCents && (
+                <button
+                  type="button"
+                  onClick={() => setPaymentAmount((suggestedFirstPeriodCents / 100).toFixed(2))}
+                  className="mt-1 text-xs text-[#d4af37] hover:underline"
+                >
+                  First period ({formatCentsAsCurrency(suggestedFirstPeriodCents)})
+                </button>
+              )}
+          </label>
+          <label className="block text-xs text-[#e8e0d5]/80">
+            Adjust stay total $ (optional)
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              placeholder="Discount / comp on full stay"
+              value={stayTotalOverride}
+              onChange={(e) => setStayTotalOverride(e.target.value)}
+              className={`${inputClass} mt-1`}
+            />
+          </label>
           <input
             type="text"
-            placeholder="Override reason"
+            placeholder="Reason if stay total differs"
             value={overrideReason}
             onChange={(e) => setOverrideReason(e.target.value)}
-            className={inputClass}
+            className={`${inputClass} sm:col-span-2`}
           />
+          {balanceAfterCents > 0 && (
+            <p className="sm:col-span-2 text-xs text-amber-300/90">
+              Balance after payment: {formatCentsAsCurrency(balanceAfterCents)}
+            </p>
+          )}
         </div>
       )}
 

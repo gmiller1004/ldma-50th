@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Search, Loader2, Calendar, User, UserPlus, X, MapPin, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import {
   format,
@@ -17,8 +17,11 @@ import {
 } from "date-fns";
 import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate } from "@/lib/reservation-camps";
 import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
-import { computeStayPricing, formatCentsAsCurrency } from "@/lib/reservation-pricing";
+import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
 import { countNights } from "@/lib/reservation-dates";
+import { suggestedReservationPaymentCents } from "@/lib/reservation-billing";
+import { scalePeriodDraftsToTotal } from "@/lib/reservation-price-override";
+import { resolveCreateReservationPricing } from "@/lib/reservation-create-metadata";
 import { ReservationCalendarView } from "@/app/members/caretaker/ReservationCalendarView";
 import {
   ReservationBillingSection,
@@ -343,6 +346,7 @@ export function CaretakerPortalContent({
   const [resEditSubmitting, setResEditSubmitting] = useState(false);
   const [resEditMemberLookup, setResEditMemberLookup] = useState<LookupResult | null>(null);
   const [resEditPaymentDueCents, setResEditPaymentDueCents] = useState<number | null>(null);
+  const [resEditPayAmountCents, setResEditPayAmountCents] = useState(0);
   const [cancellingReservation, setCancellingReservation] = useState<Reservation | null>(null);
   const [resCancelModalOpen, setResCancelModalOpen] = useState(false);
   const [resCancelSubmitting, setResCancelSubmitting] = useState(false);
@@ -357,9 +361,11 @@ export function CaretakerPortalContent({
     cashRefundCents: number;
   } | null>(null);
   const [resCancelPreviewLoading, setResCancelPreviewLoading] = useState(false);
+  const [resCancelError, setResCancelError] = useState<string | null>(null);
   const [checkingInReservation, setCheckingInReservation] = useState<Reservation | null>(null);
   const [resCheckInSubmitting, setResCheckInSubmitting] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [detailsFocusPayment, setDetailsFocusPayment] = useState(false);
   const [detailsReservation, setDetailsReservation] = useState<Reservation | null>(null);
   const [detailsMemberLookup, setDetailsMemberLookup] = useState<LookupResult | null>(null);
   const [detailsMemberLoading, setDetailsMemberLoading] = useState(false);
@@ -372,7 +378,8 @@ export function CaretakerPortalContent({
   const [resPastDueMaintenanceCents, setResPastDueMaintenanceCents] = useState<number>(0);
   const [resPastDueMembershipCents, setResPastDueMembershipCents] = useState<number>(0);
   const [resPastDueSubmitting, setResPastDueSubmitting] = useState(false);
-  const [resOverrideTotal, setResOverrideTotal] = useState("");
+  const [resStayTotalOverride, setResStayTotalOverride] = useState("");
+  const [resPaymentAmount, setResPaymentAmount] = useState("");
   const [resOverrideReason, setResOverrideReason] = useState("");
   const [detailsPayments, setDetailsPayments] = useState<Array<{
     id: string;
@@ -572,21 +579,62 @@ export function CaretakerPortalContent({
         }).totalCents
       : 0;
   const resAllowsCash = resCheckInDate ? caretakerAllowsCashCheckIn(resCheckInDate, today) : false;
-  const resEffectiveTotalCents = (() => {
-    if (!resOverrideTotal.trim()) return resTotalCents;
-    const n = Math.round(parseFloat(resOverrideTotal) * 100);
-    return Number.isNaN(n) ? resTotalCents : n;
-  })();
 
-  function appendPriceOverrideFields(body: Record<string, unknown>) {
-    if (resOverrideTotal.trim()) {
-      const overrideCents = Math.round(parseFloat(resOverrideTotal) * 100);
-      if (!Number.isNaN(overrideCents) && overrideCents !== resTotalCents) {
-        body.amountOverrideCents = overrideCents;
-        body.overrideReason = resOverrideReason.trim();
-        body.amountCents = overrideCents;
-      }
+  const createPricingResolved = useMemo(() => {
+    const r = resolveCreateReservationPricing(Math.max(0, resTotalCents), {
+      stayTotalOverrideDollars: resStayTotalOverride,
+      overrideReason: resOverrideReason,
+      paymentAmountDollars: resPaymentAmount,
+    });
+    return r.ok ? r : null;
+  }, [resTotalCents, resStayTotalOverride, resOverrideReason, resPaymentAmount]);
+
+  const resStayTotalCents = createPricingResolved?.stayTotalCents ?? resTotalCents;
+  const resCollectCents = createPricingResolved?.collectCents ?? resStayTotalCents;
+  const resBalanceAfterCents = createPricingResolved?.balanceAfterCents ?? 0;
+
+  const resSuggestedFirstPeriodCents = useMemo(() => {
+    if (!resSelectedSite || resNights < 1 || resStayTotalCents < 1) return null;
+    let drafts = generateBillingPeriods({
+      checkInDate: resCheckInDate,
+      checkOutDate: resCheckOutDate,
+      isMember: resType === "member",
+      rates: {
+        memberRateDaily: resSelectedSite.memberRateDaily,
+        memberRateMonthly: resSelectedSite.memberRateMonthly,
+        nonMemberRateDaily: resSelectedSite.nonMemberRateDaily,
+      },
+    });
+    if (resStayTotalCents !== resTotalCents && resTotalCents > 0) {
+      drafts = scalePeriodDraftsToTotal(drafts, resStayTotalCents);
     }
+    return suggestedReservationPaymentCents(
+      drafts.map((d) => ({
+        status: "unpaid",
+        amountDueCents: d.amountDueCents,
+        amountPaidCents: 0,
+      })),
+      resStayTotalCents
+    );
+  }, [
+    resSelectedSite,
+    resNights,
+    resCheckInDate,
+    resCheckOutDate,
+    resType,
+    resStayTotalCents,
+    resTotalCents,
+  ]);
+
+  function applyCreatePricingFields(body: Record<string, unknown>): string | null {
+    const resolved = resolveCreateReservationPricing(Math.max(0, resTotalCents), {
+      stayTotalOverrideDollars: resStayTotalOverride,
+      overrideReason: resOverrideReason,
+      paymentAmountDollars: resPaymentAmount,
+    });
+    if (!resolved.ok) return resolved.error;
+    Object.assign(body, resolved.fields);
+    return null;
   }
 
   const availableSitesForDropdown = sites.filter((s) => availableSiteIds.includes(s.id));
@@ -611,10 +659,6 @@ export function CaretakerPortalContent({
       setResError("Enter guest name and email");
       return;
     }
-    if (resEffectiveTotalCents !== 0) {
-      setResError("Comp only applies when total is $0");
-      return;
-    }
     if (resTotalCents > 0 && resOverrideReason.trim().length < 3) {
       setResError("Override reason required for $0 comp");
       return;
@@ -628,7 +672,6 @@ export function CaretakerPortalContent({
         checkOutDate: resCheckOutDate,
         type: resType,
         paymentMethod: "none",
-        amountCents: 0,
         recipientEmail:
           resType === "member"
             ? resMemberLookup?.email?.trim() || "noreply@ldma.org"
@@ -638,7 +681,17 @@ export function CaretakerPortalContent({
             ? resMemberLookup?.displayName || `#${resMemberLookup?.memberNumber}`
             : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
       };
-      appendPriceOverrideFields(body);
+      const resolved = resolveCreateReservationPricing(Math.max(0, resTotalCents), {
+        stayTotalOverrideDollars: "0",
+        overrideReason: resOverrideReason,
+        paymentAmountDollars: "0",
+      });
+      if (!resolved.ok) {
+        setResError(resolved.error);
+        return;
+      }
+      Object.assign(body, resolved.fields);
+      body.paymentMethod = "none";
       if (resType === "member" && resMemberLookup) {
         body.memberContactId = resMemberLookup.contactId;
         body.memberNumber = resMemberLookup.memberNumber;
@@ -696,11 +749,11 @@ export function CaretakerPortalContent({
         return;
       }
     }
-    if (resEffectiveTotalCents === 0) {
+    if (resStayTotalCents === 0) {
       return handleCreateReservationComp();
     }
-    if (resTotalCents < 1 && resEffectiveTotalCents < 1) {
-      setResError("Invalid total");
+    if (resStayTotalCents < 1) {
+      setResError("Invalid stay total");
       return;
     }
     setResError(null);
@@ -712,14 +765,17 @@ export function CaretakerPortalContent({
         checkOutDate: resCheckOutDate,
         type: resType,
         paymentMethod: "cash",
-        amountCents: resEffectiveTotalCents,
         recipientEmail: resType === "member" ? resMemberLookup!.email!.trim() : resGuestEmail.trim(),
         recipientDisplayName:
           resType === "member"
             ? resMemberLookup!.displayName || `#${resMemberLookup!.memberNumber}`
             : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
       };
-      appendPriceOverrideFields(body);
+      const pricingErr = applyCreatePricingFields(body);
+      if (pricingErr) {
+        setResError(pricingErr);
+        return;
+      }
       if (resType === "member" && resMemberLookup) {
         body.memberContactId = resMemberLookup.contactId;
         body.memberNumber = resMemberLookup.memberNumber;
@@ -777,18 +833,17 @@ export function CaretakerPortalContent({
         return;
       }
     }
-    if (resEffectiveTotalCents === 0) {
+    if (resStayTotalCents === 0) {
       return handleCreateReservationComp();
     }
-    if (resTotalCents < 1 && resEffectiveTotalCents < 1) {
-      setResError("Invalid total");
+    if (resStayTotalCents < 1) {
+      setResError("Invalid stay total");
       return;
     }
     setResError(null);
     setResSubmitting(true);
     try {
       const checkoutBody: Record<string, unknown> = {
-        amountCents: resEffectiveTotalCents,
         paymentType: "reservation",
         recipientEmail: resType === "member" ? (resMemberLookup?.email?.trim() || resGuestEmail.trim()) : resGuestEmail.trim(),
         recipientDisplayName: resType === "member" ? (resMemberLookup?.displayName || `#${resMemberLookup?.memberNumber}`) : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
@@ -798,6 +853,11 @@ export function CaretakerPortalContent({
         nights: resNights,
         reservationType: resType,
       };
+      const pricingErr = applyCreatePricingFields(checkoutBody);
+      if (pricingErr) {
+        setResError(pricingErr);
+        return;
+      }
       if (resType === "member" && resMemberLookup) {
         checkoutBody.memberContactId = resMemberLookup.contactId;
         checkoutBody.memberNumber = resMemberLookup.memberNumber;
@@ -808,7 +868,6 @@ export function CaretakerPortalContent({
         checkoutBody.guestEmail = resGuestEmail.trim();
         checkoutBody.guestPhone = resGuestPhone.trim() || undefined;
       }
-      appendPriceOverrideFields(checkoutBody);
       const res = await fetch("/api/members/caretaker/payments/checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -836,7 +895,8 @@ export function CaretakerPortalContent({
     // Form submit from "Pay with cash" or "Pay with card" is handled by those buttons
   }
 
-  function openResDetailsModal(r: Reservation) {
+  function openResDetailsModal(r: Reservation, opts?: { focusPayment?: boolean }) {
+    setDetailsFocusPayment(opts?.focusPayment ?? false);
     setDetailsReservation(r);
     setDetailsMemberLookup(null);
     setDetailsPastDueMaintenanceCents(0);
@@ -904,6 +964,7 @@ export function CaretakerPortalContent({
     setResEditCheckInDate(toDateOnly(r.checkInDate));
     setResEditCheckOutDate(toDateOnly(r.checkOutDate));
     setResEditPaymentDueCents(null);
+    setResEditPayAmountCents(0);
     setResEditMemberLookup(null);
     setResEditModalOpen(true);
     if (r.reservationType === "member" && r.memberNumber) {
@@ -933,6 +994,7 @@ export function CaretakerPortalContent({
       if (!res.ok) {
         if (data.requirePayment && typeof data.amountDueCents === "number") {
           setResEditPaymentDueCents(data.amountDueCents);
+          setResEditPayAmountCents(data.amountDueCents);
           return;
         }
         alert(data.error ?? "Update failed");
@@ -1139,6 +1201,10 @@ export function CaretakerPortalContent({
 
   async function handleResEditPayCash() {
     if (!editingReservation || resEditPaymentDueCents == null || resEditPaymentDueCents < 1) return;
+    const payAmount = Math.min(
+      Math.max(1, resEditPayAmountCents),
+      resEditPaymentDueCents
+    );
     const recipientEmail =
       editingReservation.reservationType === "member"
         ? resEditMemberLookup?.email?.trim()
@@ -1160,7 +1226,7 @@ export function CaretakerPortalContent({
           checkInDate: resEditCheckInDate,
           checkOutDate: resEditCheckOutDate,
           paymentMethod: "cash",
-          amountCents: resEditPaymentDueCents,
+          amountCents: payAmount,
           recipientEmail,
           recipientDisplayName,
         }),
@@ -1183,6 +1249,10 @@ export function CaretakerPortalContent({
 
   async function handleResEditPayCard() {
     if (!editingReservation || resEditPaymentDueCents == null || resEditPaymentDueCents < 1) return;
+    const payAmount = Math.min(
+      Math.max(1, resEditPayAmountCents),
+      resEditPaymentDueCents
+    );
     const recipientEmail =
       editingReservation.reservationType === "member"
         ? resEditMemberLookup?.email?.trim()
@@ -1198,7 +1268,7 @@ export function CaretakerPortalContent({
     setResEditSubmitting(true);
     try {
       const checkoutBody: Record<string, unknown> = {
-        amountCents: resEditPaymentDueCents,
+        amountCents: payAmount,
         paymentType: "reservation",
         reservationId: editingReservation.id,
         recipientEmail,
@@ -1244,37 +1314,57 @@ export function CaretakerPortalContent({
   function openResCancelModal(r: Reservation) {
     setCancellingReservation(r);
     setResCancelPreview(null);
+    setResCancelError(null);
     setResCancelModalOpen(true);
     setResCancelPreviewLoading(true);
-    fetch(`/api/members/caretaker/reservations/${r.id}/cancel-preview`)
+    const campQ = `?campSlug=${encodeURIComponent(campSlug)}`;
+    fetch(`/api/members/caretaker/reservations/${r.id}/cancel-preview${campQ}`)
       .then(async (res) => {
-        if (!res.ok) return;
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setResCancelError((data as { error?: string }).error ?? "Could not load refund preview");
+          return;
+        }
         const data = await res.json();
         setResCancelPreview(data.preview ?? null);
       })
-      .catch(() => setResCancelPreview(null))
+      .catch(() => {
+        setResCancelPreview(null);
+        setResCancelError("Could not load refund preview");
+      })
       .finally(() => setResCancelPreviewLoading(false));
   }
 
   async function handleResCancelConfirm() {
     if (!cancellingReservation) return;
     setResCancelSubmitting(true);
+    setResCancelError(null);
     try {
-      const res = await fetch(`/api/members/caretaker/reservations/${cancellingReservation.id}/cancel`, {
-        method: "POST",
-      });
+      const campQ = `?campSlug=${encodeURIComponent(campSlug)}`;
+      const res = await fetch(
+        `/api/members/caretaker/reservations/${cancellingReservation.id}/cancel${campQ}`,
+        { method: "POST" }
+      );
+      const text = await res.text();
+      let data: { error?: string };
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        setResCancelError(!res.ok ? `Cancel failed (${res.status}). ${text.slice(0, 120)}` : "Cancel failed: invalid response");
+        return;
+      }
       if (!res.ok) {
-        const data = await res.json();
-        setResError(data.error ?? "Cancel failed");
+        setResCancelError(data.error ?? `Cancel failed (${res.status})`);
         return;
       }
       setResCancelModalOpen(false);
       setCancellingReservation(null);
       setResCancelPreview(null);
+      setResCancelError(null);
       setResError(null);
       loadReservations();
     } catch {
-      setResError("Cancel failed");
+      setResCancelError("Cancel failed");
     } finally {
       setResCancelSubmitting(false);
     }
@@ -1563,14 +1653,23 @@ export function CaretakerPortalContent({
             <h2 className="font-semibold text-amber-200 mb-2 text-sm">Payments to collect</h2>
             <ul className="space-y-2">
               {paymentsDue.map((item) => (
-                <li key={item.reservationId} className="flex flex-wrap justify-between gap-2 text-sm text-[#e8e0d5]">
-                  <span>
-                    {item.siteName ?? "Site"} — {item.guestLabel}
-                    {item.nextDueDate ? ` · due ${item.nextDueDate}` : ""}
-                  </span>
-                  <span className={item.isOverdue ? "text-red-300 font-medium" : "text-amber-200"}>
-                    {item.isOverdue ? "Overdue " : "Due "}{formatCentsAsCurrency(item.balanceDueCents)}
-                  </span>
+                <li key={item.reservationId}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const r = activeReservations.find((x) => x.id === item.reservationId);
+                      if (r) openResDetailsModal(r, { focusPayment: true });
+                    }}
+                    className="w-full flex flex-wrap justify-between gap-2 text-sm text-[#e8e0d5] rounded-lg px-2 py-1.5 hover:bg-[#d4af37]/10 text-left"
+                  >
+                    <span>
+                      {item.siteName ?? "Site"} — {item.guestLabel}
+                      {item.nextDueDate ? ` · due ${item.nextDueDate}` : ""}
+                    </span>
+                    <span className={item.isOverdue ? "text-red-300 font-medium" : "text-amber-200"}>
+                      {item.isOverdue ? "Overdue " : "Due "}{formatCentsAsCurrency(item.balanceDueCents)}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -1650,6 +1749,15 @@ export function CaretakerPortalContent({
                     />
                   </div>
                   <div className="flex items-center gap-2">
+                    {(r.balanceDueCents ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => openResDetailsModal(r, { focusPayment: true })}
+                        className="px-3 py-1.5 text-sm bg-amber-950/50 text-amber-200 border border-amber-500/40 rounded hover:bg-amber-900/40"
+                      >
+                        Collect payment
+                      </button>
+                    )}
                     {!r.checkedInAt && (
                       <button
                         type="button"
@@ -1823,31 +1931,69 @@ export function CaretakerPortalContent({
                   )}
                 </div>
                 {resTotalCents > 0 && (
-                  <div className="pt-2 border-t border-[#d4af37]/20 space-y-2">
+                  <div className="pt-2 border-t border-[#d4af37]/20 space-y-3">
                     <p className="text-[#e8e0d5] font-medium">
-                      Calculated total: {formatCentsAsCurrency(resTotalCents)}
-                      {resEffectiveTotalCents !== resTotalCents && (
-                        <span className="text-amber-300"> → Charge: {formatCentsAsCurrency(resEffectiveTotalCents)}</span>
+                      Calculated stay total: {formatCentsAsCurrency(resTotalCents)}
+                      {resStayTotalCents !== resTotalCents && (
+                        <span className="text-amber-300">
+                          {" "}
+                          → Stay total: {formatCentsAsCurrency(resStayTotalCents)}
+                        </span>
                       )}
                     </p>
                     <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={resOverrideTotal}
-                        onChange={(e) => setResOverrideTotal(e.target.value)}
-                        placeholder="Override total $ (optional)"
-                        className="px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
-                      />
-                      <input
-                        type="text"
-                        value={resOverrideReason}
-                        onChange={(e) => setResOverrideReason(e.target.value)}
-                        placeholder="Override reason (if different)"
-                        className="px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
-                      />
+                      <div>
+                        <label className="text-[#e8e0d5]/70 text-xs block mb-1">Collect now $</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={resStayTotalCents / 100}
+                          step={0.01}
+                          value={resPaymentAmount}
+                          onChange={(e) => setResPaymentAmount(e.target.value)}
+                          placeholder={(resCollectCents / 100).toFixed(2)}
+                          className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                        />
+                        {resSuggestedFirstPeriodCents != null &&
+                          resSuggestedFirstPeriodCents > 0 &&
+                          resSuggestedFirstPeriodCents < resStayTotalCents && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setResPaymentAmount((resSuggestedFirstPeriodCents / 100).toFixed(2))
+                              }
+                              className="mt-1 text-xs text-[#d4af37] hover:underline"
+                            >
+                              Use first period ({formatCentsAsCurrency(resSuggestedFirstPeriodCents)})
+                            </button>
+                          )}
+                      </div>
+                      <div>
+                        <label className="text-[#e8e0d5]/70 text-xs block mb-1">Adjust stay total $ (optional)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={resStayTotalOverride}
+                          onChange={(e) => setResStayTotalOverride(e.target.value)}
+                          placeholder="Discount / comp on full stay"
+                          className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                        />
+                      </div>
                     </div>
+                    <input
+                      type="text"
+                      value={resOverrideReason}
+                      onChange={(e) => setResOverrideReason(e.target.value)}
+                      placeholder="Reason if stay total differs from calculated"
+                      className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                    />
+                    {resBalanceAfterCents > 0 && (
+                      <p className="text-amber-300/90 text-xs">
+                        Balance after this payment: {formatCentsAsCurrency(resBalanceAfterCents)} (collect later in
+                        reservation details)
+                      </p>
+                    )}
                     <p className="text-[#e8e0d5]/60 text-xs">
                       {resAllowsCash
                         ? "Cash allowed for check-in today or within the past 7 days. Card for future check-in."
@@ -1857,7 +2003,7 @@ export function CaretakerPortalContent({
                 )}
                 <div className="flex flex-col gap-2 pt-2">
                   <div className="flex gap-2">
-                    {resEffectiveTotalCents === 0 ? (
+                    {resStayTotalCents === 0 ? (
                       <button type="button" onClick={() => void handleCreateReservationComp()} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
                         {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Create comp (no payment)
                       </button>
@@ -1887,7 +2033,7 @@ export function CaretakerPortalContent({
             <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-[#f0d48f]">Reservation details</h3>
-                <button type="button" onClick={() => setDetailsModalOpen(false)} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+                <button type="button" onClick={() => { setDetailsModalOpen(false); setDetailsFocusPayment(false); }} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-4 text-sm">
                 <div>
@@ -1952,6 +2098,7 @@ export function CaretakerPortalContent({
                         : `${detailsReservation.guestFirstName ?? ""} ${detailsReservation.guestLastName ?? ""}`.trim() || "Guest"
                     }
                     onPaymentComplete={refreshDetailsReservation}
+                    autoFocusAmount={detailsFocusPayment}
                   />
                 ) : null}
 
@@ -2055,12 +2202,31 @@ export function CaretakerPortalContent({
             <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-[#f0d48f]">{resEditPaymentDueCents != null ? "Pay for additional nights" : "Edit reservation dates"}</h3>
-                <button type="button" onClick={() => { setResEditModalOpen(false); setResEditPaymentDueCents(null); }} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+                <button type="button" onClick={() => { setResEditModalOpen(false); setResEditPaymentDueCents(null); setResEditPayAmountCents(0); }} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
               </div>
               <p className="text-[#e8e0d5]/80 text-sm mb-4">{editingReservation.siteName} — {editingReservation.reservationType === "member" ? editingReservation.memberDisplayName : `${editingReservation.guestFirstName} ${editingReservation.guestLastName}`}</p>
               {resEditPaymentDueCents != null ? (
                 <div className="space-y-4">
-                  <p className="text-[#e8e0d5]">Additional amount due: <strong>{formatCentsAsCurrency(resEditPaymentDueCents)}</strong></p>
+                  <p className="text-[#e8e0d5]">
+                    Additional amount due: <strong>{formatCentsAsCurrency(resEditPaymentDueCents)}</strong>
+                  </p>
+                  <div>
+                    <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Payment amount $</label>
+                    <input
+                      type="number"
+                      min={0.01}
+                      max={resEditPaymentDueCents / 100}
+                      step={0.01}
+                      value={resEditPayAmountCents / 100}
+                      onChange={(e) =>
+                        setResEditPayAmountCents(Math.round((parseFloat(e.target.value) || 0) * 100))
+                      }
+                      className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
+                    />
+                    <p className="text-[#e8e0d5]/50 text-xs mt-1">
+                      Partial payment allowed — up to {formatCentsAsCurrency(resEditPaymentDueCents)} for this date change.
+                    </p>
+                  </div>
                   <div className="flex gap-2">
                     {resEditAllowsCash && (
                       <button type="button" onClick={handleResEditPayCash} disabled={resEditSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
@@ -2094,11 +2260,11 @@ export function CaretakerPortalContent({
 
         {/* Cancel reservation modal */}
         {resCancelModalOpen && cancellingReservation && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null))}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null), setResCancelError(null))}>
             <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-[#f0d48f]">Cancel reservation</h3>
-                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null), setResCancelError(null))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
               </div>
               <p className="text-[#e8e0d5]/90 text-sm mb-3">
                 Cancel this reservation for {cancellingReservation.siteName} — {cancellingReservation.reservationType === "member" ? cancellingReservation.memberDisplayName : `${cancellingReservation.guestFirstName} ${cancellingReservation.guestLastName}`}?
@@ -2143,8 +2309,9 @@ export function CaretakerPortalContent({
               ) : (
                 <p className="text-[#e8e0d5]/50 text-xs mb-4">Refund preview unavailable; cancellation will still apply policy rules.</p>
               )}
+              {resCancelError && <p className="mb-4 text-red-400 text-sm">{resCancelError}</p>}
               <div className="flex gap-2">
-                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Keep</button>
+                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null), setResCancelError(null))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Keep</button>
                 <button type="button" onClick={handleResCancelConfirm} disabled={resCancelSubmitting || resCancelPreviewLoading} className="flex-1 py-2.5 bg-red-800/80 text-red-100 font-semibold rounded-lg hover:bg-red-700/80 disabled:opacity-50 flex items-center justify-center gap-2">
                   {resCancelSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Yes, cancel
                 </button>

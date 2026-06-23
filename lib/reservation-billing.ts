@@ -298,3 +298,18 @@ export async function summarizeReservationBalances(
 
   return out;
 }
+
+/** Remaining due on the earliest unpaid/partial billing period, or full balance. */
+export function suggestedReservationPaymentCents(
+  billingPeriods: Pick<BillingPeriodSummary, "status" | "amountDueCents" | "amountPaidCents">[],
+  balanceDueCents: number
+): number {
+  if (balanceDueCents <= 0) return 0;
+  for (const p of billingPeriods) {
+    if (p.status === "unpaid" || p.status === "partial") {
+      const remaining = Math.max(0, p.amountDueCents - p.amountPaidCents);
+      if (remaining > 0) return Math.min(remaining, balanceDueCents);
+    }
+  }
+  return balanceDueCents;
+}

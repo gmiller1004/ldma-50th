@@ -133,8 +133,10 @@ export async function POST(request: NextRequest) {
     effectiveTotalCents: parseInt(metadata.effective_total_cents ?? "0", 10) || null,
     invoiceNumber: null as string | null,
   };
-  if (pricingMeta.effectiveTotalCents != null && pricingMeta.effectiveTotalCents > 0) {
+  if (pricingMeta.effectiveTotalCents != null && pricingMeta.effectiveTotalCents >= 0) {
     effectiveTotalCents = pricingMeta.effectiveTotalCents;
+  } else if (pricingMeta.calculatedTotalCents != null && pricingMeta.calculatedTotalCents > 0) {
+    effectiveTotalCents = pricingMeta.calculatedTotalCents;
   }
 
   // If reservation payment and no existing reservation_id, create the reservation
@@ -166,7 +168,7 @@ export async function POST(request: NextRequest) {
       amountOverrideCents: pricingMeta.amountOverrideCents,
       overrideReason: pricingMeta.overrideReason,
       priceOverrideFlag: pricingMeta.priceOverrideFlag,
-      effectiveTotalCents: pricingMeta.effectiveTotalCents ?? amountCents,
+      effectiveTotalCents: pricingMeta.effectiveTotalCents ?? pricingMeta.calculatedTotalCents ?? 0,
       invoiceNumber: null,
     });
     reservationInvoiceNumber = invoicePricing.invoiceNumber;

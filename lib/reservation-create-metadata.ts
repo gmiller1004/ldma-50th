@@ -60,3 +60,71 @@ export async function withReservationInvoice(
   const invoiceNumber = await allocateReservationInvoiceNumber(campSlug);
   return { ...pricing, invoiceNumber };
 }
+
+function parseOptionalDollarsToCents(raw: string | undefined, fallback: number): number {
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (!s) return fallback;
+  const n = Math.round(parseFloat(s) * 100);
+  return Number.isNaN(n) ? fallback : n;
+}
+
+/**
+ * Build API body fields for create: payment amount vs optional stay-total override are separate.
+ * Partial payment at create leaves a balance on the full stay total.
+ */
+export function resolveCreateReservationPricing(
+  calculatedTotalCents: number,
+  opts: {
+    stayTotalOverrideDollars?: string;
+    overrideReason?: string;
+    paymentAmountDollars?: string;
+  }
+):
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      stayTotalCents: number;
+      collectCents: number;
+      balanceAfterCents: number;
+      fields: { amountCents: number; amountOverrideCents?: number; overrideReason?: string };
+    } {
+  let stayTotalOverrideCents: number | undefined;
+  if (opts.stayTotalOverrideDollars?.trim()) {
+    const parsed = Math.round(parseFloat(opts.stayTotalOverrideDollars) * 100);
+    if (!Number.isNaN(parsed) && parsed !== calculatedTotalCents) {
+      stayTotalOverrideCents = parsed;
+    }
+  }
+
+  const parsedPricing = parseReservationPricingBody(
+    {
+      amountCents: parseOptionalDollarsToCents(
+        opts.paymentAmountDollars,
+        stayTotalOverrideCents ?? calculatedTotalCents
+      ),
+      amountOverrideCents: stayTotalOverrideCents,
+      overrideReason: opts.overrideReason,
+    },
+    calculatedTotalCents
+  );
+  if (!parsedPricing.ok) return parsedPricing;
+
+  const stayTotalCents = parsedPricing.pricing.effectiveTotalCents;
+  const collectCents = parsedPricing.paymentAmountCents;
+
+  const fields: { amountCents: number; amountOverrideCents?: number; overrideReason?: string } = {
+    amountCents: collectCents,
+  };
+  if (parsedPricing.pricing.priceOverrideFlag) {
+    fields.amountOverrideCents = parsedPricing.pricing.amountOverrideCents ?? undefined;
+    fields.overrideReason = parsedPricing.pricing.overrideReason ?? undefined;
+  }
+
+  return {
+    ok: true,
+    stayTotalCents,
+    collectCents,
+    balanceAfterCents: Math.max(0, stayTotalCents - collectCents),
+    fields,
+  };
+}
