@@ -81,8 +81,11 @@ export async function PATCH(
     }
 
     const sf = await lookupMemberByContactId(contactId);
-    if (sf.status !== "found" || !sf.member.valid) {
+    if (sf.status === "not_found") {
       return NextResponse.json({ error: sf.error ?? "Salesforce contact not found" }, { status: 404 });
+    }
+    if (sf.status !== "found" || !sf.member.valid) {
+      return NextResponse.json({ error: "Salesforce contact not found" }, { status: 404 });
     }
     if (sf.member.contactId !== contactId) {
       return NextResponse.json({ error: "Contact mismatch" }, { status: 400 });
