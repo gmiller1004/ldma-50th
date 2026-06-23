@@ -125,20 +125,35 @@ export async function listReservationPayments(reservationId: string): Promise<Re
 }
 
 export async function getReservationPaymentsTotalCents(reservationId: string): Promise<number> {
-  if (!hasDb() || !sql) return 0;
+  const totals = await getReservationPaymentTotals(reservationId);
+  return totals.netPaidCents;
+}
+
+export async function getReservationPaymentTotals(reservationId: string): Promise<{
+  totalPaidCents: number;
+  totalRefundedCents: number;
+  netPaidCents: number;
+}> {
+  if (!hasDb() || !sql) {
+    return { totalPaidCents: 0, totalRefundedCents: 0, netPaidCents: 0 };
+  }
   const rows = await sql`
-    SELECT COALESCE(SUM(
-      CASE
-        WHEN payment_type = 'reservation' THEN amount_cents
-        WHEN payment_type = 'refund' THEN -amount_cents
-        ELSE 0
-      END
-    ), 0)::int AS total
+    SELECT
+      COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation'), 0)::int AS paid,
+      COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'refund'), 0)::int AS refunded
     FROM camp_payments
     WHERE reservation_id = ${reservationId}
   `;
-  const row = (Array.isArray(rows) ? rows[0] : undefined) as { total: number } | undefined;
-  return Math.max(0, row?.total ?? 0);
+  const row = (Array.isArray(rows) ? rows[0] : undefined) as
+    | { paid: number; refunded: number }
+    | undefined;
+  const totalPaidCents = row?.paid ?? 0;
+  const totalRefundedCents = row?.refunded ?? 0;
+  return {
+    totalPaidCents,
+    totalRefundedCents,
+    netPaidCents: Math.max(0, totalPaidCents - totalRefundedCents),
+  };
 }
 
 export async function listBillingPeriods(reservationId: string): Promise<BillingPeriodSummary[]> {

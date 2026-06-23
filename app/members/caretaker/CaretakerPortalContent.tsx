@@ -37,6 +37,7 @@ type LookupResult = {
   memberNumber: string;
   displayName: string;
   email: string | null;
+  phone?: string | null;
   isLdmaMember: boolean;
   maintenanceFeesDue: number | null;
   membershipDuesOwed: number | null;
@@ -100,6 +101,8 @@ type Reservation = {
   status: string;
   checkedInAt: string | null;
   createdAt?: string;
+  cancelledAt?: string | null;
+  cancellationRefundCents?: number | null;
   invoiceNumber?: string | null;
   calculatedTotalCents?: number | null;
   amountOverrideCents?: number | null;
@@ -123,6 +126,26 @@ function toDateOnly(dateStr: string): string {
   if (dateStr == null || typeof dateStr !== "string") return String(dateStr ?? "");
   const part = dateStr.slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : dateStr;
+}
+
+function reservationIsArchived(r: { checkOutDate: string; status: string }): boolean {
+  if (r.status === "cancelled") return true;
+  const today = new Date().toISOString().slice(0, 10);
+  return toDateOnly(r.checkOutDate) < today;
+}
+
+function reservationStatusLabel(r: {
+  status: string;
+  checkOutDate: string;
+  checkedInAt?: string | null;
+}): string {
+  if (r.status === "cancelled") return "Cancelled";
+  const today = new Date().toISOString().slice(0, 10);
+  if (toDateOnly(r.checkOutDate) < today) {
+    return r.checkedInAt ? "Completed (checked in)" : "Completed";
+  }
+  if (r.checkedInAt) return "Checked in";
+  return "Reserved";
 }
 
 /** Parse YYYY-MM-DD as local date (avoids timezone shifting display by one day). */
@@ -391,6 +414,23 @@ export function CaretakerPortalContent({
     stripePaymentIntentId: string | null;
     createdAt: string;
   }>>([]);
+  const [detailsPaymentSummary, setDetailsPaymentSummary] = useState<{
+    totalPaidCents: number;
+    totalRefundedCents: number;
+    netPaidCents: number;
+  } | null>(null);
+  const [detailsContactLookupInput, setDetailsContactLookupInput] = useState("");
+  const [detailsContactLookupLoading, setDetailsContactLookupLoading] = useState(false);
+  const [detailsContactLookupMatches, setDetailsContactLookupMatches] = useState<LookupMatch[]>([]);
+  const [detailsContactLookupResult, setDetailsContactLookupResult] = useState<LookupResult | null>(null);
+  const [detailsContactLinkSubmitting, setDetailsContactLinkSubmitting] = useState(false);
+  const [detailsContactEmail, setDetailsContactEmail] = useState("");
+  const [detailsContactPhone, setDetailsContactPhone] = useState("");
+  const [detailsContactSaving, setDetailsContactSaving] = useState(false);
+  const [detailsContactError, setDetailsContactError] = useState<string | null>(null);
+  const [detailsGuestEmail, setDetailsGuestEmail] = useState("");
+  const [detailsGuestPhone, setDetailsGuestPhone] = useState("");
+  const [detailsGuestContactSaving, setDetailsGuestContactSaving] = useState(false);
   const [paymentsDue, setPaymentsDue] = useState<Array<{
     reservationId: string;
     siteName: string | null;
@@ -904,10 +944,20 @@ export function CaretakerPortalContent({
     setDetailsBillingPeriods([]);
     setDetailsSiteBalance(null);
     setDetailsPayments([]);
+    setDetailsPaymentSummary(null);
+    setDetailsContactLookupInput(r.memberNumber ?? "");
+    setDetailsContactLookupMatches([]);
+    setDetailsContactLookupResult(null);
+    setDetailsContactEmail("");
+    setDetailsContactPhone("");
+    setDetailsContactError(null);
+    setDetailsGuestEmail(r.guestEmail?.trim() ?? "");
+    setDetailsGuestPhone(r.guestPhone?.trim() ?? "");
     setDetailsModalOpen(true);
     setDetailsLoading(true);
 
-    fetch(`/api/members/caretaker/reservations/${r.id}`)
+    const campQ = `?campSlug=${encodeURIComponent(campSlug)}`;
+    fetch(`/api/members/caretaker/reservations/${r.id}${campQ}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((detail) => {
         if (detail) {
@@ -915,23 +965,31 @@ export function CaretakerPortalContent({
           setDetailsBillingPeriods(detail.billingPeriods ?? []);
           setDetailsSiteBalance(detail.balance ?? null);
           setDetailsPayments(detail.payments ?? []);
+          setDetailsPaymentSummary(detail.paymentSummary ?? null);
+          setDetailsGuestEmail(detail.guestEmail?.trim() ?? "");
+          setDetailsGuestPhone(detail.guestPhone?.trim() ?? "");
         }
       })
       .catch(() => {})
       .finally(() => setDetailsLoading(false));
 
-    if (r.reservationType === "member" && r.memberNumber) {
+    if (r.reservationType === "member" && (r.memberContactId || r.memberNumber)) {
       setDetailsMemberLoading(true);
+      const lookupBody = r.memberContactId
+        ? { contactId: r.memberContactId }
+        : { memberNumber: r.memberNumber!.trim() };
       fetch("/api/members/caretaker/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memberNumber: r.memberNumber.trim() }),
+        body: JSON.stringify(lookupBody),
       })
         .then((res) => res.ok ? res.json() : null)
         .then((data) => {
-          const lookup = data ?? null;
+          const lookup = data?.multiple ? null : (data ?? null);
           setDetailsMemberLookup(lookup);
           if (lookup) {
+            setDetailsContactEmail(lookup.email?.trim() || "");
+            setDetailsContactPhone(lookup.phone?.trim() || "");
             setDetailsPastDueMaintenanceCents(Math.round((lookup.maintenanceFeesDue ?? 0) * 100));
             setDetailsPastDueMembershipCents(Math.round((lookup.membershipDuesOwed ?? 0) * 100));
           }
@@ -941,10 +999,187 @@ export function CaretakerPortalContent({
     }
   }
 
+  async function handleDetailsContactLookup() {
+    const fields = parseCaretakerLookupInput(detailsContactLookupInput);
+    if (!fields.memberNumber && !fields.email && !fields.phone) {
+      setDetailsContactError("Enter member #, email, or phone");
+      return;
+    }
+    setDetailsContactLookupLoading(true);
+    setDetailsContactError(null);
+    setDetailsContactLookupMatches([]);
+    setDetailsContactLookupResult(null);
+    try {
+      const res = await fetch("/api/members/caretaker/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDetailsContactError(data.error ?? "Lookup failed");
+        return;
+      }
+      if (data.multiple && Array.isArray(data.matches)) {
+        setDetailsContactLookupMatches(data.matches);
+        return;
+      }
+      setDetailsContactLookupResult(data as LookupResult);
+    } catch {
+      setDetailsContactError("Lookup failed");
+    } finally {
+      setDetailsContactLookupLoading(false);
+    }
+  }
+
+  function handleDetailsContactPick(match: LookupMatch) {
+    setDetailsContactLookupMatches([]);
+    setDetailsContactLookupResult({
+      contactId: match.contactId,
+      memberNumber: match.memberNumber ?? "",
+      displayName: match.displayName,
+      email: match.email,
+      phone: match.phone,
+      isLdmaMember: true,
+      maintenanceFeesDue: null,
+      membershipDuesOwed: null,
+      membershipBalance: null,
+    });
+  }
+
+  async function handleDetailsContactLink() {
+    if (!detailsReservation || !detailsContactLookupResult) return;
+    setDetailsContactLinkSubmitting(true);
+    setDetailsContactError(null);
+    try {
+      const campQ = `?campSlug=${encodeURIComponent(campSlug)}`;
+      const res = await fetch(
+        `/api/members/caretaker/reservations/${detailsReservation.id}/contact${campQ}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            linkMember: {
+              contactId: detailsContactLookupResult.contactId,
+              memberNumber: detailsContactLookupResult.memberNumber,
+              memberDisplayName: detailsContactLookupResult.displayName,
+            },
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setDetailsContactError(data.error ?? "Could not link contact");
+        return;
+      }
+      setDetailsReservation((prev) =>
+        prev
+          ? {
+              ...prev,
+              memberContactId: data.memberContactId,
+              memberNumber: data.memberNumber,
+              memberDisplayName: data.memberDisplayName,
+            }
+          : prev
+      );
+      setDetailsMemberLookup(detailsContactLookupResult);
+      setDetailsContactEmail(data.email?.trim() || detailsContactLookupResult.email?.trim() || "");
+      setDetailsContactPhone(data.phone?.trim() || detailsContactLookupResult.phone?.trim() || "");
+      setDetailsContactLookupResult(null);
+      setDetailsContactLookupMatches([]);
+      loadReservations();
+    } catch {
+      setDetailsContactError("Could not link contact");
+    } finally {
+      setDetailsContactLinkSubmitting(false);
+    }
+  }
+
+  async function handleDetailsContactSave() {
+    if (!detailsReservation?.memberContactId) return;
+    setDetailsContactSaving(true);
+    setDetailsContactError(null);
+    try {
+      const campQ = `?campSlug=${encodeURIComponent(campSlug)}`;
+      const res = await fetch(
+        `/api/members/caretaker/reservations/${detailsReservation.id}/contact${campQ}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            salesforceContact: {
+              email: detailsContactEmail.trim(),
+              phone: detailsContactPhone.trim(),
+            },
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setDetailsContactError(data.error ?? "Save failed");
+        return;
+      }
+      setDetailsMemberLookup((prev) =>
+        prev
+          ? {
+              ...prev,
+              email: detailsContactEmail.trim() || null,
+              phone: detailsContactPhone.trim() || null,
+            }
+          : prev
+      );
+    } catch {
+      setDetailsContactError("Save failed");
+    } finally {
+      setDetailsContactSaving(false);
+    }
+  }
+
+  async function handleDetailsGuestContactSave() {
+    if (!detailsReservation || detailsReservation.reservationType !== "guest") return;
+    setDetailsGuestContactSaving(true);
+    setDetailsContactError(null);
+    try {
+      const campQ = `?campSlug=${encodeURIComponent(campSlug)}`;
+      const res = await fetch(
+        `/api/members/caretaker/reservations/${detailsReservation.id}/contact${campQ}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            guestContact: {
+              email: detailsGuestEmail.trim(),
+              phone: detailsGuestPhone.trim(),
+            },
+          }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setDetailsContactError(data.error ?? "Save failed");
+        return;
+      }
+      setDetailsReservation((prev) =>
+        prev
+          ? {
+              ...prev,
+              guestEmail: data.guestEmail ?? prev.guestEmail,
+              guestPhone: data.guestPhone ?? prev.guestPhone,
+            }
+          : prev
+      );
+    } catch {
+      setDetailsContactError("Save failed");
+    } finally {
+      setDetailsGuestContactSaving(false);
+    }
+  }
+
   function refreshDetailsReservation() {
     if (!detailsReservation) return;
     setDetailsLoading(true);
-    fetch(`/api/members/caretaker/reservations/${detailsReservation.id}`)
+    const campQ = `?campSlug=${encodeURIComponent(campSlug)}`;
+    fetch(`/api/members/caretaker/reservations/${detailsReservation.id}${campQ}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((detail) => {
         if (detail) {
@@ -952,6 +1187,9 @@ export function CaretakerPortalContent({
           setDetailsBillingPeriods(detail.billingPeriods ?? []);
           setDetailsSiteBalance(detail.balance ?? null);
           setDetailsPayments(detail.payments ?? []);
+          setDetailsPaymentSummary(detail.paymentSummary ?? null);
+          setDetailsGuestEmail(detail.guestEmail?.trim() ?? "");
+          setDetailsGuestPhone(detail.guestPhone?.trim() ?? "");
         }
       })
       .catch(() => {})
@@ -1806,9 +2044,21 @@ export function CaretakerPortalContent({
                   <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/40 border border-[#d4af37]/10 rounded-lg text-[#e8e0d5]/80">
                     <span>
                       {r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}
+                      {r.status === "cancelled" ? (
+                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-red-950/60 text-red-300">Cancelled</span>
+                      ) : null}
                       {r.eventProductHandle ? <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#d4af37]/20 text-[#f0d48f]">Event{r.eventSiteType === "upgrade_hookup" ? " (hookup)" : ""}</span> : null}
                     </span>
-                    <span className="text-sm">{r.checkInDate} – {r.checkOutDate}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{r.checkInDate} – {r.checkOutDate}</span>
+                      <button
+                        type="button"
+                        onClick={() => openResDetailsModal(r)}
+                        className="px-3 py-1.5 text-sm bg-[#1a120b] text-[#e8e0d5] border border-[#d4af37]/40 rounded hover:bg-[#d4af37]/10"
+                      >
+                        Details
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -2047,8 +2297,14 @@ export function CaretakerPortalContent({
                 <div className="flex flex-wrap gap-4">
                   <div>
                     <p className="text-[#e8e0d5]/60 mb-0.5">Status</p>
-                    <p className="text-[#e8e0d5]">{detailsReservation.checkedInAt ? "Checked in" : "Reserved"}</p>
+                    <p className="text-[#e8e0d5]">{reservationStatusLabel(detailsReservation)}</p>
                   </div>
+                  {detailsReservation.status === "cancelled" && detailsReservation.cancelledAt && (
+                    <div>
+                      <p className="text-[#e8e0d5]/60 mb-0.5">Cancelled</p>
+                      <p className="text-[#e8e0d5]">{toDateOnly(detailsReservation.cancelledAt)}</p>
+                    </div>
+                  )}
                   {detailsReservation.createdAt && (
                     <div>
                       <p className="text-[#e8e0d5]/60 mb-0.5">Created</p>
@@ -2078,9 +2334,52 @@ export function CaretakerPortalContent({
                   </div>
                 ) : null}
 
+                {detailsReservation.status === "cancelled" && detailsPaymentSummary && (
+                  <div className="rounded-lg border border-red-900/40 bg-red-950/20 p-3 space-y-2">
+                    <p className="text-red-200/90 font-medium text-sm">Refund summary</p>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-[#e8e0d5]/70">Site fees paid</span>
+                      <span>{formatCentsAsCurrency(detailsPaymentSummary.totalPaidCents)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-[#e8e0d5]/70">Refunded</span>
+                      <span className="text-red-300">−{formatCentsAsCurrency(detailsPaymentSummary.totalRefundedCents)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-semibold text-[#f0d48f] pt-1 border-t border-[#d4af37]/20">
+                      <span>Net retained</span>
+                      <span>{formatCentsAsCurrency(detailsPaymentSummary.netPaidCents)}</span>
+                    </div>
+                    {detailsReservation.cancellationRefundCents != null && detailsReservation.cancellationRefundCents > 0 && (
+                      <p className="text-[#e8e0d5]/50 text-xs">
+                        Policy refund amount: {formatCentsAsCurrency(detailsReservation.cancellationRefundCents)}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {detailsLoading ? (
                   <p className="text-[#e8e0d5]/60 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading billing…</p>
-                ) : detailsSiteBalance ? (
+                ) : reservationIsArchived(detailsReservation) && detailsReservation.status !== "cancelled" && detailsSiteBalance ? (
+                  <div className="rounded-lg border border-[#d4af37]/15 bg-[#0f0a06]/80 p-3 space-y-2">
+                    <p className="text-[#f0d48f] font-medium text-sm">Stay summary</p>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-[#e8e0d5]/70">Total site fees</span>
+                      <span>{formatCentsAsCurrency(detailsSiteBalance.totalDueCents)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-[#e8e0d5]/70">Total paid</span>
+                      <span>{formatCentsAsCurrency(detailsSiteBalance.totalPaidCents)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-semibold pt-1 border-t border-[#d4af37]/20">
+                      <span className="text-[#e8e0d5]/70">Balance due</span>
+                      <span className={detailsSiteBalance.balanceDueCents > 0 ? "text-amber-400" : "text-[#6dd472]"}>
+                        {detailsSiteBalance.balanceDueCents > 0
+                          ? formatCentsAsCurrency(detailsSiteBalance.balanceDueCents)
+                          : "Paid in full"}
+                      </span>
+                    </div>
+                  </div>
+                ) : !reservationIsArchived(detailsReservation) && detailsSiteBalance ? (
                   <ReservationBillingSection
                     key={`${detailsReservation.id}-${detailsSiteBalance.balanceDueCents}`}
                     reservationId={detailsReservation.id}
@@ -2102,19 +2401,43 @@ export function CaretakerPortalContent({
                   />
                 ) : null}
 
+                {reservationIsArchived(detailsReservation) && detailsBillingPeriods.length > 0 && (
+                  <div className="pt-2 border-t border-[#d4af37]/20">
+                    <p className="text-[#f0d48f] font-medium text-sm mb-2">Billing periods</p>
+                    <ul className="space-y-1.5 text-xs">
+                      {detailsBillingPeriods.map((p) => (
+                        <li key={p.id} className="flex flex-wrap justify-between gap-2 text-[#e8e0d5]/80">
+                          <span>
+                            {p.periodStart} – {p.periodEnd} ({p.nights} night{p.nights === 1 ? "" : "s"})
+                          </span>
+                          <span>
+                            {formatCentsAsCurrency(p.amountPaidCents)} / {formatCentsAsCurrency(p.amountDueCents)}
+                            {" · "}
+                            <span className="capitalize">{p.status.replace(/_/g, " ")}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {detailsPayments.length > 0 && (
                   <div className="pt-2 border-t border-[#d4af37]/20">
-                    <p className="text-[#f0d48f] font-medium text-sm mb-2">Payments</p>
+                    <p className="text-[#f0d48f] font-medium text-sm mb-2">Payment history</p>
                     <ul className="space-y-2 text-xs">
                       {detailsPayments.map((p) => (
                         <li key={p.id} className="text-[#e8e0d5]/80">
-                          <span className="text-[#e8e0d5]">{formatCentsAsCurrency(p.amountCents)}</span>
+                          {p.paymentType === "refund" ? (
+                            <span className="text-red-300">Refund {formatCentsAsCurrency(p.amountCents)}</span>
+                          ) : (
+                            <span className="text-[#e8e0d5]">{formatCentsAsCurrency(p.amountCents)}</span>
+                          )}
                           {" · "}{p.method === "card" ? "Card" : "Cash"}
                           {" · "}{toDateOnly(p.createdAt)}
                           {p.stripePaymentIntentId && (
                             <p className="text-[#e8e0d5]/50 font-mono truncate" title={p.stripePaymentIntentId}>PI: {p.stripePaymentIntentId}</p>
                           )}
-                          {p.method === "cash" && (
+                          {p.method === "cash" && p.paymentType !== "refund" && (
                             <p className="text-[#e8e0d5]/50 font-mono truncate" title={p.id}>ID: {p.id}</p>
                           )}
                         </li>
@@ -2127,12 +2450,127 @@ export function CaretakerPortalContent({
                   <>
                     <div>
                       <p className="text-[#e8e0d5]/60 mb-0.5">Member</p>
-                      <p className="text-[#e8e0d5] font-medium">{detailsReservation.memberDisplayName || `#${detailsReservation.memberNumber}`}</p>
-                      <p className="text-[#e8e0d5]/80">Member # {detailsReservation.memberNumber}</p>
+                      <p className="text-[#e8e0d5] font-medium">
+                        {detailsReservation.memberDisplayName || detailsMemberLookup?.displayName || "Member"}
+                      </p>
+                      {(detailsReservation.memberNumber || detailsMemberLookup?.memberNumber) && (
+                        <p className="text-[#e8e0d5]/80">
+                          Member # {detailsReservation.memberNumber || detailsMemberLookup?.memberNumber}
+                        </p>
+                      )}
                     </div>
-                    {detailsMemberLoading ? (
-                      <p className="text-[#e8e0d5]/60">Loading member details…</p>
-                    ) : detailsMemberLookup ? (
+
+                    <div className="pt-2 border-t border-[#d4af37]/20 space-y-3">
+                      <p className="text-[#f0d48f] font-medium text-sm">Salesforce contact</p>
+                      {detailsContactError && (
+                        <p className="text-red-400 text-xs">{detailsContactError}</p>
+                      )}
+
+                      {!detailsReservation.memberContactId ? (
+                        <div className="space-y-2">
+                          <p className="text-amber-400/90 text-xs">
+                            Not linked to Salesforce — look up the member to connect this reservation.
+                          </p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={detailsContactLookupInput}
+                              onChange={(e) => setDetailsContactLookupInput(e.target.value)}
+                              placeholder="Member #, email, or phone"
+                              className="flex-1 px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleDetailsContactLookup}
+                              disabled={detailsContactLookupLoading || !detailsContactLookupInput.trim()}
+                              className="px-3 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {detailsContactLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                              Look up
+                            </button>
+                          </div>
+                          {detailsContactLookupMatches.length > 0 && (
+                            <div className="rounded-lg border border-amber-500/40 bg-amber-950/20 p-2 space-y-2">
+                              <p className="text-amber-200/90 text-xs font-medium">Multiple matches — select one:</p>
+                              {detailsContactLookupMatches.map((m) => (
+                                <button
+                                  key={m.contactId}
+                                  type="button"
+                                  onClick={() => handleDetailsContactPick(m)}
+                                  className="w-full text-left px-3 py-2 rounded border border-[#d4af37]/20 bg-[#0f0a06]/80 hover:border-[#d4af37]/50"
+                                >
+                                  <p className="text-[#e8e0d5] text-sm font-medium">
+                                    {m.displayName}{m.memberNumber ? ` (#${m.memberNumber})` : ""}
+                                  </p>
+                                  <p className="text-[#e8e0d5]/60 text-xs">
+                                    {[m.email, m.phone].filter(Boolean).join(" · ") || "No email or phone on file"}
+                                  </p>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {detailsContactLookupResult && (
+                            <div className="rounded-lg border border-[#d4af37]/25 bg-[#0f0a06]/80 p-3 space-y-2">
+                              <p className="text-[#e8e0d5] text-sm">
+                                ✓ {detailsContactLookupResult.displayName}
+                                {detailsContactLookupResult.memberNumber
+                                  ? ` (#${detailsContactLookupResult.memberNumber})`
+                                  : ""}
+                              </p>
+                              <p className="text-[#e8e0d5]/60 text-xs">
+                                {[detailsContactLookupResult.email, detailsContactLookupResult.phone]
+                                  .filter(Boolean)
+                                  .join(" · ") || "No email or phone on file"}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={handleDetailsContactLink}
+                                disabled={detailsContactLinkSubmitting}
+                                className="w-full py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                              >
+                                {detailsContactLinkSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                Link to reservation
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : detailsMemberLoading ? (
+                        <p className="text-[#e8e0d5]/60 text-sm">Loading contact…</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="text-[#6dd472]/90 text-xs">Linked to Salesforce</p>
+                          <div>
+                            <label className="block text-[#e8e0d5]/60 text-xs mb-1">Email</label>
+                            <input
+                              type="email"
+                              value={detailsContactEmail}
+                              onChange={(e) => setDetailsContactEmail(e.target.value)}
+                              className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[#e8e0d5]/60 text-xs mb-1">Phone</label>
+                            <input
+                              type="tel"
+                              value={detailsContactPhone}
+                              onChange={(e) => setDetailsContactPhone(e.target.value)}
+                              className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleDetailsContactSave}
+                            disabled={detailsContactSaving}
+                            className="py-2 px-4 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {detailsContactSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                            Save to Salesforce
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {!reservationIsArchived(detailsReservation) && detailsMemberLookup && (
                       <div className="pt-2 border-t border-[#d4af37]/20 space-y-2">
                         <p className="text-[#f0d48f] font-medium text-sm">Membership & maintenance (Salesforce)</p>
                         <p className="text-[#e8e0d5]/60 text-xs">Separate from site fees above.</p>
@@ -2172,18 +2610,50 @@ export function CaretakerPortalContent({
                         ) : (
                           <p className="text-[#e8e0d5]/80">No past-due amounts</p>
                         )}
-                        <p className="text-[#e8e0d5]/80">Email & phone on file for this member</p>
                       </div>
-                    ) : detailsReservation.memberNumber ? (
-                      <p className="text-[#e8e0d5]/60">Could not load member details.</p>
-                    ) : null}
+                    )}
                   </>
                 ) : (
-                  <div className="space-y-2">
-                    <p className="text-[#e8e0d5]/60 mb-0.5">Guest</p>
-                    <p className="text-[#e8e0d5] font-medium">{detailsReservation.guestFirstName} {detailsReservation.guestLastName}</p>
-                    <p className="text-[#e8e0d5]">Email: {detailsReservation.guestEmail ?? "—"}</p>
-                    <p className="text-[#e8e0d5]">Phone: {detailsReservation.guestPhone ?? "—"}</p>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[#e8e0d5]/60 mb-0.5">Guest</p>
+                      <p className="text-[#e8e0d5] font-medium">
+                        {detailsReservation.guestFirstName} {detailsReservation.guestLastName}
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-[#d4af37]/20 space-y-2">
+                      <p className="text-[#f0d48f] font-medium text-sm">Contact on reservation</p>
+                      {detailsContactError && (
+                        <p className="text-red-400 text-xs">{detailsContactError}</p>
+                      )}
+                      <div>
+                        <label className="block text-[#e8e0d5]/60 text-xs mb-1">Email</label>
+                        <input
+                          type="email"
+                          value={detailsGuestEmail}
+                          onChange={(e) => setDetailsGuestEmail(e.target.value)}
+                          className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[#e8e0d5]/60 text-xs mb-1">Phone</label>
+                        <input
+                          type="tel"
+                          value={detailsGuestPhone}
+                          onChange={(e) => setDetailsGuestPhone(e.target.value)}
+                          className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDetailsGuestContactSave}
+                        disabled={detailsGuestContactSaving}
+                        className="py-2 px-4 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center gap-1"
+                      >
+                        {detailsGuestContactSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        Save contact
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

@@ -514,6 +514,7 @@ export async function getSalesforceRestClient(): Promise<{
 }
 
 export type ProfileUpdateInput = {
+  email?: string;
   phone?: string;
   otherStreet?: string;
   otherCity?: string;
@@ -541,6 +542,7 @@ export async function updateContact(
   }
 
   const body: Record<string, unknown> = {};
+  if (input.email !== undefined) body.Email = input.email;
   if (input.phone !== undefined) body.Phone = input.phone;
   if (input.otherStreet !== undefined) body.OtherStreet = input.otherStreet;
   if (input.otherCity !== undefined) body.OtherCity = input.otherCity;

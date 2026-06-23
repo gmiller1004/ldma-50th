@@ -5,6 +5,7 @@ import { campUsesReservations, caretakerAllowsCashCheckIn } from "@/lib/reservat
 import { lookupMember } from "@/lib/salesforce";
 import {
   getReservationBalance,
+  getReservationPaymentTotals,
   listBillingPeriods,
   listReservationPayments,
   siteRatesFromRow,
@@ -44,6 +45,8 @@ type ReservationRow = {
   amount_override_cents?: number | null;
   override_reason?: string | null;
   price_override_flag?: boolean | null;
+  cancelled_at?: string | null;
+  cancellation_refund_cents?: number | null;
 };
 
 function rowToJson(row: ReservationRow) {
@@ -71,6 +74,8 @@ function rowToJson(row: ReservationRow) {
     amountOverrideCents: row.amount_override_cents ?? null,
     overrideReason: row.override_reason ?? null,
     priceOverrideFlag: Boolean(row.price_override_flag),
+    cancelledAt: row.cancelled_at ?? null,
+    cancellationRefundCents: row.cancellation_refund_cents ?? null,
   };
 }
 
@@ -108,7 +113,8 @@ export async function GET(
            r.reservation_type, r.member_contact_id, r.member_number, r.member_display_name,
            r.guest_first_name, r.guest_last_name, r.guest_email, r.guest_phone,
            r.status, r.checked_in_at, r.created_at, r.updated_at,
-           r.invoice_number, r.calculated_total_cents, r.amount_override_cents, r.override_reason, r.price_override_flag
+           r.invoice_number, r.calculated_total_cents, r.amount_override_cents, r.override_reason, r.price_override_flag,
+           r.cancelled_at, r.cancellation_refund_cents
     FROM camp_reservations r
     LEFT JOIN camp_sites s ON s.id = r.site_id
     WHERE r.id = ${id} AND r.camp_slug = ${caretaker.campSlug}
@@ -122,6 +128,7 @@ export async function GET(
   const billingPeriods = await listBillingPeriods(id);
   const balance = await getReservationBalance(id);
   const payments = await listReservationPayments(id);
+  const paymentSummary = await getReservationPaymentTotals(id);
 
   return NextResponse.json({
     ...rowToJson(row),
@@ -129,6 +136,7 @@ export async function GET(
     billingPeriods,
     balance,
     payments,
+    paymentSummary,
   });
 }
 

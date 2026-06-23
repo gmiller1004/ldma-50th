@@ -16,6 +16,7 @@ function memberToCaretakerJson(member: MemberLookupResult, memberNumber: string 
     memberNumber: memberNumber ?? "",
     displayName,
     email: member.email?.trim() || null,
+    phone: member.phone?.trim() || null,
     isLdmaMember: member.active === true,
     maintenanceFeesDue: member.duesOwed ?? null,
     membershipDuesOwed: member.membershipDuesOwed ?? null,
