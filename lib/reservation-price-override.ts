@@ -64,7 +64,7 @@ export function validatePriceOverride(input: PriceOverrideInput):
   if (paymentAmountCents > calculatedTotalCents) {
     return {
       ok: false,
-      error: `Payment cannot exceed calculated total ($${(calculatedTotalCents / 100).toFixed(2)})`,
+      error: `Collect amount ($${(paymentAmountCents / 100).toFixed(2)}) cannot exceed calculated stay total ($${(calculatedTotalCents / 100).toFixed(2)})`,
     };
   }
   if (paymentAmountCents < 1 && calculatedTotalCents > 0) {

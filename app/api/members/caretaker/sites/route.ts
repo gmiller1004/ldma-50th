@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCaretakerContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations } from "@/lib/reservation-camps";
+import { siteRatesFromRow } from "@/lib/reservation-billing";
 
 type SiteRow = {
   id: string;
@@ -16,15 +17,16 @@ type SiteRow = {
 };
 
 function rowToJson(row: SiteRow) {
+  const rates = siteRatesFromRow(row);
   return {
     id: row.id,
     campSlug: row.camp_slug,
     name: row.name,
     siteType: row.site_type,
     sortOrder: row.sort_order,
-    memberRateDaily: row.member_rate_daily,
-    memberRateMonthly: row.member_rate_monthly,
-    nonMemberRateDaily: row.non_member_rate_daily,
+    memberRateDaily: rates.memberRateDaily,
+    memberRateMonthly: rates.memberRateMonthly,
+    nonMemberRateDaily: rates.nonMemberRateDaily,
     notes: row.notes,
   };
 }

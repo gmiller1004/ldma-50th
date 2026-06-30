@@ -56,6 +56,9 @@ export function ManualReservationPanel() {
   const [stayTotalOverride, setStayTotalOverride] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [overrideReason, setOverrideReason] = useState("");
+  const [quotedTotalCents, setQuotedTotalCents] = useState<number | null>(null);
+  const [quotedNights, setQuotedNights] = useState<number | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -63,11 +66,12 @@ export function ManualReservationPanel() {
   const today = new Date().toISOString().slice(0, 10);
   const earliestCheckIn = caretakerEarliestCheckInDate(today);
   const nights =
-    checkInDate && checkOutDate && checkInDate < checkOutDate
+    quotedNights ??
+    (checkInDate && checkOutDate && checkInDate < checkOutDate
       ? countNights(checkInDate, checkOutDate)
-      : 0;
+      : 0);
   const selectedSite = sites.find((s) => s.id === siteId);
-  const calculatedTotalCents =
+  const localTotalCents =
     nights > 0 && selectedSite
       ? computeStayPricing({
           checkInDate,
@@ -80,6 +84,7 @@ export function ManualReservationPanel() {
           },
         }).totalCents
       : 0;
+  const calculatedTotalCents = quotedTotalCents ?? localTotalCents;
   const effectiveTotalCents = (() => {
     const r = resolveCreateReservationPricing(Math.max(0, calculatedTotalCents), {
       stayTotalOverrideDollars: stayTotalOverride,
@@ -162,6 +167,44 @@ export function ManualReservationPanel() {
       .then((data: { availableSiteIds?: string[] }) => setAvailableSiteIds(data.availableSiteIds ?? []))
       .catch(() => setAvailableSiteIds([]));
   }, [campSlug, checkInDate, checkOutDate]);
+
+  useEffect(() => {
+    if (!campSlug || !siteId || !checkInDate || !checkOutDate || checkInDate >= checkOutDate) {
+      setQuotedTotalCents(null);
+      setQuotedNights(null);
+      return;
+    }
+    const controller = new AbortController();
+    setQuoteLoading(true);
+    const params = new URLSearchParams({
+      campSlug,
+      siteId,
+      checkInDate,
+      checkOutDate,
+      type: resType,
+    });
+    fetch(`/api/members/caretaker/reservations/quote?${params}`, { signal: controller.signal })
+      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          setQuotedTotalCents(null);
+          setQuotedNights(null);
+          return;
+        }
+        setQuotedTotalCents(
+          typeof data.calculatedTotalCents === "number" ? data.calculatedTotalCents : null
+        );
+        setQuotedNights(typeof data.nights === "number" ? data.nights : null);
+      })
+      .catch((err: Error) => {
+        if (err.name !== "AbortError") {
+          setQuotedTotalCents(null);
+          setQuotedNights(null);
+        }
+      })
+      .finally(() => setQuoteLoading(false));
+    return () => controller.abort();
+  }, [campSlug, siteId, checkInDate, checkOutDate, resType]);
 
   async function runMemberLookup(body: Record<string, string>) {
     setMemberLoading(true);
@@ -247,6 +290,10 @@ export function ManualReservationPanel() {
       }
     } else if (effectiveTotalCents < 1) {
       setError("Invalid stay total");
+      return false;
+    }
+    if (quoteLoading) {
+      setError("Stay total is still loading — please wait a moment");
       return false;
     }
     const pricingCheck = applyPricingFields({});
@@ -548,6 +595,13 @@ export function ManualReservationPanel() {
         <div className="grid gap-2 sm:grid-cols-2 pt-2 border-t border-[#d4af37]/15">
           <p className="sm:col-span-2 text-sm text-[#e8e0d5]">
             Calculated stay total: {formatCentsAsCurrency(calculatedTotalCents)}
+            {quoteLoading ? <span className="text-[#e8e0d5]/50 text-xs"> (updating…)</span> : null}
+            {nights > 0 ? (
+              <span className="text-[#e8e0d5]/60 text-xs">
+                {" "}
+                · {nights} night{nights === 1 ? "" : "s"}
+              </span>
+            ) : null}
             {effectiveTotalCents !== calculatedTotalCents && (
               <span className="text-amber-300">
                 {" "}

@@ -404,6 +404,9 @@ export function CaretakerPortalContent({
   const [resStayTotalOverride, setResStayTotalOverride] = useState("");
   const [resPaymentAmount, setResPaymentAmount] = useState("");
   const [resOverrideReason, setResOverrideReason] = useState("");
+  const [resQuotedTotalCents, setResQuotedTotalCents] = useState<number | null>(null);
+  const [resQuotedNights, setResQuotedNights] = useState<number | null>(null);
+  const [resQuoteLoading, setResQuoteLoading] = useState(false);
   const [detailsPayments, setDetailsPayments] = useState<Array<{
     id: string;
     method: string;
@@ -517,6 +520,43 @@ export function CaretakerPortalContent({
     }
   }, [resCheckInDate, resCheckOutDate]);
 
+  useEffect(() => {
+    if (!resSiteId || !resCheckInDate || !resCheckOutDate || resCheckInDate >= resCheckOutDate) {
+      setResQuotedTotalCents(null);
+      setResQuotedNights(null);
+      return;
+    }
+    const controller = new AbortController();
+    setResQuoteLoading(true);
+    const params = new URLSearchParams({
+      siteId: resSiteId,
+      checkInDate: resCheckInDate,
+      checkOutDate: resCheckOutDate,
+      type: resType,
+    });
+    fetch(`/api/members/caretaker/reservations/quote?${params}`, { signal: controller.signal })
+      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          setResQuotedTotalCents(null);
+          setResQuotedNights(null);
+          return;
+        }
+        setResQuotedTotalCents(
+          typeof data.calculatedTotalCents === "number" ? data.calculatedTotalCents : null
+        );
+        setResQuotedNights(typeof data.nights === "number" ? data.nights : null);
+      })
+      .catch((err: Error) => {
+        if (err.name !== "AbortError") {
+          setResQuotedTotalCents(null);
+          setResQuotedNights(null);
+        }
+      })
+      .finally(() => setResQuoteLoading(false));
+    return () => controller.abort();
+  }, [resSiteId, resCheckInDate, resCheckOutDate, resType]);
+
   async function runCaretakerMemberLookup(
     body: Record<string, string>,
     onSuccess: (result: LookupResult) => void,
@@ -601,11 +641,12 @@ export function CaretakerPortalContent({
   const today = new Date().toISOString().slice(0, 10);
   const earliestCheckIn = caretakerEarliestCheckInDate(today);
   const resNights =
-    resCheckInDate && resCheckOutDate && resCheckInDate < resCheckOutDate
+    resQuotedNights ??
+    (resCheckInDate && resCheckOutDate && resCheckInDate < resCheckOutDate
       ? countNights(resCheckInDate, resCheckOutDate)
-      : 0;
+      : 0);
   const resSelectedSite = sites.find((s) => s.id === resSiteId);
-  const resTotalCents =
+  const resLocalTotalCents =
     resNights > 0 && resSelectedSite
       ? computeStayPricing({
           checkInDate: resCheckInDate,
@@ -618,6 +659,7 @@ export function CaretakerPortalContent({
           },
         }).totalCents
       : 0;
+  const resTotalCents = resQuotedTotalCents ?? resLocalTotalCents;
   const resAllowsCash = resCheckInDate ? caretakerAllowsCashCheckIn(resCheckInDate, today) : false;
 
   const createPricingResolved = useMemo(() => {
@@ -796,6 +838,10 @@ export function CaretakerPortalContent({
       setResError("Invalid stay total");
       return;
     }
+    if (resQuoteLoading) {
+      setResError("Stay total is still loading — please wait a moment");
+      return;
+    }
     setResError(null);
     setResSubmitting(true);
     try {
@@ -878,6 +924,10 @@ export function CaretakerPortalContent({
     }
     if (resStayTotalCents < 1) {
       setResError("Invalid stay total");
+      return;
+    }
+    if (resQuoteLoading) {
+      setResError("Stay total is still loading — please wait a moment");
       return;
     }
     setResError(null);
@@ -2184,6 +2234,15 @@ export function CaretakerPortalContent({
                   <div className="pt-2 border-t border-[#d4af37]/20 space-y-3">
                     <p className="text-[#e8e0d5] font-medium">
                       Calculated stay total: {formatCentsAsCurrency(resTotalCents)}
+                      {resQuoteLoading ? (
+                        <span className="text-[#e8e0d5]/50 text-xs font-normal"> (updating…)</span>
+                      ) : null}
+                      {resNights > 0 ? (
+                        <span className="text-[#e8e0d5]/60 text-xs font-normal">
+                          {" "}
+                          · {resNights} night{resNights === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
                       {resStayTotalCents !== resTotalCents && (
                         <span className="text-amber-300">
                           {" "}
