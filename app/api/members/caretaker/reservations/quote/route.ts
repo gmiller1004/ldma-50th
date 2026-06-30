@@ -10,6 +10,7 @@ import { siteRatesFromRow } from "@/lib/reservation-billing";
  * Authoritative stay total for create-reservation UI (matches POST /reservations pricing).
  */
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
   const campSlugOverride = searchParams.get("campSlug")?.trim() || undefined;
   const caretaker = campSlugOverride
     ? await getCaretakerWriteContext(campSlugOverride)
@@ -24,7 +25,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Database not available" }, { status: 503 });
   }
 
-  const { searchParams } = new URL(request.url);
   const siteId = searchParams.get("siteId")?.trim() ?? "";
   const checkInDate = searchParams.get("checkInDate")?.trim() ?? "";
   const checkOutDate = searchParams.get("checkOutDate")?.trim() ?? "";
