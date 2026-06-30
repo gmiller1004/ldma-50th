@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Complete Family Legacy Bundle Mailer (8.5×11, double-sided)</title>
+    <!--
+      Audience: LDMA members without email on file (direct mail)
+      Offer: Complete Family Legacy Bundle — $600 (retail $3,250 · save $2,650)
+      Includes: Pre-Paid Transfer Fee, Companion Add-On, Transferability Add-On
+      Online code: CompleteLegacy50th · expires June 21, 2026
+      Mail merge: leave address / member # boxes blank for variable-data print.
+      Export: Chrome → Print → Save as PDF (see docs/flyers/README.md)
+    -->
+    <style>
+      :root {
+        --cream: #f5f6f0;
+        --white: #ffffff;
+        --ink: #1c2526;
+        --muted: #444444;
+        --soft: #777777;
+        --line: #e0dcc8;
+        --line-dark: #eee9dc;
+        --gold: #b8860b;
+        --gold-light: #f0d48f;
+        --gold-bg: #fff9eb;
+        --band: #1c2526;
+        --forest: #0f3d1e;
+        --trim-w: 8.5in;
+        --trim-h: 11in;
+        --bleed: 0.125in;
+        --safe: 0.4in;
+        --reply-h: 3.38in;
+        --perf-clearance: 0.24in;
+      }
+
+      @page {
+        size: calc(var(--trim-w) + 2 * var(--bleed)) calc(var(--trim-h) + 2 * var(--bleed));
+        margin: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #ddd;
+        font-family: Georgia, "Times New Roman", Times, serif;
+        color: var(--ink);
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .sheet {
+        width: calc(var(--trim-w) + 2 * var(--bleed));
+        height: calc(var(--trim-h) + 2 * var(--bleed));
+        page-break-after: always;
+        position: relative;
+        overflow: hidden;
+        background: var(--white);
+      }
+
+      .sheet:last-child {
+        page-break-after: auto;
+      }
+
+      .trim {
+        position: absolute;
+        left: var(--bleed);
+        top: var(--bleed);
+        width: var(--trim-w);
+        height: var(--trim-h);
+      }
+
+      /* ——— FRONT ——— */
+      .front-inner {
+        position: absolute;
+        inset: 0;
+        padding: var(--safe);
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        overflow: hidden;
+      }
+
+      .front-masthead {
+        display: grid;
+        grid-template-columns: 1.5in 1fr 1.5in;
+        gap: 8px;
+        align-items: end;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--line-dark);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7.5pt;
+        line-height: 1.35;
+        color: var(--muted);
+        flex-shrink: 0;
+      }
+
+      .masthead-return strong {
+        display: block;
+        color: var(--ink);
+        font-size: 8pt;
+        font-weight: 700;
+      }
+
+      .masthead-logo {
+        text-align: center;
+      }
+
+      .masthead-logo img {
+        width: 1.6in;
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+      }
+
+      .masthead-meta {
+        text-align: right;
+        font-size: 7pt;
+        line-height: 1.5;
+      }
+
+      .masthead-meta .meta-label {
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--soft);
+      }
+
+      .blank-inline {
+        display: inline-block;
+        min-width: 0.5in;
+        border-bottom: 1px solid #333;
+        vertical-align: baseline;
+      }
+
+      .front-subject {
+        margin: 0;
+        font-size: 11pt;
+        font-weight: 700;
+        line-height: 1.25;
+        flex-shrink: 0;
+      }
+
+      .address-window {
+        width: 4in;
+        height: 1.35in;
+        flex-shrink: 0;
+        background: var(--white);
+      }
+
+      .front-content {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .kicker {
+        margin: 0;
+        text-align: center;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 8.5pt;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--gold);
+      }
+
+      .headline {
+        margin: 0;
+        text-align: center;
+        font-size: 15.5pt;
+        line-height: 1.2;
+        font-weight: 700;
+      }
+
+      .price-hero {
+        text-align: center;
+      }
+
+      .price-hero .amount {
+        margin: 0;
+        font-size: 40pt;
+        line-height: 1;
+        font-weight: 700;
+        color: var(--gold);
+      }
+
+      .price-hero .retail {
+        margin: 4px 0 0;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11pt;
+        color: var(--muted);
+      }
+
+      .price-hero .retail .was {
+        text-decoration: line-through;
+        color: var(--soft);
+      }
+
+      .band {
+        background: var(--forest);
+        color: var(--cream);
+        text-align: center;
+        padding: 9px 12px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 10.5pt;
+        font-weight: 700;
+        line-height: 1.35;
+        border: 1px solid var(--gold);
+      }
+
+      .band em {
+        color: var(--gold-light);
+        font-style: normal;
+      }
+
+      .section-title {
+        margin: 0 0 5px;
+        font-size: 12pt;
+        font-weight: 700;
+      }
+
+      .includes-box {
+        border: 1px solid var(--line);
+        background: var(--cream);
+        padding: 8px 10px;
+      }
+
+      .includes-box--with-img {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .includes-box .product-img {
+        width: 1.35in;
+        max-width: 1.35in;
+        height: auto;
+        display: block;
+        border-radius: 4px;
+        border: 1px solid var(--line);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .includes-box .product-caption {
+        margin: 4px 0 0;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7pt;
+        line-height: 1.3;
+        text-align: center;
+        color: var(--soft);
+        max-width: 1.35in;
+      }
+
+      .check-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9.5pt;
+        line-height: 1.35;
+      }
+
+      .check-list li {
+        margin-bottom: 4px;
+        padding-left: 14px;
+        position: relative;
+      }
+
+      .check-list li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        color: var(--gold);
+        font-weight: 700;
+      }
+
+      .check-list li:last-child {
+        margin-bottom: 0;
+      }
+
+      .detail-callout {
+        border: 2px solid var(--gold);
+        background: var(--gold-bg);
+        padding: 9px 11px;
+      }
+
+      .detail-callout .detail-subhead {
+        margin: 0 0 5px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9.5pt;
+        font-weight: 700;
+      }
+
+      .detail-bullets {
+        margin: 0;
+        padding: 0 0 0 14px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 8.75pt;
+        line-height: 1.32;
+        color: var(--muted);
+      }
+
+      .detail-bullets li {
+        margin-bottom: 4px;
+      }
+
+      .detail-bullets li:last-child {
+        margin-bottom: 0;
+      }
+
+      .cta-single {
+        text-align: center;
+        padding: 10px 12px;
+        border-radius: 6px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11pt;
+        font-weight: 700;
+        color: #fff;
+        background: var(--gold);
+      }
+
+      .phone-cta {
+        text-align: center;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12pt;
+        font-weight: 700;
+        color: var(--gold);
+        border: 2px solid var(--gold);
+        padding: 7px;
+        border-radius: 6px;
+        background: var(--cream);
+      }
+
+      .front-footer {
+        margin: 0;
+        flex-shrink: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7pt;
+        line-height: 1.35;
+        color: var(--soft);
+      }
+
+      /* ——— BACK ——— */
+      .back-upper {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: calc(var(--trim-h) - var(--reply-h));
+        padding: var(--safe);
+        padding-bottom: var(--perf-clearance);
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        overflow: hidden;
+      }
+
+      .logo-row {
+        text-align: center;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--line-dark);
+      }
+
+      .logo-row img {
+        width: 2.2in;
+        max-width: 100%;
+        height: auto;
+      }
+
+      .compare-card {
+        border: 1px solid var(--line);
+        text-align: center;
+        font-family: Arial, Helvetica, sans-serif;
+        max-width: 3.2in;
+        margin: 0 auto;
+        width: 100%;
+      }
+
+      .compare-card .head {
+        background: var(--line-dark);
+        padding: 7px;
+        font-size: 10pt;
+        font-weight: 700;
+      }
+
+      .compare-card .body {
+        padding: 10px 8px;
+      }
+
+      .compare-card .was {
+        margin: 0;
+        font-size: 9pt;
+        color: #666;
+        text-decoration: line-through;
+      }
+
+      .compare-card .now {
+        margin: 2px 0 4px;
+        font-size: 22pt;
+        font-weight: 700;
+        color: var(--gold);
+      }
+
+      .compare-card .note {
+        margin: 0;
+        font-size: 9pt;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
+      .back-upper .section-title {
+        font-size: 11.5pt;
+      }
+
+      .body-copy {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9.5pt;
+        line-height: 1.4;
+        color: var(--muted);
+      }
+
+      .feature-block {
+        border-left: 3px solid var(--gold);
+        background: #faf8f2;
+        padding: 7px 10px;
+      }
+
+      .feature-block .feature-tag {
+        margin: 0 0 3px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7pt;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #8b6914;
+      }
+
+      .feature-block h3 {
+        margin: 0 0 4px;
+        font-size: 10.5pt;
+        line-height: 1.25;
+      }
+
+      .feature-block p {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9pt;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
+      .back-cta-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        margin-top: 2px;
+      }
+
+      .qr-drop {
+        flex-shrink: 0;
+        width: 1.05in;
+        height: 1.05in;
+        border: 1px solid var(--line);
+        background: var(--white);
+        padding: 2px;
+        overflow: hidden;
+      }
+
+      .qr-drop img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+      }
+
+      .back-cta-text {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 10.5pt;
+        font-weight: 700;
+        line-height: 1.4;
+        color: var(--ink);
+        text-align: left;
+      }
+
+      .back-cta-text .phone {
+        display: block;
+        margin-top: 3px;
+        font-size: 12pt;
+        color: var(--gold);
+      }
+
+      .disclaimer {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7.5pt;
+        line-height: 1.35;
+        color: var(--soft);
+        margin: 0;
+        flex-shrink: 0;
+      }
+
+      .org-footer {
+        text-align: center;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7.5pt;
+        line-height: 1.35;
+        color: var(--soft);
+        border-top: 1px solid var(--line-dark);
+        padding-top: 6px;
+        margin: 6px 0 0;
+        flex-shrink: 0;
+      }
+
+      .perf-line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(var(--trim-h) - var(--reply-h));
+        height: 0;
+        border: none;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      .perf-line::before {
+        content: "";
+        position: absolute;
+        left: 0.35in;
+        right: 0.35in;
+        top: 0;
+        border-top: 2px dashed #888;
+      }
+
+      .perf-label {
+        position: absolute;
+        left: 50%;
+        top: -12px;
+        transform: translateX(-50%);
+        background: var(--white);
+        padding: 0 10px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7pt;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #666;
+        white-space: nowrap;
+      }
+
+      .perf-crop {
+        position: absolute;
+        top: -5px;
+        width: 0;
+        height: 10px;
+        border-left: 1px solid #888;
+      }
+
+      .perf-crop--left {
+        left: 0.2in;
+      }
+
+      .perf-crop--right {
+        right: 0.2in;
+      }
+
+      .reply-panel {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: var(--reply-h);
+        background: #fafaf8;
+        border-top: 3px double #999;
+        padding: 8px var(--safe) 0.07in;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 8.5pt;
+        color: var(--ink);
+      }
+
+      .reply-header {
+        margin-bottom: 4px;
+      }
+
+      .reply-header h2 {
+        margin: 0;
+        font-size: 10pt;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .reply-header .sub {
+        margin: 1px 0 0;
+        font-size: 7pt;
+        color: #666;
+      }
+
+      .reply-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 10px;
+        align-items: start;
+      }
+
+      .reply-col {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .merge-block {
+        border: 1px solid #bbb;
+        background: var(--white);
+        min-height: 0.62in;
+      }
+
+      .field-line {
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+        margin-bottom: 3px;
+        font-size: 8pt;
+      }
+
+      .field-line label {
+        flex-shrink: 0;
+        font-weight: 600;
+      }
+
+      .field-line .line {
+        flex: 1;
+        border-bottom: 1px solid #333;
+        min-height: 14px;
+      }
+
+      .option-group > .group-label {
+        margin: 0 0 4px;
+        font-size: 8pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #555;
+      }
+
+      .option {
+        display: flex;
+        align-items: flex-start;
+        gap: 5px;
+        margin-bottom: 2px;
+        font-size: 7.75pt;
+        line-height: 1.28;
+      }
+
+      .checkbox {
+        width: 11px;
+        height: 11px;
+        border: 1.5px solid #333;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+
+      .cc-grid {
+        display: grid;
+        grid-template-columns: 1.5fr 0.65fr 0.45fr;
+        gap: 6px;
+        margin-top: 3px;
+      }
+
+      .cc-field label {
+        display: block;
+        font-size: 7pt;
+        font-weight: 600;
+        margin-bottom: 2px;
+        color: #555;
+      }
+
+      .cc-field .line {
+        border-bottom: 1px solid #333;
+        height: 14px;
+      }
+
+      .reply-footer {
+        margin-top: 3px;
+        padding-top: 3px;
+        border-top: 1px solid #ccc;
+      }
+
+      .sig-row {
+        display: grid;
+        grid-template-columns: 1.5fr 0.55fr;
+        gap: 8px;
+        margin-bottom: 2px;
+      }
+
+      .sig-row .field-line {
+        margin: 0;
+      }
+
+      .return-address {
+        margin: 0;
+        font-size: 6.5pt;
+        line-height: 1.3;
+        color: #555;
+      }
+
+      .return-address strong {
+        color: var(--ink);
+      }
+
+      @media screen {
+        body {
+          padding: 16px;
+        }
+        .sheet {
+          margin: 0 auto 20px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        .address-window {
+          box-shadow: inset 0 0 0 1px dashed #d8d4c8;
+        }
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- PAGE 1 — FRONT -->
+    <section class="sheet front" aria-label="Mailer front">
+      <div class="trim front-inner">
+        <header class="front-masthead">
+          <div class="masthead-return">
+            <strong>Lost Dutchman's Mining Association</strong>
+            PO Box 891509<br />
+            Temecula, CA 92589
+          </div>
+          <div class="masthead-logo">
+            <img
+              src="../../public/images/50th-logo.png"
+              alt="Lost Dutchman's Mining Association — 50th Anniversary"
+            />
+          </div>
+          <div class="masthead-meta">
+            <div><span class="meta-label">Offer expires</span> <strong>6/21/26</strong></div>
+            <div><span class="meta-label">Member #</span> <span class="blank-inline" aria-hidden="true"></span></div>
+            <div><span class="meta-label">Contact</span> (888) 465-3717</div>
+          </div>
+        </header>
+
+        <p class="front-subject">Re: Complete Family Legacy Bundle — 50th Anniversary offer</p>
+
+        <div class="address-window" aria-label="Mailing address (windowed envelope)"></div>
+
+        <div class="front-content">
+          <p class="kicker">50th Anniversary · save $2,650</p>
+
+          <h1 class="headline">
+            Lock in the complete <strong>Family Legacy bundle</strong> for just
+          </h1>
+
+          <div class="price-hero">
+            <p class="amount">$600</p>
+            <p class="retail">
+              <span class="was">Retail $3,250</span> · all three legacy add-ons in one bundle
+            </p>
+          </div>
+
+          <div class="band">
+            <em>Pre-Paid Transfer Fee</em> · Companion · Transferability<br />
+            The complete bundle — at a fraction of retail
+          </div>
+
+          <div class="includes-box includes-box--with-img">
+            <div>
+              <p class="section-title" style="text-align: center; margin-bottom: 5px">
+                The Complete Family Legacy Bundle includes
+              </p>
+              <ul class="check-list">
+                <li>
+                  <strong>Pre-Paid Transfer Fee</strong> — transfer cost covered in advance for your
+                  heir
+                </li>
+                <li>
+                  <strong>Companion Add-On</strong> — independent camp and claim access for someone you
+                  name
+                </li>
+                <li>
+                  <strong>Transferability Add-On</strong> — your chosen heir receives the membership
+                  later
+                </li>
+              </ul>
+            </div>
+            <div>
+              <img
+                class="product-img"
+                src="https://cdn.shopify.com/s/files/1/0554/1914/2215/files/complete_family_legacy_Large_fc8ffcbb-31f9-465f-85be-28c386251fc3.jpg?v=1781716168"
+                alt="Complete Family Legacy Bundle"
+              />
+              <p class="product-caption">Complete Family Legacy Bundle</p>
+            </div>
+          </div>
+
+          <div class="detail-callout">
+            <p class="detail-subhead">Why members add the complete bundle now:</p>
+            <ul class="detail-bullets">
+              <li>
+                <strong>Pre-Paid Transfer Fee</strong> — handle the transfer cost now, while you can, so
+                your family is not left with an unexpected fee at a difficult time
+              </li>
+              <li>
+                <strong>Companion</strong> — a spouse, adult child, parent, or grandparent can check in at
+                camp and use claims on their own schedule
+              </li>
+              <li>
+                <strong>Transferability</strong> — designate who receives your membership so the camps and
+                traditions you built stay in the family
+              </li>
+            </ul>
+          </div>
+
+          <div class="cta-single">Get the Complete Bundle — $600</div>
+
+          <div class="phone-cta">
+            Call (888) 465-3717 · or detach and mail the order form on back
+          </div>
+
+          <p class="front-footer">
+            Offer for qualifying LDMA members while this promotion is active. The bundle remains
+            available after 6/21/26 — the <strong>$600</strong> rate does not. Full add-on terms
+            provided at purchase.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 2 — BACK -->
+    <section class="sheet back" aria-label="Mailer back">
+      <div class="trim">
+        <div class="back-upper">
+          <header class="logo-row">
+            <img src="../../public/images/50th-logo.png" alt="LDMA" />
+          </header>
+
+          <p class="section-title" style="text-align: center; margin: 0">At a glance</p>
+          <div class="compare-card">
+            <div class="head">Complete Family Legacy Bundle</div>
+            <div class="body">
+              <p class="was">$3,250 retail</p>
+              <p class="now">$600</p>
+              <p class="note">Save <strong>$2,650</strong> · offer ends <strong>6/21/26</strong></p>
+            </div>
+          </div>
+
+          <div class="feature-block">
+            <p class="feature-tag">The piece most members never add — until it is too late</p>
+            <h3>Pre-Paid Transfer Fee</h3>
+            <p>
+              When a membership is transferred, the person receiving it typically pays a transfer fee —
+              often at exactly the wrong moment. Pre-paying now means your heir receives the membership
+              <strong>with no transfer fee</strong> when the time comes.
+            </p>
+          </div>
+
+          <div>
+            <p class="section-title">Companion Add-On</p>
+            <p class="body-copy">
+              Name a spouse, adult child (18+), parent, or grandparent on your membership so they can
+              check in at LDMA camps, prospect on claims, and participate in events
+              <strong>on their own</strong> — even when you are not there.
+            </p>
+          </div>
+
+          <div>
+            <p class="section-title">Transferability Add-On</p>
+            <p class="body-copy">
+              Designate who receives your membership in the future — spouse, child, grandchild, or another
+              family member — so the camps, claims, and traditions you built can stay in the family.
+            </p>
+          </div>
+
+          <div class="back-cta-row">
+            <div class="qr-drop">
+              <img
+                src="../../public/images/family-legacy-qr.png"
+                alt="QR code — Complete Family Legacy Bundle at myldma.com/family-legacy"
+              />
+            </div>
+            <div class="back-cta-text">
+              Learn more — scan QR code
+              <span class="phone">Or call (888) 465-3717</span>
+            </div>
+          </div>
+
+          <p class="disclaimer">
+            Qualifying LDMA members only. The Complete Family Legacy Bundle will still be available after
+            6/21/26 — but <strong>not at $600</strong>. <strong>Offer expires 6/21/26.</strong>
+          </p>
+
+          <div class="org-footer">
+            <strong>Lost Dutchman's Mining Association</strong><br />
+            PO Box 891509, Temecula, CA 92589 · hello@myldma.com · (888) 465-3717
+          </div>
+        </div>
+
+        <div class="perf-line" aria-hidden="true">
+          <span class="perf-crop perf-crop--left"></span>
+          <span class="perf-crop perf-crop--right"></span>
+          <span class="perf-label">✂ Detach along dotted line · mail bottom portion back</span>
+        </div>
+
+        <div class="reply-panel">
+          <div class="reply-header">
+            <h2>Order form — Complete Family Legacy Bundle</h2>
+            <p class="sub">Complete, detach along dotted line, and return in your prepaid reply envelope.</p>
+          </div>
+
+          <div class="reply-body">
+            <div class="reply-col">
+              <div class="merge-block" aria-label="Mailing address"></div>
+
+              <div class="field-line">
+                <label>LDMA Member #</label>
+                <span class="line"></span>
+              </div>
+
+              <div class="option-group">
+                <p class="group-label">My order</p>
+                <div class="option">
+                  <span class="checkbox"></span>
+                  <span>
+                    <strong>Yes — Complete Family Legacy Bundle · $600</strong> (retail $3,250 · includes
+                    Pre-Paid Transfer Fee, Companion &amp; Transferability)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="reply-col">
+              <div class="option-group">
+                <p class="group-label">Payment method (check one)</p>
+                <div class="option">
+                  <span class="checkbox"></span>
+                  <span>
+                    I am enclosing a check for <strong>$600</strong> made payable to
+                    <strong>LDMA</strong>
+                  </span>
+                </div>
+                <div class="option">
+                  <span class="checkbox"></span>
+                  <span><strong>Charge my credit card $600</strong> (complete below)</span>
+                </div>
+                <div class="cc-field" style="margin-top: 2px">
+                  <label>Card number</label>
+                  <div class="line"></div>
+                </div>
+                <div class="cc-grid">
+                  <div class="cc-field">
+                    <label>Name on card</label>
+                    <div class="line"></div>
+                  </div>
+                  <div class="cc-field">
+                    <label>Exp. date</label>
+                    <div class="line"></div>
+                  </div>
+                  <div class="cc-field">
+                    <label>CVV</label>
+                    <div class="line"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="reply-footer">
+            <div class="sig-row">
+              <div class="field-line">
+                <label>Signature</label>
+                <span class="line"></span>
+              </div>
+              <div class="field-line">
+                <label>Date</label>
+                <span class="line"></span>
+              </div>
+            </div>
+            <p class="return-address">
+              <strong>MAIL TO:</strong> LDMA Member Relations · PO Box 891509, Temecula, CA 92589
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </body>
+</html>

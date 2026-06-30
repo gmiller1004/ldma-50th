@@ -1,0 +1,1073 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GPAA Lifetime → LDMA Dual Upgrade Mailer (8.5×11, double-sided)</title>
+    <!--
+      Audience: GPAA Lifetime members (pre-2014 segment)
+      Offer A: $500 dual GPAA/LDMA Lifetime + $250 paydirt
+      Offer B: $900 total (+ Legacy bundle: Companion, Transferability, Pre-Paid Transfer Fee)
+      Mail merge: leave address / member # boxes blank for variable-data print.
+      Export: Chrome → Print → Save as PDF (see docs/flyers/README.md)
+    -->
+    <style>
+      :root {
+        --cream: #f5f6f0;
+        --white: #ffffff;
+        --ink: #1c2526;
+        --muted: #444444;
+        --soft: #777777;
+        --line: #e0dcc8;
+        --line-dark: #eee9dc;
+        --gold: #b8860b;
+        --gold-light: #f0d48f;
+        --gold-bg: #fff9eb;
+        --band: #1c2526;
+        --trim-w: 8.5in;
+        --trim-h: 11in;
+        --bleed: 0.125in;
+        --safe: 0.4in;
+        --reply-h: 3.38in; /* detachable reply form — sized to content (BRM) */
+        --perf-clearance: 0.24in; /* space below org footer before perf line */
+      }
+
+      @page {
+        size: calc(var(--trim-w) + 2 * var(--bleed)) calc(var(--trim-h) + 2 * var(--bleed));
+        margin: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #ddd;
+        font-family: Georgia, "Times New Roman", Times, serif;
+        color: var(--ink);
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .sheet {
+        width: calc(var(--trim-w) + 2 * var(--bleed));
+        height: calc(var(--trim-h) + 2 * var(--bleed));
+        page-break-after: always;
+        position: relative;
+        overflow: hidden;
+        background: var(--white);
+      }
+
+      .sheet:last-child {
+        page-break-after: auto;
+      }
+
+      .trim {
+        position: absolute;
+        left: var(--bleed);
+        top: var(--bleed);
+        width: var(--trim-w);
+        height: var(--trim-h);
+      }
+
+      /* ——— FRONT ——— */
+      .front {
+        background: var(--white);
+      }
+
+      .front-inner {
+        position: absolute;
+        inset: 0;
+        padding: var(--safe);
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        overflow: hidden;
+      }
+
+      /* Letterhead — matches windowed-envelope mailer positioning */
+      .front-masthead {
+        display: grid;
+        grid-template-columns: 1.5in 1fr 1.5in;
+        gap: 8px;
+        align-items: end;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--line-dark);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7.5pt;
+        line-height: 1.35;
+        color: var(--muted);
+        flex-shrink: 0;
+      }
+
+      .masthead-return strong {
+        display: block;
+        color: var(--ink);
+        font-size: 8pt;
+        font-weight: 700;
+      }
+
+      .masthead-logo {
+        text-align: center;
+      }
+
+      .masthead-logo img {
+        width: 1.6in;
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+      }
+
+      .masthead-meta {
+        text-align: right;
+        font-size: 7pt;
+        line-height: 1.5;
+      }
+
+      .masthead-meta .meta-label {
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--soft);
+      }
+
+      .blank-inline {
+        display: inline-block;
+        min-width: 0.5in;
+        border-bottom: 1px solid #333;
+        vertical-align: baseline;
+      }
+
+      .front-subject {
+        margin: 0;
+        font-size: 11pt;
+        font-weight: 700;
+        line-height: 1.25;
+        flex-shrink: 0;
+      }
+
+      /* Blank area for windowed-envelope address (mail merge) */
+      .address-window {
+        width: 4in;
+        height: 1.35in;
+        flex-shrink: 0;
+        background: var(--white);
+      }
+
+      .front-content {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .logo-row {
+        text-align: center;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--line-dark);
+      }
+
+      .logo-row img {
+        width: 3.1in;
+        max-width: 100%;
+        height: auto;
+      }
+
+      .kicker {
+        margin: 0;
+        text-align: center;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 8.5pt;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--gold);
+      }
+
+      .headline {
+        margin: 0;
+        text-align: center;
+        font-size: 16pt;
+        line-height: 1.2;
+        font-weight: 700;
+      }
+
+      .price-hero {
+        text-align: center;
+      }
+
+      .price-hero .amount {
+        margin: 0;
+        font-size: 40pt;
+        line-height: 1;
+        font-weight: 700;
+        color: var(--gold);
+      }
+
+      .price-hero .retail {
+        margin: 4px 0 0;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11pt;
+        color: var(--muted);
+      }
+
+      .band {
+        background: var(--band);
+        color: var(--cream);
+        text-align: center;
+        padding: 10px 14px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11pt;
+        font-weight: 700;
+        line-height: 1.35;
+      }
+
+      .band em {
+        color: var(--gold-light);
+        font-style: normal;
+      }
+
+      .section-title {
+        margin: 0 0 6px;
+        font-size: 13pt;
+        font-weight: 700;
+      }
+
+      .back-upper .section-title {
+        font-size: 12pt;
+      }
+
+      .body-copy {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11pt;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+
+      .includes-box {
+        border: 1px solid var(--line);
+        background: var(--cream);
+        padding: 8px 10px;
+      }
+
+      .includes-box--with-img {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .includes-box .paydirt-img {
+        width: 1.45in;
+        max-width: 1.45in;
+        height: auto;
+        display: block;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+      }
+
+      .includes-box .paydirt-caption {
+        margin: 4px 0 0;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7pt;
+        line-height: 1.3;
+        text-align: center;
+        color: var(--soft);
+        max-width: 1.45in;
+      }
+
+      .includes-box ul {
+        margin: 0;
+        padding: 0 0 0 16px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9.5pt;
+        line-height: 1.35;
+      }
+
+      .includes-box li {
+        margin-bottom: 4px;
+      }
+
+      .includes-box li:last-child {
+        margin-bottom: 0;
+      }
+
+      .legacy-callout {
+        border: 2px solid var(--gold);
+        background: var(--gold-bg);
+        padding: 10px 12px;
+        text-align: center;
+      }
+
+      .legacy-callout .tag {
+        margin: 0 0 4px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 8.5pt;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8b6914;
+      }
+
+      .legacy-callout h3 {
+        margin: 0 0 4px;
+        font-size: 12.5pt;
+        line-height: 1.25;
+      }
+
+      .legacy-callout .legacy-intro {
+        margin: 0 0 8px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9pt;
+        line-height: 1.35;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .legacy-callout .legacy-subhead {
+        margin: 0 0 5px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9.5pt;
+        font-weight: 700;
+        text-align: left;
+      }
+
+      .legacy-callout .legacy-bullets {
+        margin: 0;
+        padding: 0 0 0 16px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9pt;
+        line-height: 1.35;
+        color: var(--muted);
+        text-align: left;
+      }
+
+      .legacy-callout .legacy-bullets li {
+        margin-bottom: 5px;
+      }
+
+      .legacy-callout .legacy-bullets li:last-child {
+        margin-bottom: 0;
+      }
+
+      .cta-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .cta {
+        text-align: center;
+        padding: 9px 8px;
+        border-radius: 6px;
+        font-size: 10pt;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      .cta--gold {
+        background: var(--gold);
+      }
+
+      .cta--dark {
+        background: var(--band);
+      }
+
+      .phone-cta {
+        text-align: center;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12pt;
+        font-weight: 700;
+        color: var(--gold);
+        border: 2px solid var(--gold);
+        padding: 7px;
+        border-radius: 6px;
+        background: var(--cream);
+      }
+
+      .front-footer {
+        margin-top: 0;
+        flex-shrink: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7pt;
+        line-height: 1.35;
+        color: var(--soft);
+      }
+
+      /* ——— BACK ——— */
+      .back {
+        background: var(--white);
+      }
+
+      .back-upper {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: calc(var(--trim-h) - var(--reply-h));
+        padding: var(--safe);
+        padding-bottom: var(--perf-clearance);
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        overflow: hidden;
+      }
+
+      .compare-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .compare-card {
+        border: 1px solid var(--line);
+        text-align: center;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .compare-card .head {
+        background: var(--line-dark);
+        padding: 8px;
+        font-size: 10pt;
+        font-weight: 700;
+      }
+
+      .compare-card .body {
+        padding: 10px 8px;
+      }
+
+      .compare-card .was {
+        margin: 0;
+        font-size: 9pt;
+        color: #666;
+        text-decoration: line-through;
+      }
+
+      .compare-card .now {
+        margin: 2px 0 6px;
+        font-size: 22pt;
+        font-weight: 700;
+        color: var(--gold);
+      }
+
+      .compare-card .note {
+        margin: 0;
+        font-size: 9pt;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
+      .legacy-list {
+        margin: 0;
+        padding: 0 0 0 16px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 9.5pt;
+        line-height: 1.4;
+        color: var(--muted);
+      }
+
+      .legacy-list li {
+        margin-bottom: 3px;
+      }
+
+      .back-cta-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 4px;
+      }
+
+      .qr-drop {
+        flex-shrink: 0;
+        width: 1.05in;
+        height: 1.05in;
+        border: 1px solid var(--line);
+        background: var(--white);
+        padding: 2px;
+        overflow: hidden;
+      }
+
+      .qr-drop img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+      }
+
+      .back-cta-text {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11pt;
+        font-weight: 700;
+        line-height: 1.4;
+        color: var(--ink);
+        text-align: left;
+      }
+
+      .back-cta-text .phone {
+        display: block;
+        margin-top: 4px;
+        font-size: 13pt;
+        color: var(--gold);
+      }
+
+      .disclaimer {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7.5pt;
+        line-height: 1.35;
+        color: var(--soft);
+        margin: 0;
+        flex-shrink: 0;
+      }
+
+      .org-footer {
+        text-align: center;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7.5pt;
+        line-height: 1.35;
+        color: var(--soft);
+        border-top: 1px solid var(--line-dark);
+        padding-top: 6px;
+        margin: 6px 0 0;
+        flex-shrink: 0;
+      }
+
+      /* Perforation */
+      .perf-line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(var(--trim-h) - var(--reply-h));
+        height: 0;
+        border: none;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      .perf-line::before {
+        content: "";
+        position: absolute;
+        left: 0.35in;
+        right: 0.35in;
+        top: 0;
+        border-top: 2px dashed #888;
+      }
+
+      .perf-label {
+        position: absolute;
+        left: 50%;
+        top: -12px;
+        transform: translateX(-50%);
+        background: var(--white);
+        padding: 0 10px;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 7pt;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #666;
+        white-space: nowrap;
+      }
+
+      .perf-crop {
+        position: absolute;
+        top: -5px;
+        width: 0;
+        height: 10px;
+        border-left: 1px solid #888;
+      }
+
+      .perf-crop--left {
+        left: 0.2in;
+      }
+
+      .perf-crop--right {
+        right: 0.2in;
+      }
+
+      /* Reply form — bottom panel */
+      .reply-panel {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: var(--reply-h);
+        background: #fafaf8;
+        border-top: 3px double #999;
+        padding: 8px var(--safe) 0.07in;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 8.5pt;
+        color: var(--ink);
+      }
+
+      .reply-header {
+        margin-bottom: 4px;
+      }
+
+      .reply-header h2 {
+        margin: 0;
+        font-size: 10pt;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .reply-header .sub {
+        margin: 1px 0 0;
+        font-size: 7pt;
+        color: #666;
+      }
+
+      .reply-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 10px;
+        align-items: start;
+      }
+
+      .reply-col {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .merge-block {
+        border: 1px solid #bbb;
+        background: var(--white);
+        min-height: 0.62in;
+        margin-bottom: 0;
+      }
+
+      .merge-block--blank {
+        padding: 0;
+      }
+
+      .field-line {
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+        margin-bottom: 3px;
+        font-size: 8pt;
+      }
+
+      .field-line label {
+        flex-shrink: 0;
+        font-weight: 600;
+      }
+
+      .field-line .line {
+        flex: 1;
+        border-bottom: 1px solid #333;
+        min-height: 14px;
+      }
+
+      .option-group {
+        margin-bottom: 4px;
+      }
+
+      .option-group:last-child {
+        margin-bottom: 0;
+      }
+
+      .option-group > .group-label {
+        margin: 0 0 4px;
+        font-size: 8pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #555;
+      }
+
+      .option {
+        display: flex;
+        align-items: flex-start;
+        gap: 5px;
+        margin-bottom: 2px;
+        font-size: 7.75pt;
+        line-height: 1.28;
+      }
+
+      .checkbox {
+        width: 11px;
+        height: 11px;
+        border: 1.5px solid #333;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+
+      .cc-grid {
+        display: grid;
+        grid-template-columns: 1.5fr 0.65fr 0.45fr;
+        gap: 6px;
+        margin-top: 3px;
+      }
+
+      .cc-field label {
+        display: block;
+        font-size: 7pt;
+        font-weight: 600;
+        margin-bottom: 2px;
+        color: #555;
+      }
+
+      .cc-field .line {
+        border-bottom: 1px solid #333;
+        height: 14px;
+      }
+
+      .reply-footer {
+        margin-top: 3px;
+        padding-top: 3px;
+        border-top: 1px solid #ccc;
+      }
+
+      .sig-row {
+        display: grid;
+        grid-template-columns: 1.5fr 0.55fr;
+        gap: 8px;
+        margin-bottom: 2px;
+      }
+
+      .sig-row .field-line {
+        margin: 0;
+      }
+
+      .return-address {
+        margin: 0;
+        font-size: 6.5pt;
+        line-height: 1.3;
+        color: #555;
+      }
+
+      .return-address strong {
+        color: var(--ink);
+      }
+
+      @media screen {
+        body {
+          padding: 16px;
+        }
+        .sheet {
+          margin: 0 auto 20px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        .address-window {
+          box-shadow: inset 0 0 0 1px dashed #d8d4c8;
+        }
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- PAGE 1 — FRONT -->
+    <section class="sheet front" aria-label="Mailer front">
+      <div class="trim front-inner">
+        <header class="front-masthead">
+          <div class="masthead-return">
+            <strong>GPAA · LDMA</strong>
+            PO Box 891509<br />
+            Temecula, CA 92589
+          </div>
+          <div class="masthead-logo">
+            <img
+              src="../../public/images/50th-logo.png"
+              alt="Lost Dutchman's Mining Association — 50th Anniversary"
+            />
+          </div>
+          <div class="masthead-meta">
+            <div><span class="meta-label">Offer expires</span> <strong>9/30/26</strong></div>
+            <div><span class="meta-label">Member #</span> <span class="blank-inline" aria-hidden="true"></span></div>
+            <div><span class="meta-label">Contact</span> (888) 465-3717</div>
+          </div>
+        </header>
+
+        <p class="front-subject">Re: Dual GPAA + LDMA Lifetime upgrade — exclusive member offer</p>
+
+        <div class="address-window" aria-label="Mailing address (windowed envelope)"></div>
+
+        <div class="front-content">
+          <p class="kicker">Exclusive offer · longtime GPAA Lifetime members</p>
+
+          <h1 class="headline">
+            Upgrade to dual <strong>GPAA + LDMA Lifetime</strong> for just
+          </h1>
+
+          <div class="price-hero">
+            <p class="amount">$500</p>
+            <p class="retail">
+              LDMA Lifetime retails for <strong>$4,750</strong> · our thank-you to longtime
+              <strong>GPAA Lifetime members</strong>
+            </p>
+          </div>
+
+          <div class="band">
+            One combined <em>dual Lifetime Membership</em><br />
+            GPAA and LDMA together · at a price we have never offered before
+          </div>
+
+          <div class="includes-box includes-box--with-img">
+            <div>
+              <p class="section-title" style="text-align: center; margin-bottom: 6px">
+                Your $500 upgrade includes
+              </p>
+              <ul>
+                <li>
+                  <strong>Dual GPAA/LDMA Lifetime Membership</strong> — full benefits of both
+                  organizations under one membership
+                </li>
+                <li>
+                  <strong>$250 LDMA Paydirt Bag</strong> — celebrating 250 years of the USA and 50
+                  years of LDMA
+                </li>
+                <li>
+                  <strong>$10 monthly maintenance begins January 2027</strong> — not billed before then
+                </li>
+                <li>
+                  <strong>LDMA campgrounds and claims nationwide</strong> — the camps LDMA members have
+                  treasured for generations
+                </li>
+              </ul>
+            </div>
+            <div>
+              <img
+                class="paydirt-img"
+                src="https://cdn.shopify.com/s/files/1/0554/1914/2215/files/DiggersConcentrates_Large_e013b13c-9bfd-409a-9e34-1448a18486d9.jpg?v=1781564930"
+                alt="Digger's Concentrates LDMA Paydirt bag"
+              />
+              <p class="paydirt-caption">$250 LDMA Paydirt Bag included</p>
+            </div>
+          </div>
+
+          <div class="legacy-callout">
+            <p class="tag">Optional add-on to your $500 upgrade</p>
+            <h3>Add the Legacy bundle for <span style="color: var(--gold)">$400</span></h3>
+            <p class="legacy-intro">
+              Companion, Transferability &amp; Pre-Paid Transfer Fee — retail value <strong>$8,000</strong>.<br />
+              <strong>$500</strong> dual upgrade + <strong>$400</strong> Legacy add-on = <strong>$900 total</strong>
+            </p>
+            <p class="legacy-subhead">What the Legacy bundle gives your family:</p>
+            <ul class="legacy-bullets">
+              <li>
+                <strong>Companion Add-On</strong> — name a spouse, adult child, parent, or grandparent on
+                your membership so they can check in at LDMA camps and use claims on their own schedule,
+                even when you are not there
+              </li>
+              <li>
+                <strong>Transferability Add-On</strong> — designate who receives your dual membership in the
+                future, so the camps and claims you love can stay in the family
+              </li>
+              <li>
+                <strong>Pre-Paid Transfer Fee</strong> — the transfer fee is paid now, so your family is not
+                left with an unexpected cost at a difficult time
+              </li>
+            </ul>
+          </div>
+
+          <div class="cta-row">
+            <div class="cta cta--gold">Upgrade now · $500</div>
+            <div class="cta cta--dark">Upgrade + Legacy · $900</div>
+          </div>
+
+          <div class="phone-cta">Call (888) 465-3717 · myldma.com/offers/gpaa-lifetime-ldma-upgrade</div>
+
+          <p class="front-footer">
+            Offer for qualifying GPAA Lifetime members while this promotion is active. Upgrade converts
+            membership to dual GPAA/LDMA Lifetime status. Legacy bundle optional at time of upgrade.
+            Full membership terms provided at purchase.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 2 — BACK -->
+    <section class="sheet back" aria-label="Mailer back">
+      <div class="trim">
+        <div class="back-upper">
+          <header class="logo-row" style="padding-bottom: 6px">
+            <img
+              src="../../public/images/50th-logo.png"
+              alt="LDMA"
+              style="width: 2.2in"
+            />
+          </header>
+
+          <p class="section-title" style="text-align: center; margin: 0">At a glance</p>
+          <div class="compare-grid">
+            <div class="compare-card">
+              <div class="head">Dual upgrade</div>
+              <div class="body">
+                <p class="was">$4,750</p>
+                <p class="now">$500</p>
+                <p class="note">GPAA + LDMA Lifetime · paydirt included</p>
+              </div>
+            </div>
+            <div class="compare-card">
+              <div class="head">+ Legacy bundle</div>
+              <div class="body">
+                <p class="was">$8,000</p>
+                <p class="now">$400</p>
+                <p class="note">Add to dual upgrade · <strong>Total $900</strong></p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p class="section-title">What the Legacy bundle gives your family</p>
+            <ul class="legacy-list">
+              <li>
+                <strong>Companion Add-On</strong> — name a spouse, adult child, parent, or
+                grandparent so they can check in at LDMA camps on their own schedule
+              </li>
+              <li>
+                <strong>Transferability Add-On</strong> — designate who receives your dual
+                membership in the future
+              </li>
+              <li>
+                <strong>Pre-Paid Transfer Fee</strong> — transfer fee paid now so your family is not
+                left with an unexpected cost later
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <p class="section-title">What is LDMA?</p>
+            <p class="body-copy" style="font-size: 10pt">
+              The <strong>Lost Dutchman's Mining Association</strong> is the sister organization to
+              GPAA. LDMA members enjoy <strong>private campgrounds</strong>,
+              <strong>patented gold claims</strong>, member events, and a close-knit prospecting
+              community. If you love GPAA, this dual upgrade is the natural next step.
+            </p>
+          </div>
+
+          <div class="back-cta-row">
+            <div class="qr-drop">
+              <img
+                src="../../public/images/lifetime-upgrade-qr.png"
+                alt="QR code — order GPAA/LDMA dual upgrade online"
+              />
+            </div>
+            <div class="back-cta-text">
+              Order online — scan QR code
+              <span class="phone">Or call (888) 465-3717</span>
+            </div>
+          </div>
+
+          <p class="disclaimer">
+            Lapse or cancellation does not revert to prior GPAA-only Lifetime terms. Keeping
+            maintenance current is required to remain in good standing. Qualifying GPAA Lifetime
+            members only. <strong>Offer expires 9/30/26.</strong>
+          </p>
+
+          <div class="org-footer">
+            <strong>Gold Prospectors Association of America · Lost Dutchman's Mining Association</strong><br />
+            PO Box 891509, Temecula, CA 92589 · hello@myldma.com · (888) 465-3717
+          </div>
+        </div>
+
+        <!-- Perforation -->
+        <div class="perf-line" aria-hidden="true">
+          <span class="perf-crop perf-crop--left"></span>
+          <span class="perf-crop perf-crop--right"></span>
+          <span class="perf-label">✂ Detach along dotted line · mail bottom portion back</span>
+        </div>
+
+        <!-- Detachable reply form -->
+        <div class="reply-panel">
+          <div class="reply-header">
+            <h2>Order form — GPAA Lifetime dual upgrade</h2>
+            <p class="sub">Complete, detach along dotted line, and return in your prepaid reply envelope.</p>
+          </div>
+
+          <div class="reply-body">
+            <div class="reply-col">
+              <div class="merge-block merge-block--blank" aria-label="Mailing address"></div>
+
+              <div class="field-line">
+                <label>GPAA Member #</label>
+                <span class="line"></span>
+              </div>
+
+              <div class="option-group">
+                <p class="group-label">I choose (check one)</p>
+                <div class="option">
+                  <span class="checkbox"></span>
+                  <span>
+                    <strong>$500 — Dual GPAA/LDMA Lifetime upgrade</strong> includes $250 LDMA Paydirt
+                    Bag (LDMA retail $4,750)
+                  </span>
+                </div>
+                <div class="option">
+                  <span class="checkbox"></span>
+                  <span>
+                    <strong>$900 — Dual upgrade + Legacy bundle</strong> (Companion, Transferability,
+                    Pre-Paid Transfer Fee — retail for bundle $8,000)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="reply-col">
+              <div class="option-group">
+                <p class="group-label">Payment method (check one)</p>
+                <div class="option">
+                  <span class="checkbox"></span>
+                  <span>
+                    I am enclosing a check for $&nbsp;<span
+                      style="display: inline-block; width: 0.5in; border-bottom: 1px solid #333"
+                    ></span>
+                    made payable to <strong>GPAA</strong>
+                  </span>
+                </div>
+                <div class="option">
+                  <span class="checkbox"></span>
+                  <span><strong>Charge my credit card</strong> (complete below)</span>
+                </div>
+                <div class="cc-field" style="margin-top: 2px">
+                  <label>Card number</label>
+                  <div class="line"></div>
+                </div>
+                <div class="cc-grid">
+                  <div class="cc-field">
+                    <label>Name on card</label>
+                    <div class="line"></div>
+                  </div>
+                  <div class="cc-field">
+                    <label>Exp. date</label>
+                    <div class="line"></div>
+                  </div>
+                  <div class="cc-field">
+                    <label>CVV</label>
+                    <div class="line"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="reply-footer">
+            <div class="sig-row">
+              <div class="field-line">
+                <label>Signature</label>
+                <span class="line"></span>
+              </div>
+              <div class="field-line">
+                <label>Date</label>
+                <span class="line"></span>
+              </div>
+            </div>
+            <p class="return-address">
+              <strong>MAIL TO:</strong> GPAA/LDMA Member Relations · PO Box 891509, Temecula, CA 92589
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </body>
+</html>
