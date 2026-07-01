@@ -30,7 +30,7 @@ export function CaretakerThemeShell({ children }: { children: ReactNode }) {
   return (
     <div
       data-caretaker-theme={theme}
-      className="caretaker-themed"
+      className="caretaker-themed mt-4 rounded-xl border border-[#d4af37]/15 px-4 sm:px-6 lg:px-8 xl:px-10 py-5 sm:py-6"
       style={{ backgroundColor: "var(--ct-page)", color: "var(--ct-text)", minHeight: "1px" }}
     >
       <div className="flex justify-end mb-4">
