@@ -7,7 +7,7 @@ import { ViewAsCaretakerButton } from "./CaretakerAdminViewControls";
 import { ReservationBillingSection } from "./ReservationBillingSection";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
 import type { PaymentDueItem } from "@/lib/caretaker-site-ar";
-import { ChevronDown, ChevronRight, HelpCircle, Loader2, Tent } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, HelpCircle, Loader2, Tent } from "lucide-react";
 
 type RosterRow = {
   contactId: string;
@@ -438,6 +438,8 @@ export function CaretakerAdminDashboard() {
   const [columnHelpId, setColumnHelpId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [priceOverrides, setPriceOverrides] = useState<Array<{
     id: string;
     campSlug: string;
@@ -575,6 +577,51 @@ export function CaretakerAdminDashboard() {
     if (to) return `Through ${to}`;
     return "All dates (Stripe)";
   }, [revenuePeriod]);
+
+  const paymentExportFrom = appliedRevenueFrom || revFromInput.trim();
+  const paymentExportTo = appliedRevenueTo || revToInput.trim();
+  const paymentExportCampLabel = filterSlug
+    ? camps.find((c) => c.slug === filterSlug)?.name ?? filterSlug
+    : "All camps";
+
+  async function handleDownloadPaymentsReport() {
+    if (!paymentExportFrom || !paymentExportTo) {
+      setExportError("Enter a from and to date in the toolbar above (then Apply), or use a quick range preset.");
+      return;
+    }
+    setExportLoading(true);
+    setExportError(null);
+    try {
+      const params = new URLSearchParams({
+        from: paymentExportFrom,
+        to: paymentExportTo,
+      });
+      if (filterSlug) params.set("campSlug", filterSlug);
+      const res = await fetch(`/api/members/caretaker/admin/payments-export?${params}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(typeof j.error === "string" ? j.error : "Download failed");
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition");
+      const match = cd?.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? `ldma-payments-${paymentExportFrom}-to-${paymentExportTo}.csv`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setExportLoading(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -825,6 +872,42 @@ export function CaretakerAdminDashboard() {
           </select>
         </label>
       </div>
+
+      <section className="rounded-lg border border-[#d4af37]/25 bg-[#0f0a06]/40 p-4 space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-medium text-[#f0d48f]">Payment report (CSV)</h2>
+            <p className="text-xs text-[#e8e0d5]/55 mt-1 max-w-2xl">
+              Download card, cash, refund, and comp activity for the date range in the toolbar above.
+              Respects the camp filter when set ({paymentExportCampLabel}).
+              Columns: payment date, payor, type, amount, camp, and description.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleDownloadPaymentsReport()}
+            disabled={exportLoading || !paymentExportFrom || !paymentExportTo}
+            className="inline-flex items-center gap-2 rounded border border-[#d4af37]/50 bg-[#d4af37]/15 text-[#f0d48f] px-4 py-2 text-sm hover:bg-[#d4af37]/25 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Download CSV
+          </button>
+        </div>
+        {exportError ? (
+          <p className="text-sm text-red-300" role="alert">
+            {exportError}
+          </p>
+        ) : null}
+        {!paymentExportFrom || !paymentExportTo ? (
+          <p className="text-xs text-[#e8e0d5]/45">
+            Set both from and to dates in the Stripe revenue period toolbar to enable export.
+          </p>
+        ) : (
+          <p className="text-xs text-[#e8e0d5]/45">
+            Export range: {paymentExportFrom} → {paymentExportTo} · {paymentExportCampLabel}
+          </p>
+        )}
+      </section>
 
       <div className="overflow-x-auto rounded-lg border border-[#d4af37]/20">
         <table className="ct-admin-table w-full min-w-[1000px] border-collapse text-left text-sm sm:text-[0.9375rem]">
