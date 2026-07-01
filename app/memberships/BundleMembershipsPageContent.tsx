@@ -9,6 +9,7 @@ import { addMembershipToCart } from "@/app/actions/cart";
 import { useCart } from "@/context/CartContext";
 import { trackAddToCart } from "@/lib/analytics";
 import { MEMBERSHIP_METRICS, trackMembershipMetricOnsite } from "@/lib/klaviyo-membership-browser";
+import { CustomizeMembershipButton } from "./CustomizeMembershipButton";
 
 const BUNDLE_CONTENT: Record<
   string,
@@ -336,6 +337,23 @@ export function BundleMembershipsPageContent() {
                   </article>
                 );
               })}
+            </div>
+          )}
+
+          {!loading && (
+            <div className="mt-12 max-w-2xl mx-auto text-center rounded-2xl border border-[#d4af37]/20 bg-[#1a120b]/60 px-6 py-8">
+              <p className="text-[#e8e0d5]/90 text-base md:text-lg">
+                Looking for different bundles or membership options?
+              </p>
+              <p className="mt-2 text-[#e8e0d5]/65 text-sm leading-relaxed">
+                Build your own package — LDMA Lifetime from $2,000, then add legacy add-ons, GPAA, detector, and more.
+              </p>
+              <div className="mt-5">
+                <CustomizeMembershipButton
+                  label="Customize your membership"
+                  klaviyoSource="bundle_page_customize_cta"
+                />
+              </div>
             </div>
           )}
 
