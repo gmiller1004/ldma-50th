@@ -440,6 +440,7 @@ export function CaretakerAdminDashboard() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [exportLoading, setExportLoading] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [priceOverridesExpanded, setPriceOverridesExpanded] = useState(false);
   const [priceOverrides, setPriceOverrides] = useState<Array<{
     id: string;
     campSlug: string;
@@ -789,32 +790,52 @@ export function CaretakerAdminDashboard() {
       ) : null}
 
       {priceOverrides.length > 0 ? (
-        <section className="space-y-2">
-          <h2 className="text-sm font-medium text-[#f0d48f]">Flagged price overrides</h2>
-          <div className="overflow-x-auto rounded border border-amber-500/30">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="text-[#e8e0d5]/60 border-b border-amber-500/20">
-                  <th className="py-2 px-2">Camp</th>
-                  <th className="py-2 px-2">Guest</th>
-                  <th className="py-2 px-2">Calculated</th>
-                  <th className="py-2 px-2">Charged</th>
-                  <th className="py-2 px-2">Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {priceOverrides.slice(0, 20).map((row) => (
-                  <tr key={row.id} className="border-b border-amber-500/10 text-[#e8e0d5]">
-                    <td className="py-2 px-2">{row.campSlug}</td>
-                    <td className="py-2 px-2">{row.guestLabel}</td>
-                    <td className="py-2 px-2">{formatUsd((row.calculatedTotalCents ?? 0))}</td>
-                    <td className="py-2 px-2">{formatUsd((row.amountOverrideCents ?? 0))}</td>
-                    <td className="py-2 px-2 max-w-[200px] truncate" title={row.overrideReason ?? ""}>{row.overrideReason ?? "—"}</td>
+        <section className="rounded-lg border border-amber-500/30 bg-amber-950/10">
+          <button
+            type="button"
+            onClick={() => setPriceOverridesExpanded((open) => !open)}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-amber-950/20 transition-colors"
+            aria-expanded={priceOverridesExpanded}
+          >
+            <span className="flex items-center gap-2 text-sm font-medium text-[#f0d48f]">
+              {priceOverridesExpanded ? (
+                <ChevronDown className="w-4 h-4 shrink-0 text-amber-300/80" />
+              ) : (
+                <ChevronRight className="w-4 h-4 shrink-0 text-amber-300/80" />
+              )}
+              Flagged price overrides
+              <span className="text-xs font-normal text-[#e8e0d5]/55">({priceOverrides.length})</span>
+            </span>
+            <span className="text-xs text-[#e8e0d5]/50">
+              {priceOverridesExpanded ? "Collapse" : "Expand"}
+            </span>
+          </button>
+          {priceOverridesExpanded ? (
+            <div className="overflow-x-auto border-t border-amber-500/20 px-2 pb-2">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="text-[#e8e0d5]/60 border-b border-amber-500/20">
+                    <th className="py-2 px-2">Camp</th>
+                    <th className="py-2 px-2">Guest</th>
+                    <th className="py-2 px-2">Calculated</th>
+                    <th className="py-2 px-2">Charged</th>
+                    <th className="py-2 px-2">Reason</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {priceOverrides.slice(0, 20).map((row) => (
+                    <tr key={row.id} className="border-b border-amber-500/10 text-[#e8e0d5]">
+                      <td className="py-2 px-2">{row.campSlug}</td>
+                      <td className="py-2 px-2">{row.guestLabel}</td>
+                      <td className="py-2 px-2">{formatUsd((row.calculatedTotalCents ?? 0))}</td>
+                      <td className="py-2 px-2">{formatUsd((row.amountOverrideCents ?? 0))}</td>
+                      <td className="py-2 px-2 max-w-[200px] truncate" title={row.overrideReason ?? ""}>{row.overrideReason ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
