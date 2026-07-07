@@ -323,7 +323,7 @@ export const loudMineData: CampPageData = {
   heroImageFallback: "/images/campgrounds/loud-mine-georgia/camp-loud-mine.jpg",
   tagline: "Dahlonega Gold Belt • Stream Gold & Family Activities",
   overview:
-    "37 acres in the Southern gold country, just 5 miles from Cleveland Town Square. Rich stream gold and bench deposits. Tranquil wooded hills with swimming, fishing, kayaking, and hiking. RV hookups, pavilion, laundry, craft room, and game room. Owned by LDMA (Lost Dutchman's Mining Association).",
+    "37 acres in the Southern gold country, just 5 miles from Cleveland Town Square. Rich stream gold and bench deposits. Tranquil wooded hills with swimming, fishing, kayaking, and hiking. RV hookups, pavilion, craft room, and game room. Owned by LDMA (Lost Dutchman's Mining Association).",
   stats: [
     { value: "37", label: "Patented Acres" },
     { value: "5 Mi", label: "From Cleveland" },
@@ -335,7 +335,6 @@ export const loudMineData: CampPageData = {
     { icon: "Tent", text: "Dry camping" },
     { icon: "Home", text: "Clubhouse, game room, craft room", highlight: true },
     { icon: "ShowerHead", text: "Showers & restrooms" },
-    { icon: "Shirt", text: "Laundry" },
     { icon: "Trophy", text: "Pavilion & fire pit" },
     { icon: "Fuel", text: "Dump station" },
   ],
