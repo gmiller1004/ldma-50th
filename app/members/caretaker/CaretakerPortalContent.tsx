@@ -370,6 +370,26 @@ export function CaretakerPortalContent({
   const [resEditMemberLookup, setResEditMemberLookup] = useState<LookupResult | null>(null);
   const [resEditPaymentDueCents, setResEditPaymentDueCents] = useState<number | null>(null);
   const [resEditPayAmountCents, setResEditPayAmountCents] = useState(0);
+  const [movingReservation, setMovingReservation] = useState<Reservation | null>(null);
+  const [resMoveModalOpen, setResMoveModalOpen] = useState(false);
+  const [resMoveNewSiteId, setResMoveNewSiteId] = useState("");
+  const [resMovePreview, setResMovePreview] = useState<{
+    newSiteId: string;
+    newSiteName: string;
+    available: boolean;
+    newTotalCents: number;
+    netPaidCents: number;
+    additionalDueCents: number;
+    refundCents: number;
+    refundBreakdown: { stripeRefundCents: number; cashRefundCents: number };
+    cashAllowed: boolean;
+  } | null>(null);
+  const [resMovePreviewLoading, setResMovePreviewLoading] = useState(false);
+  const [resMoveSubmitting, setResMoveSubmitting] = useState(false);
+  const [resMovePaymentDueCents, setResMovePaymentDueCents] = useState<number | null>(null);
+  const [resMoveCashAllowed, setResMoveCashAllowed] = useState(false);
+  const [resMoveMemberLookup, setResMoveMemberLookup] = useState<LookupResult | null>(null);
+  const [resMoveError, setResMoveError] = useState<string | null>(null);
   const [cancellingReservation, setCancellingReservation] = useState<Reservation | null>(null);
   const [resCancelModalOpen, setResCancelModalOpen] = useState(false);
   const [resCancelSubmitting, setResCancelSubmitting] = useState(false);
@@ -1299,6 +1319,185 @@ export function CaretakerPortalContent({
     }
   }
 
+  function openResMoveModal(r: Reservation) {
+    setMovingReservation(r);
+    setResMoveNewSiteId("");
+    setResMovePreview(null);
+    setResMovePaymentDueCents(null);
+    setResMoveError(null);
+    setResMoveMemberLookup(null);
+    setResMoveModalOpen(true);
+    if (r.reservationType === "member" && r.memberNumber) {
+      fetch("/api/members/caretaker/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberNumber: r.memberNumber.trim() }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setResMoveMemberLookup(data ?? null))
+        .catch(() => setResMoveMemberLookup(null));
+    }
+  }
+
+  function closeResMoveModal() {
+    setResMoveModalOpen(false);
+    setMovingReservation(null);
+    setResMovePreview(null);
+    setResMovePaymentDueCents(null);
+    setResMoveError(null);
+  }
+
+  async function loadResMovePreview(newSiteId: string) {
+    if (!movingReservation || !newSiteId) return;
+    setResMovePreviewLoading(true);
+    setResMovePreview(null);
+    setResMovePaymentDueCents(null);
+    setResMoveError(null);
+    try {
+      const res = await fetch(
+        `/api/members/caretaker/reservations/${movingReservation.id}/move-preview?newSiteId=${encodeURIComponent(newSiteId)}`
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setResMoveError(data.error ?? "Could not preview move");
+        return;
+      }
+      setResMovePreview(data);
+    } catch {
+      setResMoveError("Could not preview move");
+    } finally {
+      setResMovePreviewLoading(false);
+    }
+  }
+
+  function resMoveRecipient() {
+    if (!movingReservation) return null;
+    const email =
+      movingReservation.reservationType === "member"
+        ? resMoveMemberLookup?.email?.trim() || movingReservation.guestEmail?.trim()
+        : movingReservation.guestEmail?.trim();
+    const displayName =
+      movingReservation.reservationType === "member"
+        ? movingReservation.memberDisplayName || `#${movingReservation.memberNumber}`
+        : `${movingReservation.guestFirstName ?? ""} ${movingReservation.guestLastName ?? ""}`.trim() || "Guest";
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+    return { email, displayName };
+  }
+
+  async function confirmResMove() {
+    if (!movingReservation || !resMovePreview || !resMovePreview.available) return;
+    setResMoveSubmitting(true);
+    setResMoveError(null);
+    try {
+      const res = await fetch(`/api/members/caretaker/reservations/${movingReservation.id}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newSiteId: resMovePreview.newSiteId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResMoveError(data.error ?? "Move failed");
+        return;
+      }
+      if (data.requirePayment && typeof data.amountDueCents === "number") {
+        setResMovePaymentDueCents(data.amountDueCents);
+        setResMoveCashAllowed(Boolean(data.cashAllowed));
+        return;
+      }
+      closeResMoveModal();
+      loadReservations();
+    } catch {
+      setResMoveError("Move failed");
+    } finally {
+      setResMoveSubmitting(false);
+    }
+  }
+
+  async function handleResMovePayCash() {
+    if (!movingReservation || !resMovePreview || resMovePaymentDueCents == null || resMovePaymentDueCents < 1) return;
+    const recipient = resMoveRecipient();
+    if (!recipient) {
+      setResMoveError("Recipient email required for receipt.");
+      return;
+    }
+    setResMoveSubmitting(true);
+    setResMoveError(null);
+    try {
+      const res = await fetch(`/api/members/caretaker/reservations/${movingReservation.id}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          newSiteId: resMovePreview.newSiteId,
+          paymentMethod: "cash",
+          amountCents: resMovePaymentDueCents,
+          recipientEmail: recipient.email,
+          recipientDisplayName: recipient.displayName,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResMoveError(data.error ?? "Payment failed");
+        return;
+      }
+      closeResMoveModal();
+      loadReservations();
+    } catch {
+      setResMoveError("Payment failed");
+    } finally {
+      setResMoveSubmitting(false);
+    }
+  }
+
+  async function handleResMovePayCard() {
+    if (!movingReservation || !resMovePreview || resMovePaymentDueCents == null || resMovePaymentDueCents < 1) return;
+    const recipient = resMoveRecipient();
+    if (!recipient) {
+      setResMoveError("Recipient email required for receipt.");
+      return;
+    }
+    setResMoveSubmitting(true);
+    setResMoveError(null);
+    try {
+      const checkoutBody: Record<string, unknown> = {
+        amountCents: resMovePaymentDueCents,
+        paymentType: "reservation",
+        reservationId: movingReservation.id,
+        recipientEmail: recipient.email,
+        recipientDisplayName: recipient.displayName,
+        siteId: resMovePreview.newSiteId,
+        checkInDate: toDateOnly(movingReservation.checkInDate),
+        checkOutDate: toDateOnly(movingReservation.checkOutDate),
+        nights: countNights(toDateOnly(movingReservation.checkInDate), toDateOnly(movingReservation.checkOutDate)),
+        reservationType: movingReservation.reservationType,
+      };
+      if (movingReservation.reservationType === "member") {
+        checkoutBody.memberContactId = movingReservation.memberContactId ?? "";
+        checkoutBody.memberNumber = movingReservation.memberNumber ?? "";
+        checkoutBody.memberDisplayName = movingReservation.memberDisplayName ?? "";
+      } else {
+        checkoutBody.guestFirstName = movingReservation.guestFirstName ?? "";
+        checkoutBody.guestLastName = movingReservation.guestLastName ?? "";
+        checkoutBody.guestEmail = movingReservation.guestEmail ?? "";
+        checkoutBody.guestPhone = movingReservation.guestPhone ?? undefined;
+      }
+      const res = await fetch("/api/members/caretaker/payments/checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checkoutBody),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        setResMoveError(data.error ?? "Failed to start checkout");
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
+      setResMoveError("Checkout failed");
+    } finally {
+      setResMoveSubmitting(false);
+    }
+  }
+
   async function handleDetailsPayPastDueCash() {
     if (!detailsReservation || detailsReservation.reservationType !== "member" || !detailsMemberLookup) return;
     const totalCents = detailsPastDueMaintenanceCents + detailsPastDueMembershipCents;
@@ -2063,6 +2262,9 @@ export function CaretakerPortalContent({
                     <button type="button" onClick={() => openResEditModal(r)} className="px-3 py-1.5 text-sm bg-[#d4af37]/20 text-[#d4af37] rounded hover:bg-[#d4af37]/30">
                       Edit
                     </button>
+                    <button type="button" onClick={() => openResMoveModal(r)} className="px-3 py-1.5 text-sm bg-[#2a1f14] border border-[#d4af37]/40 text-[#f0d48f] rounded hover:bg-[#d4af37]/10">
+                      Move site
+                    </button>
                     <button type="button" onClick={() => openResCancelModal(r)} className="px-3 py-1.5 text-sm bg-red-950/50 text-red-300 rounded hover:bg-red-900/40 border border-red-800/50">
                       Cancel
                     </button>
@@ -2782,6 +2984,97 @@ export function CaretakerPortalContent({
                     </button>
                   </div>
                 </form>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Move reservation to a different site */}
+        {resMoveModalOpen && movingReservation && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !resMoveSubmitting && closeResMoveModal()}>
+            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-[#f0d48f]">{resMovePaymentDueCents != null ? "Charge site difference" : "Move to a different site"}</h3>
+                <button type="button" onClick={() => !resMoveSubmitting && closeResMoveModal()} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+              </div>
+              <p className="text-[#e8e0d5]/80 text-sm mb-4">
+                {movingReservation.siteName} — {movingReservation.reservationType === "member" ? movingReservation.memberDisplayName : `${movingReservation.guestFirstName} ${movingReservation.guestLastName}`} · {toDateOnly(movingReservation.checkInDate)} → {toDateOnly(movingReservation.checkOutDate)}
+              </p>
+
+              {resMovePaymentDueCents != null ? (
+                <div className="space-y-4">
+                  <p className="text-[#e8e0d5]">Additional amount due: <strong>{formatCentsAsCurrency(resMovePaymentDueCents)}</strong></p>
+                  {resMoveError && <p className="text-red-300 text-sm">{resMoveError}</p>}
+                  <div className="flex gap-2">
+                    {resMoveCashAllowed && (
+                      <button type="button" onClick={handleResMovePayCash} disabled={resMoveSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                        {resMoveSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay cash
+                      </button>
+                    )}
+                    <button type="button" onClick={handleResMovePayCard} disabled={resMoveSubmitting} className="flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2">
+                      {resMoveSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay card
+                    </button>
+                  </div>
+                  <p className="text-[#e8e0d5]/50 text-xs">The reservation has already been moved. Collect the difference to settle the balance.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Destination site</label>
+                    <select
+                      value={resMoveNewSiteId}
+                      onChange={(e) => {
+                        setResMoveNewSiteId(e.target.value);
+                        if (e.target.value) loadResMovePreview(e.target.value);
+                        else setResMovePreview(null);
+                      }}
+                      className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
+                    >
+                      <option value="">Select a site…</option>
+                      {sites.filter((s) => s.id !== movingReservation.siteId).map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}{s.siteType ? ` (${s.siteType})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {resMovePreviewLoading ? (
+                    <div className="flex items-center gap-2 text-[#e8e0d5]/70 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Checking availability & price…</div>
+                  ) : resMovePreview ? (
+                    <div className="bg-[#0f0a06]/80 border border-[#d4af37]/15 rounded-lg p-3 text-sm space-y-1.5">
+                      {!resMovePreview.available ? (
+                        <p className="text-red-300">Not available for these dates. Pick another site.</p>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-[#e8e0d5]/80"><span>New stay total</span><span>{formatCentsAsCurrency(resMovePreview.newTotalCents)}</span></div>
+                          <div className="flex justify-between text-[#e8e0d5]/80"><span>Paid so far</span><span>{formatCentsAsCurrency(resMovePreview.netPaidCents)}</span></div>
+                          {resMovePreview.additionalDueCents > 0 ? (
+                            <div className="flex justify-between text-amber-400 font-medium pt-1 border-t border-[#d4af37]/20"><span>Additional to collect</span><span>{formatCentsAsCurrency(resMovePreview.additionalDueCents)}</span></div>
+                          ) : resMovePreview.refundCents > 0 ? (
+                            <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20"><span>Refund on move</span><span>{formatCentsAsCurrency(resMovePreview.refundCents)}</span></div>
+                          ) : (
+                            <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20"><span>No price change</span><span>$0.00</span></div>
+                          )}
+                          {resMovePreview.refundCents > 0 && resMovePreview.refundBreakdown.stripeRefundCents > 0 && (
+                            <p className="text-[#e8e0d5]/50 text-xs">
+                              {formatCentsAsCurrency(resMovePreview.refundBreakdown.stripeRefundCents)} back to card
+                              {resMovePreview.refundBreakdown.cashRefundCents > 0 ? ` · ${formatCentsAsCurrency(resMovePreview.refundBreakdown.cashRefundCents)} cash` : ""}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {resMoveError && <p className="text-red-300 text-sm">{resMoveError}</p>}
+
+                  <div className="flex gap-2">
+                    <button type="button" onClick={closeResMoveModal} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
+                    <button type="button" onClick={confirmResMove} disabled={resMoveSubmitting || resMovePreviewLoading || !resMovePreview || !resMovePreview.available} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                      {resMoveSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      {resMovePreview && resMovePreview.refundCents > 0 ? "Move & refund" : "Move site"}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>

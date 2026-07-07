@@ -36,6 +36,26 @@ type CancelPreview = {
   refundCents: number;
 };
 
+type MoveSite = {
+  id: string;
+  name: string;
+  siteType: string;
+};
+
+type MovePreview = {
+  newSiteId: string;
+  newSiteName: string;
+  sameSite: boolean;
+  available: boolean;
+  currentTotalCents: number;
+  newTotalCents: number;
+  netPaidCents: number;
+  additionalDueCents: number;
+  refundCents: number;
+  refundBreakdown: { stripeRefundCents: number; cashRefundCents: number };
+  cashAllowed: boolean;
+};
+
 function toDateOnly(val: string): string {
   return val.slice(0, 10);
 }
@@ -72,6 +92,17 @@ export function AdminCampReservationsTab({
   const [cancelPreview, setCancelPreview] = useState<CancelPreview | null>(null);
   const [cancelPreviewLoading, setCancelPreviewLoading] = useState(false);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+
+  const [moving, setMoving] = useState<ReservationDetail | null>(null);
+  const [moveSites, setMoveSites] = useState<MoveSite[]>([]);
+  const [moveNewSiteId, setMoveNewSiteId] = useState("");
+  const [movePreview, setMovePreview] = useState<MovePreview | null>(null);
+  const [movePreviewLoading, setMovePreviewLoading] = useState(false);
+  const [moveSubmitting, setMoveSubmitting] = useState(false);
+  const [movePaymentDue, setMovePaymentDue] = useState<number | null>(null);
+  const [moveCashAllowed, setMoveCashAllowed] = useState(false);
+  const [moveMemberEmail, setMoveMemberEmail] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
 
   const editNights =
     editCheckIn && editCheckOut && editCheckIn < editCheckOut
@@ -299,6 +330,210 @@ export function AdminCampReservationsTab({
     }
   }
 
+  async function openMove(row: AdminReservationListRow) {
+    if (row.status === "cancelled") return;
+    setEditLoading(true);
+    setMoveNewSiteId("");
+    setMovePreview(null);
+    setMovePaymentDue(null);
+    setMoveError(null);
+    setMoveMemberEmail(null);
+    try {
+      const [detailRes, sitesRes] = await Promise.all([
+        fetch(`/api/members/caretaker/reservations/${row.id}${apiQs}`),
+        fetch(`/api/members/caretaker/admin/sites${apiQs}`),
+      ]);
+      const detailData = await detailRes.json();
+      if (!detailRes.ok) {
+        alert(detailData.error ?? "Failed to load reservation");
+        return;
+      }
+      const sitesData = await sitesRes.json().catch(() => ({}));
+      const detail: ReservationDetail = {
+        ...row,
+        siteId: detailData.siteId,
+        memberContactId: detailData.memberContactId ?? null,
+        guestPhone: detailData.guestPhone ?? null,
+      };
+      const allSites = (Array.isArray(sitesData.sites) ? sitesData.sites : []) as MoveSite[];
+      setMoveSites(allSites.filter((s) => s.id !== detailData.siteId));
+      setMoving(detail);
+      if (row.reservationType === "member" && row.memberNumber) {
+        fetch("/api/members/caretaker/lookup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ memberNumber: row.memberNumber }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((lookup) => setMoveMemberEmail(lookup?.email?.trim() || null))
+          .catch(() => setMoveMemberEmail(null));
+      }
+    } catch {
+      alert("Failed to load reservation");
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  function closeMove() {
+    setMoving(null);
+    setMovePreview(null);
+    setMovePaymentDue(null);
+    setMoveError(null);
+  }
+
+  async function loadMovePreview(newSiteId: string) {
+    if (!moving || !newSiteId) return;
+    setMovePreviewLoading(true);
+    setMovePreview(null);
+    setMovePaymentDue(null);
+    setMoveError(null);
+    try {
+      const res = await fetch(
+        `/api/members/caretaker/reservations/${moving.id}/move-preview${apiQs}&newSiteId=${encodeURIComponent(newSiteId)}`
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setMoveError(data.error ?? "Could not preview move");
+        return;
+      }
+      setMovePreview(data as MovePreview);
+    } catch {
+      setMoveError("Could not preview move");
+    } finally {
+      setMovePreviewLoading(false);
+    }
+  }
+
+  function moveRecipient() {
+    if (!moving) return null;
+    const email =
+      moving.reservationType === "member"
+        ? moveMemberEmail?.trim() || moving.guestEmail?.trim()
+        : moving.guestEmail?.trim();
+    const displayName =
+      moving.reservationType === "member"
+        ? moving.memberDisplayName || `#${moving.memberNumber}`
+        : [moving.guestFirstName, moving.guestLastName].filter(Boolean).join(" ").trim() || "Guest";
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+    return { email, displayName };
+  }
+
+  async function confirmMove() {
+    if (!moving || !movePreview || !movePreview.available) return;
+    setMoveSubmitting(true);
+    setMoveError(null);
+    try {
+      const res = await fetch(`/api/members/caretaker/reservations/${moving.id}/move${apiQs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newSiteId: movePreview.newSiteId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMoveError(data.error ?? "Move failed");
+        return;
+      }
+      if (data.requirePayment && typeof data.amountDueCents === "number") {
+        setMovePaymentDue(data.amountDueCents);
+        setMoveCashAllowed(Boolean(data.cashAllowed));
+        return;
+      }
+      closeMove();
+      onUpdated();
+    } catch {
+      setMoveError("Move failed");
+    } finally {
+      setMoveSubmitting(false);
+    }
+  }
+
+  async function handleMovePayCash() {
+    if (!moving || !movePreview || movePaymentDue == null || movePaymentDue < 1) return;
+    const recipient = moveRecipient();
+    if (!recipient) {
+      setMoveError("Recipient email required for receipt.");
+      return;
+    }
+    setMoveSubmitting(true);
+    setMoveError(null);
+    try {
+      const res = await fetch(`/api/members/caretaker/reservations/${moving.id}/move${apiQs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          newSiteId: movePreview.newSiteId,
+          paymentMethod: "cash",
+          amountCents: movePaymentDue,
+          recipientEmail: recipient.email,
+          recipientDisplayName: recipient.displayName,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMoveError(data.error ?? "Payment failed");
+        return;
+      }
+      closeMove();
+      onUpdated();
+    } catch {
+      setMoveError("Payment failed");
+    } finally {
+      setMoveSubmitting(false);
+    }
+  }
+
+  async function handleMovePayCard() {
+    if (!moving || !movePreview || movePaymentDue == null || movePaymentDue < 1) return;
+    const recipient = moveRecipient();
+    if (!recipient) {
+      setMoveError("Recipient email required for receipt.");
+      return;
+    }
+    setMoveSubmitting(true);
+    setMoveError(null);
+    try {
+      const checkoutBody: Record<string, unknown> = {
+        amountCents: movePaymentDue,
+        paymentType: "reservation",
+        reservationId: moving.id,
+        recipientEmail: recipient.email,
+        recipientDisplayName: recipient.displayName,
+        siteId: movePreview.newSiteId,
+        checkInDate: toDateOnly(moving.checkInDate),
+        checkOutDate: toDateOnly(moving.checkOutDate),
+        nights: countNights(toDateOnly(moving.checkInDate), toDateOnly(moving.checkOutDate)),
+        reservationType: moving.reservationType,
+        campSlug,
+      };
+      if (moving.reservationType === "member") {
+        checkoutBody.memberContactId = moving.memberContactId ?? "";
+        checkoutBody.memberNumber = moving.memberNumber ?? "";
+        checkoutBody.memberDisplayName = moving.memberDisplayName ?? "";
+      } else {
+        checkoutBody.guestFirstName = moving.guestFirstName ?? "";
+        checkoutBody.guestLastName = moving.guestLastName ?? "";
+        checkoutBody.guestEmail = moving.guestEmail ?? "";
+        checkoutBody.guestPhone = moving.guestPhone ?? undefined;
+      }
+      const res = await fetch("/api/members/caretaker/payments/checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checkoutBody),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        setMoveError(data.error ?? "Failed to start checkout");
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
+      setMoveError("Checkout failed");
+    } finally {
+      setMoveSubmitting(false);
+    }
+  }
+
   if (reservations === undefined) {
     return (
       <div className="flex items-center gap-2 py-4 text-sm text-[#e8e0d5]/60">
@@ -356,6 +591,14 @@ export function AdminCampReservationsTab({
                         className="px-2 py-1 text-xs bg-[#d4af37]/20 text-[#d4af37] rounded hover:bg-[#d4af37]/30 disabled:opacity-50"
                       >
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openMove(r)}
+                        disabled={editLoading}
+                        className="px-2 py-1 text-xs bg-[#2a1f14] border border-[#d4af37]/40 text-[#f0d48f] rounded hover:bg-[#d4af37]/10 disabled:opacity-50"
+                      >
+                        Move site
                       </button>
                       <button
                         type="button"
@@ -478,6 +721,160 @@ export function AdminCampReservationsTab({
                   </button>
                 </div>
               </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {moving && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
+          onClick={() => !moveSubmitting && closeMove()}
+        >
+          <div
+            className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-[#f0d48f]">
+                {movePaymentDue != null ? "Charge site difference" : "Move to a different site"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => !moveSubmitting && closeMove()}
+                className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-[#e8e0d5]/80 text-sm mb-4">
+              {moving.siteName} — {partyLabel(moving)} · {toDateOnly(moving.checkInDate)} → {toDateOnly(moving.checkOutDate)}
+            </p>
+
+            {movePaymentDue != null ? (
+              <div className="space-y-4">
+                <p className="text-[#e8e0d5]">
+                  Additional amount due: <strong>{formatCentsAsCurrency(movePaymentDue)}</strong>
+                </p>
+                {moveError && <p className="text-red-300 text-sm">{moveError}</p>}
+                <div className="flex gap-2">
+                  {moveCashAllowed && (
+                    <button
+                      type="button"
+                      onClick={handleMovePayCash}
+                      disabled={moveSubmitting}
+                      className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {moveSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay cash
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleMovePayCard}
+                    disabled={moveSubmitting}
+                    className="flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {moveSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay card
+                  </button>
+                </div>
+                <p className="text-[#e8e0d5]/50 text-xs">The reservation has already been moved. Collect the difference to settle the balance.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Destination site</label>
+                  <select
+                    value={moveNewSiteId}
+                    onChange={(e) => {
+                      setMoveNewSiteId(e.target.value);
+                      if (e.target.value) loadMovePreview(e.target.value);
+                      else setMovePreview(null);
+                    }}
+                    className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
+                  >
+                    <option value="">Select a site…</option>
+                    {moveSites.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                        {s.siteType ? ` (${s.siteType})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {movePreviewLoading ? (
+                  <div className="flex items-center gap-2 text-[#e8e0d5]/70 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Checking availability & price…
+                  </div>
+                ) : movePreview ? (
+                  <div className="bg-[#0f0a06]/80 border border-[#d4af37]/15 rounded-lg p-3 text-sm space-y-1.5">
+                    {!movePreview.available ? (
+                      <p className="text-red-300">Not available for these dates. Pick another site.</p>
+                    ) : (
+                      <>
+                        <div className="flex justify-between text-[#e8e0d5]/80">
+                          <span>New stay total</span>
+                          <span>{formatCentsAsCurrency(movePreview.newTotalCents)}</span>
+                        </div>
+                        <div className="flex justify-between text-[#e8e0d5]/80">
+                          <span>Paid so far</span>
+                          <span>{formatCentsAsCurrency(movePreview.netPaidCents)}</span>
+                        </div>
+                        {movePreview.additionalDueCents > 0 ? (
+                          <div className="flex justify-between text-amber-400 font-medium pt-1 border-t border-[#d4af37]/20">
+                            <span>Additional to collect</span>
+                            <span>{formatCentsAsCurrency(movePreview.additionalDueCents)}</span>
+                          </div>
+                        ) : movePreview.refundCents > 0 ? (
+                          <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20">
+                            <span>Refund on move</span>
+                            <span>{formatCentsAsCurrency(movePreview.refundCents)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20">
+                            <span>No price change</span>
+                            <span>$0.00</span>
+                          </div>
+                        )}
+                        {movePreview.refundCents > 0 && movePreview.refundBreakdown.stripeRefundCents > 0 && (
+                          <p className="text-[#e8e0d5]/50 text-xs">
+                            {formatCentsAsCurrency(movePreview.refundBreakdown.stripeRefundCents)} back to card
+                            {movePreview.refundBreakdown.cashRefundCents > 0
+                              ? ` · ${formatCentsAsCurrency(movePreview.refundBreakdown.cashRefundCents)} cash`
+                              : ""}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ) : null}
+
+                {moveError && <p className="text-red-300 text-sm">{moveError}</p>}
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={closeMove}
+                    className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmMove}
+                    disabled={
+                      moveSubmitting ||
+                      movePreviewLoading ||
+                      !movePreview ||
+                      !movePreview.available
+                    }
+                    className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {moveSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {movePreview && movePreview.refundCents > 0 ? "Move & refund" : "Move site"}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
