@@ -61,9 +61,17 @@ export function trackVipUpsellMaybeLater(): void {
   trackEvent("vip_upsell_maybe_later");
 }
 
-/** Newsletter signup (optional `source` e.g. events, home for GA4 breakdown) */
+/** Newsletter signup (optional `source` e.g. events, home, discover_events for GA4 breakdown) */
 export function trackNewsletterSignup(source?: string): void {
   trackEvent("newsletter_signup", source ? { signup_source: source } : undefined);
+}
+
+/** Discover events landing page CTA click */
+export function trackDiscoverCtaClick(cta: string, interestPath?: string): void {
+  trackEvent("discover_events_cta", {
+    cta,
+    ...(interestPath ? { interest_path: interestPath } : {}),
+  });
 }
 
 /** Contact form submit */

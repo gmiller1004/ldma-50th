@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Events | LDMA 50th Anniversary",
   description:
-    "Dirt Fest, detector days, and more across LDMA campgrounds. Register for gold prospecting events at Stanton, Italian Bar, Oconee, and more.",
+    "Gold Diggin's, Dirt Party, detector days, and more across LDMA campgrounds. Register for gold prospecting events at Stanton, Italian Bar, Oconee, and more.",
 };
 
 export default async function EventsPage() {
@@ -33,7 +34,9 @@ export default async function EventsPage() {
       <>
         <Navbar />
         <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
-          <EventsPageContent events={events} isMemberLoggedIn={isMemberLoggedIn} />
+          <Suspense fallback={<div className="py-24 text-center text-[#e8e0d5]/60">Loading events…</div>}>
+            <EventsPageContent events={events} isMemberLoggedIn={isMemberLoggedIn} />
+          </Suspense>
         </main>
         <Footer />
       </>
@@ -44,7 +47,9 @@ export default async function EventsPage() {
       <>
         <Navbar />
         <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
-          <EventsPageContent events={[]} isMemberLoggedIn={false} />
+          <Suspense fallback={<div className="py-24 text-center text-[#e8e0d5]/60">Loading events…</div>}>
+            <EventsPageContent events={[]} isMemberLoggedIn={false} />
+          </Suspense>
         </main>
         <Footer />
       </>

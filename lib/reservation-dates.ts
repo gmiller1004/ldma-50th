@@ -13,6 +13,14 @@ export function formatDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Normalize a DB date (string or Date) to YYYY-MM-DD. Neon often returns Date objects. */
+export function toDateOnlyStr(val: string | Date | null | undefined): string {
+  if (val == null) return "";
+  if (typeof val === "string") return val.slice(0, 10);
+  if (val instanceof Date) return val.toISOString().slice(0, 10);
+  return String(val).slice(0, 10);
+}
+
 /** Nights between check-in and check-out (checkout day exclusive). Matches caretaker APIs. */
 export function countNights(checkInDate: string, checkOutDate: string): number {
   const checkIn = parseDateOnly(checkInDate);

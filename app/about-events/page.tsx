@@ -6,7 +6,7 @@ import { AboutEventsContent } from "./AboutEventsContent";
 export const metadata: Metadata = {
   title: "About LDMA Events | 50th Anniversary",
   description:
-    "What are LDMA events? Dirt Fest, detector days, Gold N BBQ, and more — gold prospecting gatherings across our 12 campgrounds. Learn what to expect and how to join.",
+    "What are LDMA events? Gold Diggin's, Dirt Party, detector days, and more — gold prospecting gatherings across our 12 campgrounds. Learn what to expect and how to join.",
 };
 
 export default function AboutEventsPage() {

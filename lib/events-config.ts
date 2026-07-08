@@ -7,10 +7,11 @@
 export const EVENT_COLLECTION_HANDLE =
   process.env.EVENT_COLLECTION_HANDLE?.trim() || "events";
 
-/** Event type filter values — match against product tags (case-insensitive) */
+/** Event type filter values — match against product tags/titles (see lib/event-display.ts) */
 export const EVENT_TYPES = [
   { id: "all", label: "All Events" },
-  { id: "dirtfest", label: "Dirt Fest" },
+  { id: "gold_diggings", label: "Gold Diggin's" },
+  { id: "dirt_party", label: "Dirt Party" },
   { id: "detector", label: "Detector Events" },
   { id: "other", label: "Other" },
 ] as const;
@@ -43,7 +44,7 @@ export const PRICE_LEVEL_METAFIELD = {
   key: "price_level",
 } as const;
 
-/** Handle for the Dirt Fest VIP Gold Package add-on. Shown as upsell when user adds a Dirt Fest event to cart. */
+/** Handle for the event VIP Gold Package add-on. Shown when user adds a Gold Diggin's / Dirt Party event to cart. */
 export const VIP_UPSELL_PRODUCT_HANDLE = "2026-event-vip-gold-package";
 
 /**

@@ -574,6 +574,49 @@ export async function getEventProducts(): Promise<EventProduct[]> {
   }
 }
 
+/** Fetch a single event product by handle (must be in the events collection). */
+export async function getEventProductByHandle(handle: string): Promise<EventProduct | null> {
+  try {
+    const result = await shopifyFetch<{
+      product: (EventProduct & {
+        collections?: { edges: Array<{ node: { handle: string } }> };
+      }) | null;
+    }>({
+      query: `
+        ${EVENT_PRODUCT_FRAGMENT}
+        query GetEventProductByHandle($handle: String!) {
+          product(handle: $handle) {
+            ...EventProductFields
+            collections(first: 10) {
+              edges {
+                node { handle }
+              }
+            }
+          }
+        }
+      `,
+      variables: { handle },
+    });
+
+    const product = result?.product;
+    if (!product) return null;
+
+    const inEventsCollection = (product.collections?.edges ?? []).some(
+      (e) => e.node.handle === EVENT_COLLECTION_HANDLE
+    );
+    if (!inEventsCollection) return null;
+
+    return {
+      ...product,
+      tags: (product as { tags?: string[] }).tags ?? [],
+      metafields: product.metafields,
+    };
+  } catch (e) {
+    console.error("getEventProductByHandle error:", e);
+    return null;
+  }
+}
+
 export type MerchShopData = {
   products: ShopProduct[];
   collectionDescription?: string;

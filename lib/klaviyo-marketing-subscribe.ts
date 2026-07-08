@@ -11,13 +11,14 @@ const KLAVIYO_REVISION = "2024-05-15";
 export type KlaviyoMarketingSignupSource =
   | "home"
   | "events"
+  | "discover_events"
   | "chat"
   | "membership_quote";
 
-async function setKlaviyoSignupSource(
+async function setKlaviyoProfileProperties(
   apiKey: string,
   email: string,
-  signupSource: string
+  properties: Record<string, string>
 ): Promise<void> {
   const res = await fetch(KLAVIYO_PROFILE_IMPORT_URL, {
     method: "POST",
@@ -32,9 +33,7 @@ async function setKlaviyoSignupSource(
         type: "profile",
         attributes: {
           email,
-          properties: {
-            signup_source: signupSource,
-          },
+          properties,
         },
       },
     }),
@@ -49,10 +48,11 @@ async function setKlaviyoSignupSource(
   }
 }
 
-/** Marketing subscribe + signup_source. Returns false if Klaviyo is not configured or subscribe fails. */
+/** Marketing subscribe + profile properties (signup_source, interest_path, etc.). */
 export async function subscribeEmailToKlaviyoMarketing(
   email: string,
-  signupSource: KlaviyoMarketingSignupSource
+  signupSource: KlaviyoMarketingSignupSource,
+  extraProperties?: Record<string, string>
 ): Promise<{ ok: boolean; error?: string; status?: number }> {
   const apiKey = process.env.KLAVIYO_PRIVATE_API_KEY;
   const listId = process.env.KLAVIYO_LIST_ID;
@@ -129,7 +129,11 @@ export async function subscribeEmailToKlaviyoMarketing(
     return { ok: false, error: "Unable to subscribe", status: res.status };
   }
 
-  await setKlaviyoSignupSource(apiKey, email, signupSource);
+  const properties: Record<string, string> = {
+    signup_source: signupSource,
+    ...extraProperties,
+  };
+  await setKlaviyoProfileProperties(apiKey, email, properties);
   return { ok: true };
   } catch (e) {
     console.error("[Klaviyo] subscribeEmailToKlaviyoMarketing:", e);

@@ -20,6 +20,7 @@ import {
   sendReservationModifiedEmail,
 } from "@/lib/sendgrid";
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
+import { toDateOnlyStr } from "@/lib/reservation-dates";
 
 type ReservationRow = {
   id: string;
@@ -80,13 +81,6 @@ function rowToJson(row: ReservationRow) {
 }
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
-function toDateOnlyStr(val: string | Date | null | undefined): string {
-  if (val == null) return "";
-  if (typeof val === "string") return val.slice(0, 10);
-  if (val instanceof Date) return val.toISOString().slice(0, 10);
-  return String(val).slice(0, 10);
-}
 
 /**
  * GET /api/members/caretaker/reservations/[id]

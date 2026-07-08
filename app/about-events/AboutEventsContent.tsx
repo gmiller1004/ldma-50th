@@ -19,10 +19,17 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 const EVENT_TYPES = [
   {
     icon: Trophy,
-    title: "Dirt Fest",
-    desc: "Our flagship multi-day gatherings — mining and detector activities, paydirt, prize drawings, LDMA swag, and VIP options. The ultimate LDMA experience at select camps each year.",
+    title: "Gold Diggin's",
+    desc: "Our flagship multi-day gatherings — panning, detecting, paydirt, prize drawings, LDMA swag, and VIP options. The ultimate LDMA experience at select camps each year.",
     image: "/images/about-events/dirt-fest.jpg",
-    imageAlt: "Dirt Fest — LDMA event",
+    imageAlt: "Gold Diggin's — LDMA event",
+  },
+  {
+    icon: Sparkles,
+    title: "Dirt Party",
+    desc: "High-energy weekends with activities, community, and adventure on real gold claims. Great for groups and first-time visitors.",
+    image: "/images/about-events/other-events.jpg",
+    imageAlt: "Dirt Party at an LDMA camp",
   },
   {
     icon: Radio,
@@ -34,7 +41,7 @@ const EVENT_TYPES = [
   {
     icon: Calendar,
     title: "Other Events",
-    desc: "Gold N BBQ, camp-specific gatherings, member work days, and seasonal celebrations. Check the events calendar for what’s coming up at each camp.",
+    desc: "Dredge Quest, Desert Chaos, Push Digs, Gold N BBQ, and camp-specific gatherings. Check the events calendar for what's coming up.",
     image: "/images/about-events/other-events.jpg",
     imageAlt: "LDMA camp event",
   },
@@ -201,8 +208,8 @@ export function AboutEventsContent() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            Dirt Fest, detector days, Gold N BBQ, and more — gold prospecting
-            gatherings at our 12 campgrounds. Here’s what to expect and how to
+            Gold Diggin&apos;s, Dirt Party, detector days, and more — gold prospecting
+            gatherings at our 12 campgrounds. Here&apos;s what to expect and how to
             join the celebration.
           </motion.p>
         </div>
@@ -391,7 +398,7 @@ export function AboutEventsContent() {
               Ready to Join an Event?
             </h2>
             <p className="text-[#e8e0d5]/90 mb-8">
-              Browse upcoming Dirt Fest, detector events, and more. Member
+              Browse upcoming Gold Diggin&apos;s, Dirt Party, detector events, and more. Member
               pricing is available when you’re logged in.
             </p>
             <Link

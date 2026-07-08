@@ -6,6 +6,7 @@ import {
   caretakerAllowsCashCheckIn,
   isNonBookableSite,
 } from "@/lib/reservation-camps";
+import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
 import {
   getReservationBalance,
@@ -26,8 +27,8 @@ type ReservationRow = {
   id: string;
   site_id: string;
   camp_slug: string;
-  check_in_date: string;
-  check_out_date: string;
+  check_in_date: string | Date;
+  check_out_date: string | Date;
   nights: number;
   reservation_type: string;
   member_contact_id: string | null;
@@ -93,8 +94,11 @@ export async function POST(
       return NextResponse.json({ error: "Cannot move a cancelled reservation" }, { status: 400 });
     }
 
-    const checkInDate = String(res.check_in_date).slice(0, 10);
-    const checkOutDate = String(res.check_out_date).slice(0, 10);
+    const checkInDate = toDateOnlyStr(res.check_in_date);
+    const checkOutDate = toDateOnlyStr(res.check_out_date);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(checkInDate) || !/^\d{4}-\d{2}-\d{2}$/.test(checkOutDate)) {
+      return NextResponse.json({ error: "Reservation has invalid dates" }, { status: 400 });
+    }
     const isMember = res.reservation_type === "member";
 
     const siteRows = await sql`
@@ -125,8 +129,8 @@ export async function POST(
         WHERE site_id = ${newSiteId}
           AND id != ${id}
           AND status != 'cancelled'
-          AND check_in_date < ${checkOutDate}
-          AND check_out_date > ${checkInDate}
+          AND check_in_date < ${checkOutDate}::date
+          AND check_out_date > ${checkInDate}::date
         LIMIT 1
       `;
       if (Array.isArray(overlap) && overlap.length > 0) {
