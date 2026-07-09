@@ -5,6 +5,7 @@
 
 import Stripe from "stripe";
 import { sql } from "@/lib/db";
+import { getBillingPeriodsPaidTotalCents } from "@/lib/reservation-billing";
 
 type PaymentRow = {
   id: string;
@@ -69,10 +70,12 @@ export async function getReservationSiteFeeTotals(
     | undefined;
   const paidCents = row?.paid ?? 0;
   const refundedCents = row?.refunded ?? 0;
+  const ledgerNetPaidCents = Math.max(0, paidCents - refundedCents);
+  const periodPaidCents = await getBillingPeriodsPaidTotalCents(reservationId);
   return {
     paidCents,
     refundedCents,
-    netPaidCents: Math.max(0, paidCents - refundedCents),
+    netPaidCents: Math.max(ledgerNetPaidCents, periodPaidCents),
     cardPaidCents: row?.card_paid ?? 0,
     cashPaidCents: row?.cash_paid ?? 0,
   };

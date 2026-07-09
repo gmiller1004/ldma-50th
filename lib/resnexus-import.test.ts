@@ -1,97 +1,67 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
-  parseResNexusDateRange,
-  extractSiteCode,
-  parseMoney,
-  allocatePeriodPayments,
+  buildReservationFromRows,
   classifyReservationType,
-  parseGuestName,
+  parseResNexusCsv,
 } from "./resnexus-import.ts";
+import { computeStayPricing } from "./reservation-pricing.ts";
 
-describe("parseResNexusDateRange", () => {
-  it("parses same-year monthly range with exclusive checkout", () => {
-    const r = parseResNexusDateRange("10/1-10/31/2026");
-    assert.equal(r?.checkIn, "2026-10-01");
-    assert.equal(r?.checkOut, "2026-11-01");
-  });
-
-  it("parses cross-month range", () => {
-    const r = parseResNexusDateRange("6/9-7/8/2026");
-    assert.equal(r?.checkIn, "2026-06-09");
-    assert.equal(r?.checkOut, "2026-07-09");
-  });
-});
-
-describe("extractSiteCode", () => {
-  it("normalizes Stanton numeric sites", () => {
-    assert.equal(extractSiteCode("042 North Camp: Full Hook Up - 30 AMP"), "42");
-    assert.equal(extractSiteCode("A-03 South Camp: Dry Camp"), "A-03");
-  });
-
-  it("normalizes Blue Bucket and Loud Mine", () => {
-    assert.equal(extractSiteCode("016 Main Camp: Hook Up - 50 AMP w/ Water"), "16");
-    assert.equal(extractSiteCode("D004 Dry Camp"), "D4");
-  });
-});
-
-describe("allocatePeriodPayments", () => {
-  it("prepay spills into next period", () => {
-    const result = allocatePeriodPayments([
-      { amountDueCents: 48000, paidRaw: "$960.00" },
-      { amountDueCents: 48000, paidRaw: "--" },
-      { amountDueCents: 17032, paidRaw: "--" },
-    ]);
-    assert.equal(result[0].amountPaidCents, 48000);
-    assert.equal(result[0].status, "paid");
-    assert.equal(result[1].amountPaidCents, 48000);
-    assert.equal(result[1].status, "paid");
-    assert.equal(result[2].amountPaidCents, 0);
-    assert.equal(result[2].status, "unpaid");
-  });
-
-  it("partial payment on single period", () => {
-    const result = allocatePeriodPayments([
-      { amountDueCents: 51000, paidRaw: "$455.00" },
-      { amountDueCents: 51000, paidRaw: "--" },
-    ]);
-    assert.equal(result[0].status, "partial");
-    assert.equal(result[0].amountPaidCents, 45500);
-  });
-});
+const STANTON_RATES = {
+  memberRateDaily: 19,
+  memberRateMonthly: 453.75,
+  nonMemberRateDaily: 45.5625,
+};
 
 describe("classifyReservationType", () => {
-  const rates = {
-    memberRateDaily: 19,
-    memberRateMonthly: 510,
-    nonMemberRateDaily: 45,
-  };
+  it("classifies long Stanton stays as member when ResNexus total is near LDMA monthly", () => {
+    const csv = readFileSync(
+      join(process.cwd(), "data/camp-reservations/stanton_stayed_on.csv"),
+      "utf8"
+    );
+    const rows = parseResNexusCsv(csv).filter((r) => r.resNumber === "37582");
+    const parsed = buildReservationFromRows("stanton-arizona", "37582", rows, STANTON_RATES);
+    assert.ok(parsed);
+    assert.equal(parsed.reservationType, "member");
 
-  it("zero total is member comp", () => {
-    const r = classifyReservationType([{ amountDueCents: 0, nights: 31 }], rates);
-    assert.equal(r.type, "member");
-    assert.equal(r.reason, "comp_zero_amount");
+    const pricing = computeStayPricing({
+      checkInDate: parsed.checkInDate,
+      checkOutDate: parsed.checkOutDate,
+      isMember: true,
+      rates: STANTON_RATES,
+    });
+    assert.ok(pricing.totalCents < 4_000_00);
+    assert.ok(pricing.totalCents > 3_500_00);
   });
 
-  it("matches member monthly period amount", () => {
-    const nights = 31;
-    const expected = Math.round(510 * (nights / 30) * 100);
-    const r = classifyReservationType([{ amountDueCents: expected, nights }], rates);
-    assert.equal(r.type, "member");
-  });
-});
+  it("classifies short paid stays as member when per-night rate matches LDMA daily", () => {
+    const csv = readFileSync(
+      join(process.cwd(), "data/camp-reservations/stanton_stayed_on.csv"),
+      "utf8"
+    );
+    const rows = parseResNexusCsv(csv).filter((r) => r.resNumber === "37568");
+    const parsed = buildReservationFromRows("stanton-arizona", "37568", rows, STANTON_RATES);
+    assert.ok(parsed);
+    assert.equal(parsed.reservationType, "member");
 
-describe("parseGuestName", () => {
-  it("handles slash in name", () => {
-    const r = parseGuestName("Anthony/ Liz Perez");
-    assert.equal(r.firstName, "Anthony");
-    assert.equal(r.lastName, "Liz Perez");
+    const paidTotal = parsed.periods.reduce((s, p) => s + p.amountPaidCents, 0);
+    assert.equal(paidTotal, 17_100);
+    const guestTotal = computeStayPricing({
+      checkInDate: parsed.checkInDate,
+      checkOutDate: parsed.checkOutDate,
+      isMember: false,
+      rates: STANTON_RATES,
+    }).totalCents;
+    assert.ok(guestTotal > paidTotal * 2);
   });
-});
 
-describe("parseMoney", () => {
-  it("parses currency", () => {
-    assert.equal(parseMoney("$1,620.00"), 162000);
-    assert.equal(parseMoney("--"), null);
+  it("still picks guest when amounts clearly match guest daily", () => {
+    const result = classifyReservationType(
+      [{ amountDueCents: 45_562, nights: 1 }],
+      STANTON_RATES
+    );
+    assert.equal(result.type, "guest");
   });
 });

@@ -40,7 +40,7 @@ const EVENT_TYPES = [
   },
   {
     icon: Calendar,
-    title: "Other Events",
+    title: "Specialty Events",
     desc: "Dredge Quest, Desert Chaos, Push Digs, Gold N BBQ, and camp-specific gatherings. Check the events calendar for what's coming up.",
     image: "/images/about-events/other-events.jpg",
     imageAlt: "LDMA camp event",

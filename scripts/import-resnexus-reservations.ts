@@ -206,6 +206,37 @@ async function upsertBillingPeriods(client: pg.Client, reservationId: string, pa
   }
 }
 
+/** Record ResNexus paid amounts in camp_payments so site moves and sync preserve credits. */
+async function ensureResNexusPaymentLedger(
+  client: pg.Client,
+  reservationId: string,
+  campSlug: string,
+  parsed: ParsedReservation
+) {
+  const paidTotal = parsed.periods.reduce((s, p) => s + p.amountPaidCents, 0);
+  if (paidTotal <= 0) return;
+
+  const existing = await client.query(
+    `SELECT COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation'), 0)::int AS paid
+     FROM camp_payments WHERE reservation_id = $1`,
+    [reservationId]
+  );
+  const ledgerPaid = Number(existing.rows[0]?.paid ?? 0);
+  if (ledgerPaid >= paidTotal) return;
+
+  const amountCents = paidTotal - ledgerPaid;
+  const recipientName = parsed.guestName || "Guest";
+  const recipientEmail = `resnexus+${parsed.resNumber}@import.ldma.org`;
+
+  await client.query(
+    `INSERT INTO camp_payments (
+       camp_slug, payment_type, method, amount_cents, reservation_id,
+       member_email, recipient_display_name, created_by_contact_id, created_at
+     ) VALUES ($1, 'reservation', 'cash', $2, $3, $4, $5, $6, NOW())`,
+    [campSlug, amountCents, reservationId, recipientEmail, recipientName, CREATED_BY]
+  );
+}
+
 async function run() {
   const { execute, camp: campFilter } = parseArgs(process.argv.slice(2));
 
@@ -309,6 +340,7 @@ async function run() {
       if (execute && siteId && client) {
         const reservationId = await upsertReservation(client, parsed, siteId);
         await upsertBillingPeriods(client, reservationId, parsed);
+        await ensureResNexusPaymentLedger(client, reservationId, campSlug, parsed);
       }
 
       summary.reservations++;

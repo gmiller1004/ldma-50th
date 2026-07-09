@@ -157,14 +157,14 @@ export const LDMA_KNOWLEDGE_CHUNKS: KnowledgeChunk[] = [
     topics: ["events", "dirt fest", "dirtfest", "detector", "gold n bbq", "register", "tickets", "2026"],
     title: "Events and registration",
     source: "/events",
-    content: `Public LDMA events (Dirt Fest, detector days, Gold N BBQ, and more) are listed on /events. Events are tied to Shopify products in the events collection; visitors register by purchasing the appropriate ticket. Event types include Dirt Fest, Detector Events, and Other. Filters include camp location (e.g. Stanton, Italian Bar, Duisenburg, Blue Bucket, Burnt River, Oconee, Loud Mine, Vein Mountain). Logged-in members may see member-only pricing on variants when configured in Shopify. For details about what Dirt Fest and detector events include, see /about-events.`,
+    content: `Public LDMA events (Gold Diggin's, Dirt Party, detector days, and more) are listed on /events. Events are tied to Shopify products in the events collection; visitors register by purchasing the appropriate ticket. Event types include Gold Diggin's, Dirt Party, Detector Events, and Specialty. Filters include camp location (e.g. Stanton, Italian Bar, Duisenburg, Blue Bucket, Burnt River, Oconee, Loud Mine, Vein Mountain). Logged-in members may see member-only pricing on variants when configured in Shopify. For details about what events include, see /about-events.`,
   },
   {
     id: "about-events-types",
     topics: ["dirt fest", "detector", "vip", "paydirt", "family"],
     title: "Types of LDMA events (About Events page)",
     source: "/about-events",
-    content: `Dirt Fest: multi-day flagship gatherings with mining and detector activities, paydirt, prize drawings, LDMA swag, and VIP options. Detector events: focused metal-detecting days and demos, often with manufacturer partners. Other events: Gold N BBQ, camp-specific gatherings, member work days, seasonal celebrations. Events are held at LDMA campgrounds across multiple states, and tickets typically cover everyone in your campsite. The page emphasizes community, family-friendly atmosphere, and structured activities plus time to prospect on camp claims.`,
+    content: `Gold Diggin's: multi-day flagship gatherings with mining and detector activities, paydirt, prize drawings, LDMA swag, and VIP options. Dirt Party: high-energy weekends with activities and community on real gold claims. Detector events: focused metal-detecting days and demos, often with manufacturer partners. Specialty events: Dredge Quest, Desert Chaos, Push Digs, Gold N BBQ, camp-specific gatherings, member work days, seasonal celebrations. Events are held at LDMA campgrounds across multiple states, and tickets typically cover everyone in your campsite. The page emphasizes community, family-friendly atmosphere, and structured activities plus time to prospect on camp claims.`,
   },
   {
     id: "contact-and-phone",

@@ -10,7 +10,7 @@ import {
   type SiteRates,
   type BillingPeriodDraft,
 } from "@/lib/reservation-pricing";
-import { countNights } from "@/lib/reservation-dates";
+import { countNights, toDateOnlyStr } from "@/lib/reservation-dates";
 import { scalePeriodDraftsToTotal } from "@/lib/reservation-price-override";
 
 export type BillingPeriodSummary = {
@@ -129,6 +129,30 @@ export async function getReservationPaymentsTotalCents(reservationId: string): P
   return totals.netPaidCents;
 }
 
+/** Sum of amount_paid_cents on billing periods (includes ResNexus import credits with no camp_payments row). */
+export async function getBillingPeriodsPaidTotalCents(reservationId: string): Promise<number> {
+  if (!hasDb() || !sql) return 0;
+  const rows = await sql`
+    SELECT COALESCE(SUM(amount_paid_cents), 0)::int AS paid
+    FROM camp_billing_periods
+    WHERE reservation_id = ${reservationId}
+      AND status != 'cancelled'
+  `;
+  return ((Array.isArray(rows) ? rows[0] : undefined) as { paid: number } | undefined)?.paid ?? 0;
+}
+
+/**
+ * Net paid for waterfall allocation: max(camp_payments ledger, billing period paid).
+ * ResNexus imports store credits on periods only; without this, sync/move wipes them.
+ */
+export async function getReservationNetPaidCents(reservationId: string): Promise<number> {
+  const [paymentNet, periodPaid] = await Promise.all([
+    getReservationPaymentsTotalCents(reservationId),
+    getBillingPeriodsPaidTotalCents(reservationId),
+  ]);
+  return Math.max(paymentNet, periodPaid);
+}
+
 export async function getReservationPaymentTotals(reservationId: string): Promise<{
   totalPaidCents: number;
   totalRefundedCents: number;
@@ -227,7 +251,7 @@ export async function syncBillingPeriodsForReservation(input: {
     drafts = scalePeriodDraftsToTotal(drafts, input.effectiveTotalCents);
   }
 
-  const totalPaidCents = await getReservationPaymentsTotalCents(input.reservationId);
+  const totalPaidCents = await getReservationNetPaidCents(input.reservationId);
   const allocated = allocatePaidWaterfall(drafts, totalPaidCents);
 
   await sql`DELETE FROM camp_billing_periods WHERE reservation_id = ${input.reservationId}`;
@@ -240,6 +264,142 @@ export async function syncBillingPeriodsForReservation(input: {
     totalPaidCents: appliedPaid,
     balanceDueCents: Math.max(0, totalDueCents - appliedPaid),
   };
+}
+
+/** Rebuild billing periods from the reservation's current site and dates in the database. */
+export async function resyncReservationBillingFromDb(reservationId: string): Promise<{
+  totalDueCents: number;
+  totalPaidCents: number;
+  balanceDueCents: number;
+}> {
+  if (!hasDb() || !sql) {
+    return { totalDueCents: 0, totalPaidCents: 0, balanceDueCents: 0 };
+  }
+
+  const rows = await sql`
+    SELECT r.check_in_date, r.check_out_date, r.reservation_type,
+           r.amount_override_cents, r.price_override_flag,
+           s.member_rate_daily, s.member_rate_monthly, s.non_member_rate_daily
+    FROM camp_reservations r
+    JOIN camp_sites s ON s.id = r.site_id
+    WHERE r.id = ${reservationId}
+    LIMIT 1
+  `;
+  const row = (Array.isArray(rows) ? rows[0] : undefined) as
+    | {
+        check_in_date: string | Date;
+        check_out_date: string | Date;
+        reservation_type: string;
+        amount_override_cents: number | null;
+        price_override_flag: boolean | null;
+        member_rate_daily: number | string | null;
+        member_rate_monthly: number | string | null;
+        non_member_rate_daily: number | string | null;
+      }
+    | undefined;
+  if (!row) {
+    throw new Error(`Reservation not found: ${reservationId}`);
+  }
+
+  const checkInDate = toDateOnlyStr(row.check_in_date);
+  const checkOutDate = toDateOnlyStr(row.check_out_date);
+  const isMember = row.reservation_type === "member";
+  const rates = siteRatesFromRow(row);
+  const calculatedTotalCents = computeStayPricing({
+    checkInDate,
+    checkOutDate,
+    isMember,
+    rates,
+  }).totalCents;
+
+  const effectiveTotalCents =
+    row.price_override_flag && row.amount_override_cents != null
+      ? row.amount_override_cents
+      : undefined;
+
+  return syncBillingPeriodsForReservation({
+    reservationId,
+    checkInDate,
+    checkOutDate,
+    isMember,
+    rates,
+    effectiveTotalCents,
+  });
+}
+
+/**
+ * Set an explicit balance due by scaling billing to effectiveTotal = balanceDue + netPaid.
+ * Persists amount_override_cents so future resyncs keep the override.
+ */
+export async function applyReservationBalanceOverride(input: {
+  reservationId: string;
+  balanceDueCents: number;
+  overrideReason: string;
+}): Promise<{ totalDueCents: number; totalPaidCents: number; balanceDueCents: number }> {
+  if (!hasDb() || !sql) {
+    return { totalDueCents: 0, totalPaidCents: 0, balanceDueCents: 0 };
+  }
+
+  const balanceDueCents = Math.max(0, Math.round(input.balanceDueCents));
+  const reason = input.overrideReason.trim();
+  if (reason.length < 3) {
+    throw new Error("Override reason required (min 3 characters)");
+  }
+
+  const rows = await sql`
+    SELECT r.check_in_date, r.check_out_date, r.reservation_type,
+           s.member_rate_daily, s.member_rate_monthly, s.non_member_rate_daily
+    FROM camp_reservations r
+    JOIN camp_sites s ON s.id = r.site_id
+    WHERE r.id = ${input.reservationId}
+    LIMIT 1
+  `;
+  const row = (Array.isArray(rows) ? rows[0] : undefined) as
+    | {
+        check_in_date: string | Date;
+        check_out_date: string | Date;
+        reservation_type: string;
+        member_rate_daily: number | string | null;
+        member_rate_monthly: number | string | null;
+        non_member_rate_daily: number | string | null;
+      }
+    | undefined;
+  if (!row) {
+    throw new Error(`Reservation not found: ${input.reservationId}`);
+  }
+
+  const checkInDate = toDateOnlyStr(row.check_in_date);
+  const checkOutDate = toDateOnlyStr(row.check_out_date);
+  const isMember = row.reservation_type === "member";
+  const rates = siteRatesFromRow(row);
+  const calculatedTotalCents = computeStayPricing({
+    checkInDate,
+    checkOutDate,
+    isMember,
+    rates,
+  }).totalCents;
+
+  const netPaidCents = await getReservationNetPaidCents(input.reservationId);
+  const effectiveTotalCents = balanceDueCents + netPaidCents;
+
+  await sql`
+    UPDATE camp_reservations
+    SET calculated_total_cents = ${calculatedTotalCents},
+        amount_override_cents = ${effectiveTotalCents},
+        override_reason = ${reason},
+        price_override_flag = TRUE,
+        updated_at = NOW()
+    WHERE id = ${input.reservationId}
+  `;
+
+  return syncBillingPeriodsForReservation({
+    reservationId: input.reservationId,
+    checkInDate,
+    checkOutDate,
+    isMember,
+    rates,
+    effectiveTotalCents,
+  });
 }
 
 export async function getReservationBalance(reservationId: string): Promise<{

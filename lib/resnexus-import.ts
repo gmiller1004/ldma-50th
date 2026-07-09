@@ -154,6 +154,62 @@ function expectedGuestCents(nights: number, rates: SiteRates): number {
   return Math.round(nights * daily * 100);
 }
 
+function classifyByAmounts(input: {
+  amountCents: number;
+  nights: number;
+  rates: SiteRates;
+  toleranceCents: number;
+  reviewThresholdCents: number;
+  reasonPrefix: string;
+}): { type: "member" | "guest"; needsReview: boolean; reason: string } | null {
+  const { amountCents, nights, rates, toleranceCents, reviewThresholdCents, reasonPrefix } = input;
+  if (nights < 1 || amountCents <= 0) return null;
+
+  const memberExpected = expectedMemberCents(nights, rates);
+  const guestExpected = expectedGuestCents(nights, rates);
+  const memberDiff = Math.abs(amountCents - memberExpected);
+  const guestDiff = Math.abs(amountCents - guestExpected);
+
+  if (memberDiff <= guestDiff && memberDiff <= toleranceCents) {
+    return {
+      type: "member",
+      needsReview: memberDiff > reviewThresholdCents,
+      reason: `${reasonPrefix}_member`,
+    };
+  }
+  if (guestDiff < memberDiff && guestDiff <= toleranceCents) {
+    return {
+      type: "guest",
+      needsReview: guestDiff > reviewThresholdCents,
+      reason: `${reasonPrefix}_guest`,
+    };
+  }
+
+  const perNight = Math.round(amountCents / nights);
+  const memberPerNight = Math.round((rates.memberRateDaily ?? 0) * 100);
+  const guestPerNight = Math.round((rates.nonMemberRateDaily ?? 0) * 100);
+  const memberNightDiff = Math.abs(perNight - memberPerNight);
+  const guestNightDiff = Math.abs(perNight - guestPerNight);
+  const nightTolerance = Math.max(500, Math.round(memberPerNight * 0.15));
+
+  if (memberNightDiff <= guestNightDiff && memberNightDiff <= nightTolerance) {
+    return {
+      type: "member",
+      needsReview: memberNightDiff > 100,
+      reason: `${reasonPrefix}_per_night_member`,
+    };
+  }
+  if (guestNightDiff < memberNightDiff && guestNightDiff <= nightTolerance) {
+    return {
+      type: "guest",
+      needsReview: guestNightDiff > 100,
+      reason: `${reasonPrefix}_per_night_guest`,
+    };
+  }
+
+  return null;
+}
+
 export function classifyReservationType(
   periods: { amountDueCents: number; nights: number }[],
   rates: SiteRates
@@ -170,19 +226,27 @@ export function classifyReservationType(
     return { type: "guest", needsReview: true, reason: "missing_period" };
   }
 
-  const memberExpected = expectedMemberCents(first.nights, rates);
-  const guestExpected = expectedGuestCents(first.nights, rates);
-  const amount = first.amountDueCents;
-
-  const memberDiff = Math.abs(amount - memberExpected);
-  const guestDiff = Math.abs(amount - guestExpected);
-
-  if (memberDiff <= guestDiff && memberDiff <= 200) {
-    return { type: "member", needsReview: memberDiff > 50, reason: "amount_heuristic_member" };
+  if (totalNights >= 30) {
+    const fullStay = classifyByAmounts({
+      amountCents: totalDue,
+      nights: totalNights,
+      rates,
+      toleranceCents: 50_000,
+      reviewThresholdCents: 10_000,
+      reasonPrefix: "full_stay",
+    });
+    if (fullStay) return fullStay;
   }
-  if (guestDiff < memberDiff && guestDiff <= 200) {
-    return { type: "guest", needsReview: guestDiff > 50, reason: "amount_heuristic_guest" };
-  }
+
+  const firstPeriod = classifyByAmounts({
+    amountCents: first.amountDueCents,
+    nights: first.nights,
+    rates,
+    toleranceCents: 2_000,
+    reviewThresholdCents: 500,
+    reasonPrefix: "period",
+  });
+  if (firstPeriod) return firstPeriod;
 
   return { type: "guest", needsReview: true, reason: "amount_ambiguous" };
 }

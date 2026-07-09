@@ -94,11 +94,15 @@ Tags control how events appear in the **Event type** and **Camp** filters.
 
 ### Event type
 
+Preferred: explicit tags (highest priority):
+
 | Tag | Filter |
 |-----|--------|
-| `dirtfest` or `dirt-fest` | Dirt Fest |
-| `detector` | Detector Events |
-| (no match) | Other |
+| `event-type:gold-diggings` | Gold Diggin's |
+| `event-type:dirt-party` | Dirt Party |
+| `event-type:detector` | Detector Events |
+
+Fallback: keywords in title, handle, or any tag (e.g. `gold diggin`, `dirt party`, `detector`, legacy `dirt fest` → Gold Diggin's). If nothing matches → **Specialty**.
 
 ### Camp / location
 

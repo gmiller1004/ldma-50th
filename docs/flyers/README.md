@@ -59,10 +59,11 @@
 - **Trim size**: 8.5" × 11" (US Letter) — same print/export steps as the GPAA upgrade mailer
 - **Audience**: LDMA members without email on file (direct mail)
 - **Offer**: Complete Family Legacy Bundle — **$600** (retail $3,250 · save $2,650); Pre-Paid Transfer Fee, Companion & Transferability
-- **Expires**: 6/21/26 · copy matches `docs/email-klaviyo-family-legacy-complete-bundle-50th.html`
+- **Expires**: 9/30/26 · copy matches `docs/email-klaviyo-family-legacy-complete-bundle-50th.html`
 - **Front layout**: Letter masthead, subject line, blank **address window** (4" × 1.35") for windowed-envelope mail merge; offer content below
 - **Back layout**: Bundle details + QR; **bottom panel** (~3.38") = detachable order form (blank address, LDMA member #, $600 order checkbox, check or credit card, signature)
-- **QR code**: `../../public/images/family-legacy-qr.png` → `https://myldma.com/family-legacy`
+- **QR code**: `../../public/images/family-legacy-complete-bundle-qr.png` → `https://myldma.com/cart/7579322581063:1?discount=CompleteLegacy50thMail` (checkout with Complete Family Legacy Add On — Special Offer)
+- **Regenerate QR**: `node scripts/generate-family-legacy-complete-bundle-qr.mjs`
 - **Product image**: Shopify CDN (see HTML comment)
 - **Logo**: `../../public/images/50th-logo.png`
 - **Return address**: PO Box 891509, Temecula, CA 92589

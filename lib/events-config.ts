@@ -13,7 +13,7 @@ export const EVENT_TYPES = [
   { id: "gold_diggings", label: "Gold Diggin's" },
   { id: "dirt_party", label: "Dirt Party" },
   { id: "detector", label: "Detector Events" },
-  { id: "other", label: "Other" },
+  { id: "other", label: "Specialty" },
 ] as const;
 
 /** Camp slugs for filtering — match against product tags (e.g. camp:stanton-arizona or stanton) */

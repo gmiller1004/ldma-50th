@@ -56,7 +56,7 @@ const EVENT_TYPE_CARDS = [
   {
     id: "other",
     icon: Calendar,
-    title: "Other Adventures",
+    title: "Specialty",
     desc: "Dredge Quest, Desert Chaos, Push Digs, BBQ weekends, and camp-specific gatherings across 8 states.",
     image: "/images/about-events/adventure.jpg",
   },

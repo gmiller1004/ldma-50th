@@ -21,6 +21,8 @@
     "db:migrate:camp-cancellation-refunds": "node --env-file=.env.local scripts/migrate-camp-cancellation-refunds.mjs",
     "db:migrate:camp-invoice-price-override": "node --env-file=.env.local scripts/migrate-camp-invoice-price-override.mjs",
     "db:import:resnexus": "node --env-file=.env.local --import tsx scripts/import-resnexus-reservations.ts",
+    "db:repair:resnexus-site-move": "node --env-file=.env.local --import tsx scripts/repair-resnexus-site-move-billing.ts",
+    "db:apply:balance-overrides": "node --env-file=.env.local --import tsx scripts/apply-reservation-balance-overrides.ts",
     "db:migrate:pilot-camps": "node --env-file=.env.local --import tsx scripts/migrate-pilot-camps-phase3.ts",
     "db:seed:camp-sites-master": "node --env-file=.env.local scripts/seed-camp-sites-from-master.mjs",
     "test": "node --import tsx --test lib/**/*.test.ts",
