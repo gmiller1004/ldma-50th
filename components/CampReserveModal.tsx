@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Calendar, Loader2, X } from "lucide-react";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
@@ -106,8 +107,22 @@ export function CampReserveModal({
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const seasonNote = useMemo(() => campOpenSeasonSummary(campSlug), [campSlug]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   const reset = useCallback(() => {
     setStep("dates");
@@ -230,11 +245,11 @@ export function CampReserveModal({
     }
   }
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70"
       role="dialog"
       aria-modal="true"
       aria-labelledby="camp-reserve-title"
@@ -524,6 +539,7 @@ export function CampReserveModal({
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
