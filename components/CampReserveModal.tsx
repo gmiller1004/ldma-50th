@@ -372,11 +372,9 @@ export function CampReserveModal({
                         </div>
                         <p className="text-sm font-semibold text-[#e8e0d5] tabular-nums shrink-0">
                           {formatCentsAsCurrency(price)}
-                          {t.usesMonthlyMemberRate && useMemberRate && isMember ? (
-                            <span className="block text-[10px] font-normal text-[#e8e0d5]/45 text-right">
-                              first month
-                            </span>
-                          ) : null}
+                          <span className="block text-[10px] font-normal text-[#e8e0d5]/45 text-right">
+                            total stay
+                          </span>
                         </p>
                       </div>
                     </button>
@@ -476,7 +474,7 @@ export function CampReserveModal({
                   onClick={() => setStep("payment")}
                   className="flex-1 rounded-lg border border-[#d4af37]/50 bg-[#d4af37]/15 text-[#f0d48f] font-semibold py-2.5 text-sm hover:bg-[#d4af37]/25"
                 >
-                  Continue to payment
+                  Continue to payment options
                 </button>
               </div>
             </div>
