@@ -182,7 +182,7 @@ async function executeCancellationInner(input: {
   if (!preview) return { ok: false, error: "Reservation not found or already cancelled" };
 
   const resRows = await sql`
-    SELECT r.id, r.camp_slug, r.check_out_date, r.reservation_type, r.member_number, r.member_display_name,
+    SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.nights, r.reservation_type, r.member_number, r.member_display_name,
            r.guest_email, r.guest_first_name, r.guest_last_name, r.status
     FROM camp_reservations r
     WHERE r.id = ${input.reservationId} AND r.camp_slug = ${input.campSlug}
@@ -191,7 +191,9 @@ async function executeCancellationInner(input: {
   const resRow = (Array.isArray(resRows) ? resRows[0] : undefined) as {
     id: string;
     camp_slug: string;
+    check_in_date: string;
     check_out_date: string;
+    nights: number | null;
     reservation_type: string;
     member_number: string | null;
     member_display_name: string | null;

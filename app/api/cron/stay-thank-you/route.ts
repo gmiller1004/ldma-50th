@@ -73,6 +73,7 @@ export async function GET(request: NextRequest) {
           firstName: undefined,
           lastName: recipientName || undefined,
           campSlug: stay.campSlug,
+          checkInDate: stay.checkInDate,
           checkOutDate: stay.checkOutDate,
           status: "completed",
           lastStayAs: stay.stayAs,

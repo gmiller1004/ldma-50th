@@ -290,7 +290,7 @@ export const oconeeData: CampPageData = {
   goldProspecting: {
     text: "Gold panning and gem hunting — quartz, garnets, and rubies. Panning station on-site. Equipment rentals available. A tranquil rustic retreat in the Blue Ridge foothills.",
     seasonalNote:
-      "Visit OconeeGoldCamp.com for more information and reservations.",
+      "Reserve your campsite online below. Seasonal camping at LDMA Oconee in the Blue Ridge foothills.",
   },
   address: "475 LDMA Dr, Tamassee, SC 29686",
   mapsSearchUrl:

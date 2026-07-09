@@ -179,6 +179,7 @@ export async function POST(request: NextRequest) {
     firstName,
     lastName,
     campSlug: caretaker.campSlug,
+    checkInDate: checkInDateStr,
     checkOutDate: checkOutDateStr,
     status: stayStatus,
     lastStayAs: "guest",

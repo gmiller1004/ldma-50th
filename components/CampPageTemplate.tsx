@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import {
   MapPin,
@@ -24,6 +25,7 @@ import {
 import { ShareButton } from "@/components/ShareButton";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FacebookGroupCTA } from "@/components/FacebookGroupCTA";
+import { CampHeroReserveCta } from "@/components/CampHeroReserveCta";
 import type { CampPageData, AmenityIcon } from "@/lib/camp-page-data";
 
 const ICON_MAP: Record<AmenityIcon, LucideIcon> = {
@@ -62,6 +64,16 @@ function SectionDivider() {
 }
 
 export function CampPageTemplate({ camp }: { camp: CampPageData }) {
+  return (
+    <Suspense fallback={null}>
+      <CampPageTemplateInner camp={camp} />
+    </Suspense>
+  );
+}
+
+function CampPageTemplateInner({ camp }: { camp: CampPageData }) {
+  const searchParams = useSearchParams();
+  const reservationNotice = searchParams.get("reservation");
   const [heroError, setHeroError] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -164,6 +176,23 @@ export function CampPageTemplate({ camp }: { camp: CampPageData }) {
           >
             {camp.tagline}
           </motion.p>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.28 }}
+          >
+            <CampHeroReserveCta campSlug={camp.slug} campName={camp.name} />
+          </motion.div>
+          {reservationNotice === "success" ? (
+            <motion.p
+              className="mt-4 text-sm text-[#f0d48f] bg-[#d4af37]/15 border border-[#d4af37]/30 rounded-lg px-4 py-2 max-w-md mx-auto"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              Payment received — thank you! Your site assignment and confirmation will arrive by
+              email shortly.
+            </motion.p>
+          ) : null}
         </div>
       </section>
 

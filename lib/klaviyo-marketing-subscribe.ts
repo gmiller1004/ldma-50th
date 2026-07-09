@@ -13,56 +13,17 @@ export type KlaviyoMarketingSignupSource =
   | "events"
   | "discover_events"
   | "chat"
-  | "membership_quote";
+  | "membership_quote"
+  | "camp_reservation";
 
-async function setKlaviyoProfileProperties(
+async function subscribeEmailToMarketingList(
   apiKey: string,
-  email: string,
-  properties: Record<string, string>
-): Promise<void> {
-  const res = await fetch(KLAVIYO_PROFILE_IMPORT_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Klaviyo-API-Key ${apiKey}`,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      revision: KLAVIYO_REVISION,
-    },
-    body: JSON.stringify({
-      data: {
-        type: "profile",
-        attributes: {
-          email,
-          properties,
-        },
-      },
-    }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(
-      "[Klaviyo] profile-import (signup_source) error:",
-      res.status,
-      text
-    );
-  }
-}
-
-/** Marketing subscribe + profile properties (signup_source, interest_path, etc.). */
-export async function subscribeEmailToKlaviyoMarketing(
   email: string,
   signupSource: KlaviyoMarketingSignupSource,
   extraProperties?: Record<string, string>
-): Promise<{ ok: boolean; error?: string; status?: number }> {
-  const apiKey = process.env.KLAVIYO_PRIVATE_API_KEY;
+): Promise<{ ok: boolean; status?: number }> {
   const listId = process.env.KLAVIYO_LIST_ID;
 
-  if (!apiKey) {
-    console.error("[Klaviyo] KLAVIYO_PRIVATE_API_KEY not set");
-    return { ok: false, error: "Newsletter is not configured", status: 503 };
-  }
-
-  try {
   const payload: {
     data: {
       type: string;
@@ -123,10 +84,7 @@ export async function subscribeEmailToKlaviyoMarketing(
   if (!res.ok) {
     const errBody = await res.text();
     console.error("[Klaviyo] subscribe error:", res.status, errBody);
-    if (res.status === 429) {
-      return { ok: false, error: "Too many requests. Please try again in a moment.", status: 429 };
-    }
-    return { ok: false, error: "Unable to subscribe", status: res.status };
+    return { ok: false, status: res.status };
   }
 
   const properties: Record<string, string> = {
@@ -135,6 +93,109 @@ export async function subscribeEmailToKlaviyoMarketing(
   };
   await setKlaviyoProfileProperties(apiKey, email, properties);
   return { ok: true };
+}
+
+/**
+ * Subscribe to email marketing when not already subscribed.
+ * No-op if KLAVIYO_PRIVATE_API_KEY is unset or email is already SUBSCRIBED.
+ */
+export async function ensureKlaviyoEmailSubscribed(
+  email: string,
+  signupSource: KlaviyoMarketingSignupSource = "camp_reservation"
+): Promise<void> {
+  const apiKey = process.env.KLAVIYO_PRIVATE_API_KEY?.trim();
+  if (!apiKey) return;
+
+  const normalized = email.trim();
+  if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return;
+
+  try {
+    const filter = `equals(email,"${normalized.replace(/"/g, '\\"')}")`;
+    const profileRes = await fetch(
+      `${KLAVIYO_BASE}/profiles?filter=${encodeURIComponent(filter)}`,
+      {
+        headers: {
+          Authorization: `Klaviyo-API-Key ${apiKey}`,
+          revision: KLAVIYO_REVISION,
+          accept: "application/json",
+        },
+      }
+    );
+    if (profileRes.ok) {
+      const data = (await profileRes.json()) as {
+        data?: Array<{
+          attributes?: {
+            subscriptions?: {
+              email?: { marketing?: { consent?: string } };
+            };
+          };
+        }>;
+      };
+      const consent = data.data?.[0]?.attributes?.subscriptions?.email?.marketing?.consent;
+      if (consent === "SUBSCRIBED") return;
+    }
+
+    await subscribeEmailToMarketingList(apiKey, normalized, signupSource);
+  } catch (e) {
+    console.error("[Klaviyo] ensureKlaviyoEmailSubscribed:", e);
+  }
+}
+
+async function setKlaviyoProfileProperties(
+  apiKey: string,
+  email: string,
+  properties: Record<string, string>
+): Promise<void> {
+  const res = await fetch(KLAVIYO_PROFILE_IMPORT_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Klaviyo-API-Key ${apiKey}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      revision: KLAVIYO_REVISION,
+    },
+    body: JSON.stringify({
+      data: {
+        type: "profile",
+        attributes: {
+          email,
+          properties,
+        },
+      },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(
+      "[Klaviyo] profile-import (signup_source) error:",
+      res.status,
+      text
+    );
+  }
+}
+
+/** Marketing subscribe + profile properties (signup_source, interest_path, etc.). */
+export async function subscribeEmailToKlaviyoMarketing(
+  email: string,
+  signupSource: KlaviyoMarketingSignupSource,
+  extraProperties?: Record<string, string>
+): Promise<{ ok: boolean; error?: string; status?: number }> {
+  const apiKey = process.env.KLAVIYO_PRIVATE_API_KEY;
+
+  if (!apiKey) {
+    console.error("[Klaviyo] KLAVIYO_PRIVATE_API_KEY not set");
+    return { ok: false, error: "Newsletter is not configured", status: 503 };
+  }
+
+  try {
+    const result = await subscribeEmailToMarketingList(apiKey, email, signupSource, extraProperties);
+    if (!result.ok) {
+      if (result.status === 429) {
+        return { ok: false, error: "Too many requests. Please try again in a moment.", status: 429 };
+      }
+      return { ok: false, error: "Unable to subscribe", status: result.status };
+    }
+    return { ok: true };
   } catch (e) {
     console.error("[Klaviyo] subscribeEmailToKlaviyoMarketing:", e);
     return { ok: false, error: "Unable to subscribe" };

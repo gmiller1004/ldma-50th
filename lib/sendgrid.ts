@@ -467,6 +467,97 @@ Lost Dutchman's Mining Association`;
   }
 }
 
+/**
+ * Public web booking: confirmation with assigned site number and MRS follow-up.
+ */
+export async function sendPublicCampReservationConfirmationEmail(input: {
+  to: string;
+  campName: string;
+  guestOrMemberName: string;
+  checkInDate: string;
+  checkOutDate: string;
+  siteTypeLabel: string;
+  siteAssignmentLabel: string;
+  balanceDueCents: number;
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV] Public reservation confirmation for ${input.to}`);
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping public reservation confirmation");
+    return false;
+  }
+
+  sgMail.setApiKey(apiKey);
+
+  const name = input.guestOrMemberName?.trim() || "there";
+  const balanceLine =
+    input.balanceDueCents > 0
+      ? `Balance due before arrival: $${(input.balanceDueCents / 100).toFixed(2)}.`
+      : "Your campsite fees are paid in full for this reservation.";
+
+  const textContent = `Your reservation at ${input.campName} is confirmed.
+
+Hi ${name},
+
+We received your reservation for ${input.siteTypeLabel} from ${input.checkInDate} to ${input.checkOutDate}.
+
+Your assigned site: ${input.siteAssignmentLabel}
+
+${balanceLine}
+
+A Member Relations Specialist will follow up with you if anything else is needed before your arrival.
+
+Lost Dutchman's Mining Association`;
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#1a120b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#1a120b;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" style="max-width:520px;background:#2a1f14;border-radius:8px;border:1px solid #d4af3740;">
+        <tr><td style="padding:28px 24px;text-align:center;border-bottom:1px solid #d4af3720;">
+          <h1 style="margin:0;font-size:20px;color:#f0d48f;">Reservation confirmed</h1>
+          <p style="margin:8px 0 0;font-size:14px;color:#e8e0d5b3;">${escapeHtml(input.campName)}</p>
+        </td></tr>
+        <tr><td style="padding:28px 24px;color:#e8e0d5;font-size:16px;line-height:1.55;">
+          <p style="margin:0 0 16px;">Hi ${escapeHtml(name)},</p>
+          <p style="margin:0 0 16px;">We received your reservation for <strong>${escapeHtml(input.siteTypeLabel)}</strong> from <strong>${escapeHtml(input.checkInDate)}</strong> to <strong>${escapeHtml(input.checkOutDate)}</strong>.</p>
+          <p style="margin:0 0 16px;padding:14px 16px;background:#1a120b;border-radius:6px;border:1px solid #d4af3725;">
+            <span style="display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#d4af37;margin-bottom:6px;">Your assigned site</span>
+            <strong style="color:#f0d48f;">${escapeHtml(input.siteAssignmentLabel)}</strong>
+          </p>
+          <p style="margin:0 0 16px;">${escapeHtml(balanceLine)}</p>
+          <p style="margin:0;font-size:14px;color:#e8e0d5b3;">A Member Relations Specialist will follow up with you if anything else is needed before your arrival.</p>
+        </td></tr>
+        <tr><td style="padding:14px 24px;background:#1a120b;border-top:1px solid #d4af3720;">
+          <p style="margin:0;font-size:12px;color:#e8e0d560;">Lost Dutchman's Mining Association</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+  try {
+    await sgMail.send({
+      to: input.to,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `Your ${input.campName} campsite reservation is confirmed`,
+      text: textContent,
+      html: htmlContent,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid public reservation confirmation error:", e);
+    return false;
+  }
+}
+
 const RECEIPT_CC_EMAIL = "gricci@goldprospectors.org";
 
 export type PaymentReceiptLineItem = {

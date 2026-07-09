@@ -177,6 +177,7 @@ export async function POST(request: NextRequest) {
         firstName: member.firstName ?? undefined,
         lastName: member.lastName ?? undefined,
         campSlug: caretaker.campSlug,
+        checkInDate: checkInDateStr,
         checkOutDate: checkOutDateStr,
         status: stayStatus,
         lastStayAs: "member",

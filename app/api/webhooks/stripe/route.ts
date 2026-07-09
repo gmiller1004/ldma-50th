@@ -6,6 +6,13 @@ import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 import { siteRatesFromRow, syncBillingPeriodsForReservation } from "@/lib/reservation-billing";
 import { withReservationInvoice } from "@/lib/reservation-create-metadata";
+import {
+  filterBookableSites,
+  pickNextAvailableSite,
+  PUBLIC_BOOKING_IMPORT_SOURCE,
+  type CampSiteRow,
+  type ReservationStayRow,
+} from "@/lib/public-camp-booking";
 
 /**
  * POST /api/webhooks/stripe
@@ -51,10 +58,19 @@ export async function POST(request: NextRequest) {
   }
 
   const metadata = session.metadata as Record<string, string> | null;
-  if (!metadata?.payment_type || !metadata?.camp_slug || !metadata?.created_by_contact_id || !metadata?.recipient_email || !metadata?.recipient_display_name) {
+  const isSelfService = metadata?.self_service === "true";
+  if (
+    !metadata?.payment_type ||
+    !metadata?.camp_slug ||
+    (!isSelfService && !metadata?.created_by_contact_id) ||
+    !metadata?.recipient_email ||
+    !metadata?.recipient_display_name
+  ) {
     console.error("[webhook] Missing required metadata");
     return NextResponse.json({ error: "Missing metadata" }, { status: 400 });
   }
+
+  const createdByContactId = metadata.created_by_contact_id || "public-web-self-service";
 
   const amountCents = Math.round((session.amount_total ?? 0));
   if (amountCents < 1) {
@@ -68,7 +84,6 @@ export async function POST(request: NextRequest) {
 
   const campSlug = metadata.camp_slug;
   const paymentType = metadata.payment_type;
-  const createdByContactId = metadata.created_by_contact_id;
   const recipientEmail = metadata.recipient_email;
   const recipientDisplayName = metadata.recipient_display_name;
   const sessionId = session.id;
@@ -141,15 +156,48 @@ export async function POST(request: NextRequest) {
 
   // If reservation payment and no existing reservation_id, create the reservation
   if (paymentType === "reservation" && !reservationId && !paymentOnly) {
-    const siteId = metadata.site_id;
+    let siteId = metadata.site_id;
     const checkInDate = metadata.check_in_date;
     const checkOutDate = metadata.check_out_date;
     const nights = parseInt(metadata.nights ?? "0", 10) || 1;
     const reservationType = metadata.reservation_type === "guest" ? "guest" : "member";
+    const importSource = metadata.import_source === PUBLIC_BOOKING_IMPORT_SOURCE ? PUBLIC_BOOKING_IMPORT_SOURCE : null;
+    const bookedSiteTypeLabel = metadata.booked_site_type_label?.trim() || null;
 
     if (!siteId || !checkInDate || !checkOutDate) {
       console.error("[webhook] Reservation metadata missing site_id/check_in_date/check_out_date");
       return NextResponse.json({ error: "Invalid reservation metadata" }, { status: 400 });
+    }
+
+    if (isSelfService && metadata.site_type_key) {
+      const siteRows = await sql`
+        SELECT id, name, site_code, site_type, special_type, sort_order,
+               member_rate_daily, member_rate_monthly, non_member_rate_daily
+        FROM camp_sites WHERE camp_slug = ${campSlug}
+        ORDER BY sort_order ASC, name ASC
+      `;
+      const allSites = (Array.isArray(siteRows) ? siteRows : []) as CampSiteRow[];
+      const bookable = filterBookableSites(campSlug, allSites);
+      const resRows = await sql`
+        SELECT site_id, check_in_date, check_out_date
+        FROM camp_reservations
+        WHERE camp_slug = ${campSlug} AND status != 'cancelled'
+          AND check_in_date < ${checkOutDate}::date
+          AND check_out_date > ${checkInDate}::date
+      `;
+      const reservations = (Array.isArray(resRows) ? resRows : []) as ReservationStayRow[];
+      const reassigned = pickNextAvailableSite(
+        bookable,
+        metadata.site_type_key,
+        checkInDate,
+        checkOutDate,
+        reservations
+      );
+      if (!reassigned) {
+        console.error("[webhook] No site available for public booking type");
+        return NextResponse.json({ error: "Site type not available" }, { status: 400 });
+      }
+      siteId = reassigned.id;
     }
 
     const overlap = await sql`
@@ -182,13 +230,13 @@ export async function POST(request: NextRequest) {
         INSERT INTO camp_reservations (
           site_id, camp_slug, check_in_date, check_out_date, nights,
           reservation_type, member_contact_id, member_number, member_display_name,
-          status, created_by_contact_id,
+          status, created_by_contact_id, import_source, booked_site_type_label,
           invoice_number, calculated_total_cents, amount_override_cents, override_reason, price_override_flag
         )
         VALUES (
           ${siteId}, ${campSlug}, ${checkInDate}, ${checkOutDate}, ${nights},
           'member', ${memberContactId}, ${memberNumber}, ${memberDisplayName},
-          'reserved', ${createdByContactId},
+          'reserved', ${createdByContactId}, ${importSource}, ${bookedSiteTypeLabel},
           ${invoicePricing.invoiceNumber}, ${invoicePricing.calculatedTotalCents},
           ${invoicePricing.amountOverrideCents}, ${invoicePricing.overrideReason}, ${invoicePricing.priceOverrideFlag}
         )
@@ -205,13 +253,13 @@ export async function POST(request: NextRequest) {
         INSERT INTO camp_reservations (
           site_id, camp_slug, check_in_date, check_out_date, nights,
           reservation_type, guest_first_name, guest_last_name, guest_email, guest_phone,
-          status, created_by_contact_id,
+          status, created_by_contact_id, import_source, booked_site_type_label,
           invoice_number, calculated_total_cents, amount_override_cents, override_reason, price_override_flag
         )
         VALUES (
           ${siteId}, ${campSlug}, ${checkInDate}, ${checkOutDate}, ${nights},
           'guest', ${guestFirstName}, ${guestLastName}, ${guestEmail}, ${guestPhone},
-          'reserved', ${createdByContactId},
+          'reserved', ${createdByContactId}, ${importSource}, ${bookedSiteTypeLabel},
           ${invoicePricing.invoiceNumber}, ${invoicePricing.calculatedTotalCents},
           ${invoicePricing.amountOverrideCents}, ${invoicePricing.overrideReason}, ${invoicePricing.priceOverrideFlag}
         )
@@ -268,7 +316,7 @@ export async function POST(request: NextRequest) {
 
   if (paymentType === "reservation" && reservationId && hasDb() && sql) {
     const resRow = await sql`
-      SELECT camp_slug, check_out_date, reservation_type, member_number, member_display_name,
+      SELECT camp_slug, check_in_date, check_out_date, nights, reservation_type, member_number, member_display_name,
              guest_email, guest_first_name, guest_last_name, status
       FROM camp_reservations WHERE id = ${reservationId} LIMIT 1
     `;

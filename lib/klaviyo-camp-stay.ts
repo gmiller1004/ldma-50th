@@ -1,11 +1,13 @@
 /**
  * Klaviyo sync for camp stays (reservations + check-ins).
- * Creates or updates profile with custom properties for remarketing:
- * - Most Recent Camp, Most Recent Stay Status, Most Recent Check Out, Camps Stayed.
- * Uses POST /api/profile-import and GET /api/profiles (filter by email) for merge.
+ * Creates or updates profile with custom properties for remarketing.
+ * Subscribes email marketing when not already subscribed.
  */
 
 import { lookupMember } from "@/lib/salesforce";
+import { getCampBySlug } from "@/lib/directory-camps";
+import { countNights } from "@/lib/reservation-dates";
+import { ensureKlaviyoEmailSubscribed } from "@/lib/klaviyo-marketing-subscribe";
 
 const KLAVIYO_BASE = "https://a.klaviyo.com/api";
 const KLAVIYO_REVISION = "2024-02-15";
@@ -19,10 +21,13 @@ export type CampStayProfilePayload = {
   firstName?: string | null;
   lastName?: string | null;
   campSlug: string;
-  checkOutDate: string; // YYYY-MM-DD
+  checkInDate: string;
+  checkOutDate: string;
   status: StayStatus;
   /** Whether they were a member or guest at the time of this stay. */
   lastStayAs?: StayAs | null;
+  nights?: number | null;
+  campName?: string | null;
 };
 
 function getApiKey(): string | null {
@@ -87,12 +92,68 @@ export function reservationStatusToStayStatus(dbStatus: string): StayStatus {
   }
 }
 
+function resolveCampName(campSlug: string, campName?: string | null): string | null {
+  const explicit = campName?.trim();
+  if (explicit) return explicit;
+  return getCampBySlug(campSlug)?.name ?? null;
+}
+
 /**
- * Create or update Klaviyo profile with camp stay fields.
- * Klaviyo profile-import creates a new profile when no profile matches the email (we do not send id).
- * New profiles get email, first_name, last_name (from payload: Salesforce for members, registration/check-in for guests)
- * plus custom properties: Most Recent Camp, Most Recent Stay Status, Most Recent Check Out, Camps Stayed.
- * If profile exists, merges Camps Stayed (appends this camp if not already present).
+ * Build Klaviyo custom properties for a camp stay sync.
+ */
+export function buildCampStayProfileProperties(
+  payload: CampStayProfilePayload,
+  currentProperties: Record<string, unknown>,
+  todayIso = new Date().toISOString().slice(0, 10)
+): Record<string, unknown> {
+  const checkIn = payload.checkInDate.slice(0, 10);
+  const checkOut = payload.checkOutDate.slice(0, 10);
+  const campSlug = payload.campSlug.trim();
+  const campName = resolveCampName(campSlug, payload.campName);
+  const nights =
+    payload.nights != null && payload.nights > 0
+      ? payload.nights
+      : countNights(checkIn, checkOut);
+
+  const isUpcomingReservation = payload.status === "reserved" && checkOut >= todayIso;
+
+  const properties: Record<string, unknown> = {
+    ...currentProperties,
+    "Most Recent Camp": campSlug,
+    "Most Recent Stay Status": payload.status,
+    "Most Recent Check In": checkIn,
+    "Most Recent Check Out": checkOut,
+    "Reservation Start Date": checkIn,
+    "Reservation End Date": checkOut,
+    "Camps Stayed": mergeCampsStayed(currentProperties["Camps Stayed"], campSlug),
+  };
+
+  if (campName) {
+    properties["Most Recent Camp Name"] = campName;
+  }
+  if (nights > 0) {
+    properties["Reservation Nights"] = nights;
+  }
+  if (payload.lastStayAs === "member" || payload.lastStayAs === "guest") {
+    properties["Most Recent Stay Type"] = payload.lastStayAs;
+  }
+
+  if (isUpcomingReservation) {
+    properties["Next Camp Booked"] = campSlug;
+    if (campName) properties["Next Camp Booked Name"] = campName;
+  } else if (
+    currentProperties["Next Camp Booked"] === campSlug ||
+    currentProperties["Reservation Start Date"] === checkIn
+  ) {
+    properties["Next Camp Booked"] = "";
+    properties["Next Camp Booked Name"] = "";
+  }
+
+  return properties;
+}
+
+/**
+ * Create or update Klaviyo profile with camp stay fields and ensure email marketing consent.
  * Does nothing if KLAVIYO_PRIVATE_API_KEY is not set.
  */
 export async function upsertCampStayProfile(payload: CampStayProfilePayload): Promise<boolean> {
@@ -107,20 +168,11 @@ export async function upsertCampStayProfile(payload: CampStayProfilePayload): Pr
   const email = payload.email.trim();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
 
+  await ensureKlaviyoEmailSubscribed(email, "camp_reservation");
+
   const existing = await getProfileByEmail(email);
   const currentProperties = (existing?.properties as Record<string, unknown>) || {};
-  const campsStayed = mergeCampsStayed(currentProperties["Camps Stayed"], payload.campSlug);
-
-  const properties: Record<string, unknown> = {
-    ...currentProperties,
-    "Most Recent Camp": payload.campSlug,
-    "Most Recent Stay Status": payload.status,
-    "Most Recent Check Out": payload.checkOutDate,
-    "Camps Stayed": campsStayed,
-  };
-  if (payload.lastStayAs === "member" || payload.lastStayAs === "guest") {
-    properties["Most Recent Stay Type"] = payload.lastStayAs;
-  }
+  const properties = buildCampStayProfileProperties(payload, currentProperties);
 
   const attributes: Record<string, unknown> = {
     email,
@@ -129,7 +181,6 @@ export async function upsertCampStayProfile(payload: CampStayProfilePayload): Pr
     properties,
   };
 
-  // Remove undefined so we don't clear fields
   if (attributes.first_name === undefined) delete attributes.first_name;
   if (attributes.last_name === undefined) delete attributes.last_name;
 
@@ -163,7 +214,9 @@ export async function upsertCampStayProfile(payload: CampStayProfilePayload): Pr
 
 export type ReservationRowForSync = {
   camp_slug: string;
+  check_in_date: string;
   check_out_date: string;
+  nights?: number | null;
   reservation_type: string;
   guest_email: string | null;
   guest_first_name: string | null;
@@ -175,11 +228,14 @@ export type ReservationRowForSync = {
 
 /**
  * Sync a reservation to Klaviyo (guest uses email from row; member looks up email).
- * Call fire-and-forget from API routes. Status should be reservation status (reserved/checked_in/completed/cancelled).
+ * Call fire-and-forget from API routes on create, update, cancel, and payment.
  */
 export async function syncReservationToKlaviyo(row: ReservationRowForSync): Promise<void> {
   const status = reservationStatusToStayStatus(row.status);
+  const checkInDate = String(row.check_in_date).slice(0, 10);
   const checkOutDate = String(row.check_out_date).slice(0, 10);
+  const campName = getCampBySlug(row.camp_slug)?.name ?? null;
+  const nights = row.nights ?? countNights(checkInDate, checkOutDate);
 
   if (row.reservation_type === "guest") {
     const email = row.guest_email?.trim();
@@ -189,9 +245,12 @@ export async function syncReservationToKlaviyo(row: ReservationRowForSync): Prom
       firstName: row.guest_first_name,
       lastName: row.guest_last_name,
       campSlug: row.camp_slug,
+      checkInDate,
       checkOutDate,
       status,
       lastStayAs: "guest",
+      nights,
+      campName,
     });
     return;
   }
@@ -205,8 +264,11 @@ export async function syncReservationToKlaviyo(row: ReservationRowForSync): Prom
     firstName: member.firstName,
     lastName: member.lastName ?? undefined,
     campSlug: row.camp_slug,
+    checkInDate,
     checkOutDate,
     status,
     lastStayAs: "member",
+    nights,
+    campName,
   });
 }
