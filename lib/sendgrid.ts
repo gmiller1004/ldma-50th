@@ -471,6 +471,53 @@ Lost Dutchman's Mining Association`;
 /**
  * Public web booking: confirmation with assigned site number and MRS follow-up.
  */
+export type PublicReservationConfirmationPayment = {
+  paidInFull: boolean;
+  isLongTermMember: boolean;
+  balanceDueBeforeArrivalCents: number;
+  payableNowCents: number;
+  nextPaymentDueDate?: string | null;
+  nextPaymentDueCents?: number | null;
+};
+
+function formatUsd(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function buildConfirmationPaymentCopy(payment: PublicReservationConfirmationPayment): {
+  balanceLine: string;
+  showPayButton: boolean;
+} {
+  if (payment.paidInFull) {
+    return {
+      balanceLine: "Your campsite fees are paid in full for this reservation.",
+      showPayButton: false,
+    };
+  }
+
+  if (payment.balanceDueBeforeArrivalCents > 0) {
+    const label = payment.isLongTermMember
+      ? "Balance due before arrival (first month)"
+      : "Balance due before arrival";
+    return {
+      balanceLine: `${label}: ${formatUsd(payment.balanceDueBeforeArrivalCents)}.`,
+      showPayButton: payment.payableNowCents > 0,
+    };
+  }
+
+  if (payment.nextPaymentDueDate && payment.nextPaymentDueCents) {
+    return {
+      balanceLine: `Your first month is paid in full. Next payment of ${formatUsd(payment.nextPaymentDueCents)} is due on ${payment.nextPaymentDueDate}.`,
+      showPayButton: payment.payableNowCents > 0,
+    };
+  }
+
+  return {
+    balanceLine: "Your reservation is confirmed. We will send a reminder before your next payment is due.",
+    showPayButton: false,
+  };
+}
+
 export async function sendPublicCampReservationConfirmationEmail(input: {
   to: string;
   campName: string;
@@ -479,7 +526,7 @@ export async function sendPublicCampReservationConfirmationEmail(input: {
   checkOutDate: string;
   siteTypeLabel: string;
   siteAssignmentLabel: string;
-  balanceDueCents: number;
+  payment: PublicReservationConfirmationPayment;
   payBalanceUrl?: string | null;
   notifyMrs?: boolean;
 }): Promise<boolean> {
@@ -496,13 +543,10 @@ export async function sendPublicCampReservationConfirmationEmail(input: {
   sgMail.setApiKey(apiKey);
 
   const name = input.guestOrMemberName?.trim() || "there";
-  const balanceLine =
-    input.balanceDueCents > 0
-      ? `Balance due before arrival: $${(input.balanceDueCents / 100).toFixed(2)}.`
-      : "Your campsite fees are paid in full for this reservation.";
+  const { balanceLine, showPayButton } = buildConfirmationPaymentCopy(input.payment);
   const payLine =
-    input.balanceDueCents > 0 && input.payBalanceUrl
-      ? `\nPay your balance online: ${input.payBalanceUrl}\n`
+    showPayButton && input.payBalanceUrl
+      ? `\nPay online: ${input.payBalanceUrl}\n`
       : "";
 
   const textContent = `Your reservation at ${input.campName} is confirmed.
@@ -539,8 +583,8 @@ Lost Dutchman's Mining Association`;
           </p>
           <p style="margin:0 0 16px;">${escapeHtml(balanceLine)}</p>
           ${
-            input.balanceDueCents > 0 && input.payBalanceUrl
-              ? `<p style="margin:0 0 16px;"><a href="${escapeHtml(input.payBalanceUrl)}" style="display:inline-block;padding:12px 20px;background:#d4af37;color:#1a120b;text-decoration:none;border-radius:6px;font-weight:600;">Pay balance online</a></p>`
+            showPayButton && input.payBalanceUrl
+              ? `<p style="margin:0 0 16px;"><a href="${escapeHtml(input.payBalanceUrl)}" style="display:inline-block;padding:12px 20px;background:#d4af37;color:#1a120b;text-decoration:none;border-radius:6px;font-weight:600;">Pay online</a></p>`
               : ""
           }
           <p style="margin:0;font-size:14px;color:#e8e0d5b3;">A Member Relations Specialist will follow up with you if anything else is needed before your arrival.</p>
@@ -796,9 +840,10 @@ Lost Dutchman's Mining Association`;
 }
 
 export type BalanceReminderDays = 14 | 7 | 3;
+export type BalanceReminderKind = "before_arrival" | "billing_period";
 
 /**
- * Remind guest/member to pay campsite balance before check-in.
+ * Remind guest/member to pay campsite balance before check-in or before a billing period.
  */
 export async function sendReservationBalanceReminderEmail(input: {
   to: string;
@@ -807,13 +852,16 @@ export async function sendReservationBalanceReminderEmail(input: {
   checkInDate: string;
   checkOutDate: string;
   balanceDueCents: number;
-  daysBeforeCheckIn: BalanceReminderDays;
+  daysBefore: BalanceReminderDays;
   payBalanceUrl: string;
+  reminderKind?: BalanceReminderKind;
+  paymentDueDate?: string;
 }): Promise<boolean> {
+  const kind = input.reminderKind ?? "before_arrival";
   const apiKey = process.env.SENDGRID_API_KEY;
   if (!apiKey) {
     if (process.env.NODE_ENV === "development") {
-      console.log(`[DEV] Balance reminder (${input.daysBeforeCheckIn}d) for ${input.to}`);
+      console.log(`[DEV] Balance reminder (${input.daysBefore}d, ${kind}) for ${input.to}`);
       return true;
     }
     return false;
@@ -822,20 +870,41 @@ export async function sendReservationBalanceReminderEmail(input: {
   sgMail.setApiKey(apiKey);
   const name = input.guestOrMemberName?.trim() || "there";
   const balance = (input.balanceDueCents / 100).toFixed(2);
-  const urgency =
-    input.daysBeforeCheckIn === 3
-      ? "Your check-in is in 3 days"
-      : input.daysBeforeCheckIn === 7
-        ? "Your check-in is in one week"
-        : "Your upcoming stay at LDMA";
+  const dueDate = input.paymentDueDate ?? input.checkInDate;
 
-  const textContent = `${urgency} — balance due for ${input.campName}
+  const urgency =
+    kind === "billing_period"
+      ? input.daysBefore === 3
+        ? `Your next campsite payment is due in 3 days (${dueDate})`
+        : input.daysBefore === 7
+          ? `Your next campsite payment is due in one week (${dueDate})`
+          : `Upcoming campsite payment for ${input.campName}`
+      : input.daysBefore === 3
+        ? "Your check-in is in 3 days"
+        : input.daysBefore === 7
+          ? "Your check-in is in one week"
+          : "Your upcoming stay at LDMA";
+
+  const balanceLabel =
+    kind === "billing_period"
+      ? `Payment due by ${dueDate}`
+      : "Balance due before arrival";
+
+  const heading =
+    kind === "billing_period" ? "Campsite payment due" : "Balance due before arrival";
+
+  const subject =
+    kind === "billing_period"
+      ? `Campsite payment due — ${input.campName} (${dueDate})`
+      : `Balance due — ${input.campName} (${input.checkInDate})`;
+
+  const textContent = `${urgency} — ${input.campName}
 
 Hi ${name},
 
 You have a campsite reservation from ${input.checkInDate} to ${input.checkOutDate}.
 
-Balance due before arrival: $${balance}
+${balanceLabel}: $${balance}
 
 Pay online: ${input.payBalanceUrl}
 
@@ -852,14 +921,14 @@ Lost Dutchman's Mining Association`;
     <tr><td align="center">
       <table role="presentation" width="100%" style="max-width:520px;background:#2a1f14;border-radius:8px;border:1px solid #d4af3740;">
         <tr><td style="padding:28px 24px;text-align:center;border-bottom:1px solid #d4af3720;">
-          <h1 style="margin:0;font-size:20px;color:#f0d48f;">Balance due before arrival</h1>
-          <p style="margin:8px 0 0;font-size:14px;color:#e8e0d5b3;">${escapeHtml(input.campName)} · check-in ${escapeHtml(input.checkInDate)}</p>
+          <h1 style="margin:0;font-size:20px;color:#f0d48f;">${escapeHtml(heading)}</h1>
+          <p style="margin:8px 0 0;font-size:14px;color:#e8e0d5b3;">${escapeHtml(input.campName)} · ${escapeHtml(kind === "billing_period" ? `due ${dueDate}` : `check-in ${input.checkInDate}`)}</p>
         </td></tr>
         <tr><td style="padding:28px 24px;color:#e8e0d5;font-size:16px;line-height:1.55;">
           <p style="margin:0 0 16px;">Hi ${escapeHtml(name)},</p>
           <p style="margin:0 0 16px;">${escapeHtml(urgency)}. Your reservation is <strong>${escapeHtml(input.checkInDate)}</strong> to <strong>${escapeHtml(input.checkOutDate)}</strong>.</p>
-          <p style="margin:0 0 20px;font-size:18px;color:#f0d48f;"><strong>Balance due: $${balance}</strong></p>
-          <p style="margin:0 0 20px;"><a href="${escapeHtml(input.payBalanceUrl)}" style="display:inline-block;padding:12px 20px;background:#d4af37;color:#1a120b;text-decoration:none;border-radius:6px;font-weight:600;">Pay balance online</a></p>
+          <p style="margin:0 0 20px;font-size:18px;color:#f0d48f;"><strong>${escapeHtml(balanceLabel)}: $${balance}</strong></p>
+          <p style="margin:0 0 20px;"><a href="${escapeHtml(input.payBalanceUrl)}" style="display:inline-block;padding:12px 20px;background:#d4af37;color:#1a120b;text-decoration:none;border-radius:6px;font-weight:600;">Pay online</a></p>
           <p style="margin:0;font-size:14px;color:#e8e0d5b3;">Questions? <a href="mailto:info@lostdutchmans.com" style="color:#d4af37;">info@lostdutchmans.com</a> or (888) 465-3717.</p>
         </td></tr>
       </table>
@@ -872,7 +941,7 @@ Lost Dutchman's Mining Association`;
     await sgMail.send({
       to: input.to,
       from: { email: SENDER_EMAIL, name: SENDER_NAME },
-      subject: `Balance due — ${input.campName} (${input.checkInDate})`,
+      subject,
       text: textContent,
       html: htmlContent,
     });

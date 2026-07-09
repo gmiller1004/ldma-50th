@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, hasDb } from "@/lib/db";
 import { getCampBySlug } from "@/lib/directory-camps";
-import { getReservationBalance } from "@/lib/reservation-billing";
+import { listBillingPeriods } from "@/lib/reservation-billing";
 import { lookupMember } from "@/lib/salesforce";
 import {
   formatSiteAssignmentLabel,
-  PUBLIC_BOOKING_CONFIRMATION_DELAY_MINUTES,
   PUBLIC_BOOKING_IMPORT_SOURCE,
   type CampSiteRow,
 } from "@/lib/public-camp-booking";
 import { sendPublicCampReservationConfirmationEmail } from "@/lib/sendgrid";
 import { createReservationPayToken } from "@/lib/reservation-pay-token";
 import { reservationPayPageUrl } from "@/lib/reservation-notify";
+import { summarizeReservationPaymentObligations } from "@/lib/reservation-balance-due";
 
 /**
  * Cron: send delayed confirmation emails for public web reservations (with site assignment).
@@ -88,9 +88,17 @@ export async function GET(request: NextRequest) {
       site_type: r.site_type,
       special_type: r.special_type,
     } as CampSiteRow);
-    const balance = await getReservationBalance(r.id);
+    const periods = await listBillingPeriods(r.id);
+    const checkIn = String(r.check_in_date).slice(0, 10);
+    const checkOut = String(r.check_out_date).slice(0, 10);
+    const obligations = summarizeReservationPaymentObligations({
+      periods,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      reservationType: r.reservation_type,
+    });
     const payBalanceUrl =
-      balance.balanceDueCents > 0
+      obligations.payableNowCents > 0
         ? reservationPayPageUrl(await createReservationPayToken(r.id))
         : null;
 
@@ -98,11 +106,18 @@ export async function GET(request: NextRequest) {
       to: email,
       campName,
       guestOrMemberName: name,
-      checkInDate: String(r.check_in_date).slice(0, 10),
-      checkOutDate: String(r.check_out_date).slice(0, 10),
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
       siteTypeLabel: r.booked_site_type_label || siteLabel,
       siteAssignmentLabel: siteLabel,
-      balanceDueCents: balance.balanceDueCents,
+      payment: {
+        paidInFull: obligations.paidInFull,
+        isLongTermMember: obligations.isLongTermMember,
+        balanceDueBeforeArrivalCents: obligations.balanceDueBeforeArrivalCents,
+        payableNowCents: obligations.payableNowCents,
+        nextPaymentDueDate: obligations.nextScheduledPayment?.dueDate ?? null,
+        nextPaymentDueCents: obligations.nextScheduledPayment?.amountCents ?? null,
+      },
       payBalanceUrl,
       notifyMrs: true,
     });

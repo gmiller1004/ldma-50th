@@ -13,7 +13,11 @@ type PaySummary = {
   checkOutDate: string;
   siteLabel: string;
   balanceDueCents: number;
+  totalRemainingCents?: number;
+  nextPaymentDueDate?: string | null;
+  nextPaymentDueCents?: number | null;
   paidInFull: boolean;
+  nothingPayableNow?: boolean;
 };
 
 export function ReservationPayContent() {
@@ -82,6 +86,10 @@ export function ReservationPayContent() {
               <p className="text-sm text-[#6dd472] bg-[#0f3d1e]/40 border border-[#6dd472]/30 rounded-lg px-3 py-2">
                 Payment received — thank you! Your campsite fees are paid in full.
               </p>
+            ) : paid && !summary.paidInFull ? (
+              <p className="text-sm text-[#6dd472] bg-[#0f3d1e]/40 border border-[#6dd472]/30 rounded-lg px-3 py-2">
+                Payment received — thank you!
+              </p>
             ) : null}
             <p className="text-sm text-[#e8e0d5]/75">
               Hi {summary.guestOrMemberName}, your stay at <strong className="text-[#f0d48f]">{summary.campName}</strong> is{" "}
@@ -92,11 +100,31 @@ export function ReservationPayContent() {
             </p>
             {summary.paidInFull ? (
               <p className="text-sm text-[#6dd472]">No balance due — you&apos;re all set.</p>
+            ) : summary.nothingPayableNow ? (
+              <div className="space-y-2 text-sm text-[#e8e0d5]/75">
+                <p>No payment is due right now.</p>
+                {summary.nextPaymentDueDate && summary.nextPaymentDueCents ? (
+                  <p>
+                    Next payment:{" "}
+                    <strong className="text-[#f0d48f]">
+                      {formatCentsAsCurrency(summary.nextPaymentDueCents)}
+                    </strong>{" "}
+                    due on <strong className="text-[#f0d48f]">{summary.nextPaymentDueDate}</strong>.
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <>
                 <p className="text-lg font-semibold text-[#f0d48f]">
-                  Balance due: {formatCentsAsCurrency(summary.balanceDueCents)}
+                  Amount due now: {formatCentsAsCurrency(summary.balanceDueCents)}
                 </p>
+                {summary.totalRemainingCents != null &&
+                summary.totalRemainingCents > summary.balanceDueCents ? (
+                  <p className="text-xs text-[#e8e0d5]/55">
+                    Total remaining on your stay: {formatCentsAsCurrency(summary.totalRemainingCents)}.
+                    Future months will be billed on their due dates.
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   disabled={paying}

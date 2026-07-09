@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { sql, hasDb } from "@/lib/db";
 import { getCampBySlug } from "@/lib/directory-camps";
-import { getReservationBalance } from "@/lib/reservation-billing";
+import { listBillingPeriods } from "@/lib/reservation-billing";
 import { lookupMember } from "@/lib/salesforce";
 import { verifyReservationPayToken } from "@/lib/reservation-pay-token";
 import { formatSiteAssignmentLabel, type CampSiteRow } from "@/lib/public-camp-booking";
 import { PUBLIC_BOOKING_IMPORT_SOURCE } from "@/lib/public-camp-booking";
+import { summarizeReservationPaymentObligations } from "@/lib/reservation-balance-due";
 
 function publicBookingActorId(): string {
   return process.env.PUBLIC_BOOKING_ACTOR_CONTACT_ID?.trim() || "public-web-self-service";
@@ -97,7 +98,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "No email on file for this reservation." }, { status: 400 });
   }
 
-  const balance = await getReservationBalance(row.id);
+  const periods = await listBillingPeriods(row.id);
+  const checkInDate = String(row.check_in_date).slice(0, 10);
+  const checkOutDate = String(row.check_out_date).slice(0, 10);
+  const obligations = summarizeReservationPaymentObligations({
+    periods,
+    checkInDate,
+    checkOutDate,
+    reservationType: row.reservation_type,
+  });
   const campName = getCampBySlug(row.camp_slug)?.name ?? row.camp_slug;
   const siteLabel = formatSiteAssignmentLabel({
     site_code: row.site_code,
@@ -111,11 +120,16 @@ export async function GET(request: NextRequest) {
     campSlug: row.camp_slug,
     guestOrMemberName: recipient.name,
     email: recipient.email,
-    checkInDate: String(row.check_in_date).slice(0, 10),
-    checkOutDate: String(row.check_out_date).slice(0, 10),
+    checkInDate,
+    checkOutDate,
     siteLabel,
-    balanceDueCents: balance.balanceDueCents,
-    paidInFull: balance.balanceDueCents < 1,
+    balanceDueCents: obligations.payableNowCents,
+    totalRemainingCents: obligations.totalUnpaidCents,
+    balanceDueBeforeArrivalCents: obligations.balanceDueBeforeArrivalCents,
+    nextPaymentDueDate: obligations.nextScheduledPayment?.dueDate ?? null,
+    nextPaymentDueCents: obligations.nextScheduledPayment?.amountCents ?? null,
+    paidInFull: obligations.paidInFull,
+    nothingPayableNow: obligations.payableNowCents < 1 && obligations.totalUnpaidCents > 0,
   });
 }
 
@@ -152,13 +166,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No email on file for this reservation." }, { status: 400 });
   }
 
-  const balance = await getReservationBalance(row.id);
-  if (balance.balanceDueCents < 1) {
+  const periods = await listBillingPeriods(row.id);
+  const checkInDate = String(row.check_in_date).slice(0, 10);
+  const checkOutDate = String(row.check_out_date).slice(0, 10);
+  const obligations = summarizeReservationPaymentObligations({
+    periods,
+    checkInDate,
+    checkOutDate,
+    reservationType: row.reservation_type,
+  });
+  if (obligations.paidInFull) {
     return NextResponse.json({ error: "This reservation is already paid in full." }, { status: 400 });
+  }
+  if (obligations.payableNowCents < 1) {
+    return NextResponse.json(
+      {
+        error: obligations.nextScheduledPayment
+          ? `Your next payment of ${(obligations.nextScheduledPayment.amountCents / 100).toFixed(2)} is due on ${obligations.nextScheduledPayment.dueDate}.`
+          : "No payment is due at this time.",
+      },
+      { status: 400 }
+    );
   }
 
   const campName = getCampBySlug(row.camp_slug)?.name ?? row.camp_slug;
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
+  const chargeCents = obligations.payableNowCents;
 
   const metadata: Record<string, string> = {
     self_service: "true",
@@ -169,7 +202,7 @@ export async function POST(request: NextRequest) {
     created_by_contact_id: publicBookingActorId(),
     recipient_email: recipient.email,
     recipient_display_name: recipient.name,
-    amount_cents: String(balance.balanceDueCents),
+    amount_cents: String(chargeCents),
     reservation_id: row.id,
     reservation_type: row.reservation_type,
     import_source: PUBLIC_BOOKING_IMPORT_SOURCE,
@@ -196,7 +229,7 @@ export async function POST(request: NextRequest) {
           quantity: 1,
           price_data: {
             currency: "usd",
-            unit_amount: balance.balanceDueCents,
+            unit_amount: chargeCents,
             product_data: {
               name: `${campName} — Campsite balance`,
               description: `Balance due for stay ${String(row.check_in_date).slice(0, 10)} to ${String(row.check_out_date).slice(0, 10)}`,

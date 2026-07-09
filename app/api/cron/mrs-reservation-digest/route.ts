@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, hasDb } from "@/lib/db";
 import { getCampBySlug } from "@/lib/directory-camps";
-import { getReservationBalance } from "@/lib/reservation-billing";
+import { listBillingPeriods } from "@/lib/reservation-billing";
 import { lookupMember } from "@/lib/salesforce";
 import {
   caretakerAdminReservationsUrl,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/reservation-notify";
 import { fetchUpcomingBalanceDueReservations } from "@/lib/reservation-balance-reminders";
 import { formatSiteAssignmentLabel, PUBLIC_BOOKING_IMPORT_SOURCE, type CampSiteRow } from "@/lib/public-camp-booking";
+import { summarizeReservationPaymentObligations } from "@/lib/reservation-balance-due";
 import {
   sendMrsReservationDigestEmail,
   type MrsDigestBalanceDue,
@@ -84,7 +85,13 @@ export async function GET(request: NextRequest) {
 
     if (!email) continue;
 
-    const balance = await getReservationBalance(r.id);
+    const periods = await listBillingPeriods(r.id);
+    const obligations = summarizeReservationPaymentObligations({
+      periods,
+      checkInDate: String(r.check_in_date).slice(0, 10),
+      checkOutDate: String(r.check_out_date).slice(0, 10),
+      reservationType: r.reservation_type,
+    });
     const siteLabel =
       r.booked_site_type_label ||
       formatSiteAssignmentLabel({
@@ -101,7 +108,10 @@ export async function GET(request: NextRequest) {
       checkIn: String(r.check_in_date).slice(0, 10),
       checkOut: String(r.check_out_date).slice(0, 10),
       siteLabel,
-      balanceDueCents: balance.balanceDueCents,
+      balanceDueCents:
+        obligations.balanceDueBeforeArrivalCents > 0
+          ? obligations.balanceDueBeforeArrivalCents
+          : obligations.payableNowCents,
     });
   }
 

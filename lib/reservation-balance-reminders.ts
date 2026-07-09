@@ -1,9 +1,10 @@
 /**
- * Send balance-due reminder emails at 14, 7, and 3 days before check-in.
+ * Balance-due reminder emails at 14, 7, and 3 days before check-in (arrival-month balance)
+ * and before each subsequent billing period on long member stays.
  */
 
 import { sql, hasDb } from "@/lib/db";
-import { getReservationBalance } from "@/lib/reservation-billing";
+import { listBillingPeriods } from "@/lib/reservation-billing";
 import { lookupMember } from "@/lib/salesforce";
 import { getCampBySlug } from "@/lib/directory-camps";
 import { createReservationPayToken } from "@/lib/reservation-pay-token";
@@ -13,6 +14,12 @@ import {
   type BalanceReminderDays,
 } from "@/lib/sendgrid";
 import { formatSiteAssignmentLabel, type CampSiteRow } from "@/lib/public-camp-booking";
+import {
+  balanceDueBeforeArrivalCents,
+  daysBetweenIso,
+  isLongTermMemberStay,
+  summarizeReservationPaymentObligations,
+} from "@/lib/reservation-balance-due";
 
 type ReminderRow = {
   id: string;
@@ -25,6 +32,14 @@ type ReminderRow = {
   guest_email: string | null;
   guest_first_name: string | null;
   guest_last_name: string | null;
+};
+
+type BillingPeriodReminderRow = ReminderRow & {
+  period_id: string;
+  period_index: number;
+  due_date: string;
+  amount_due_cents: number;
+  amount_paid_cents: number;
 };
 
 function addDaysIso(iso: string, days: number): string {
@@ -52,7 +67,7 @@ async function resolveRecipient(row: ReminderRow): Promise<{ email: string; name
   return { email: member.email.trim(), name };
 }
 
-async function fetchReminderCandidates(daysBefore: BalanceReminderDays): Promise<ReminderRow[]> {
+async function fetchBeforeArrivalCandidates(daysBefore: BalanceReminderDays): Promise<ReminderRow[]> {
   if (!hasDb() || !sql) return [];
   const today = new Date().toISOString().slice(0, 10);
   const targetCheckIn = addDaysIso(today, daysBefore);
@@ -96,7 +111,10 @@ async function fetchReminderCandidates(daysBefore: BalanceReminderDays): Promise
   return (Array.isArray(rows) ? rows : []) as ReminderRow[];
 }
 
-async function markReminderSent(reservationId: string, daysBefore: BalanceReminderDays): Promise<void> {
+async function markBeforeArrivalReminderSent(
+  reservationId: string,
+  daysBefore: BalanceReminderDays
+): Promise<void> {
   if (!sql) return;
   if (daysBefore === 14) {
     await sql`
@@ -119,16 +137,114 @@ async function markReminderSent(reservationId: string, daysBefore: BalanceRemind
   }
 }
 
+async function fetchBillingPeriodCandidates(
+  daysBefore: BalanceReminderDays
+): Promise<BillingPeriodReminderRow[]> {
+  if (!hasDb() || !sql) return [];
+  const today = new Date().toISOString().slice(0, 10);
+  const targetDueDate = addDaysIso(today, daysBefore);
+
+  let rows: unknown;
+  if (daysBefore === 14) {
+    rows = await sql`
+      SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.reservation_type,
+             r.member_number, r.member_display_name, r.guest_email, r.guest_first_name, r.guest_last_name,
+             bp.id AS period_id, bp.period_index, bp.due_date,
+             bp.amount_due_cents, bp.amount_paid_cents
+      FROM camp_billing_periods bp
+      JOIN camp_reservations r ON r.id = bp.reservation_id
+      WHERE r.status NOT IN ('cancelled', 'completed')
+        AND bp.period_index >= 1
+        AND bp.status IN ('unpaid', 'partial')
+        AND bp.due_date = ${targetDueDate}::date
+        AND bp.amount_due_cents > bp.amount_paid_cents
+        AND bp.balance_reminder_14d_sent_at IS NULL
+      ORDER BY bp.due_date ASC
+      LIMIT 100
+    `;
+  } else if (daysBefore === 7) {
+    rows = await sql`
+      SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.reservation_type,
+             r.member_number, r.member_display_name, r.guest_email, r.guest_first_name, r.guest_last_name,
+             bp.id AS period_id, bp.period_index, bp.due_date,
+             bp.amount_due_cents, bp.amount_paid_cents
+      FROM camp_billing_periods bp
+      JOIN camp_reservations r ON r.id = bp.reservation_id
+      WHERE r.status NOT IN ('cancelled', 'completed')
+        AND bp.period_index >= 1
+        AND bp.status IN ('unpaid', 'partial')
+        AND bp.due_date = ${targetDueDate}::date
+        AND bp.amount_due_cents > bp.amount_paid_cents
+        AND bp.balance_reminder_7d_sent_at IS NULL
+      ORDER BY bp.due_date ASC
+      LIMIT 100
+    `;
+  } else {
+    rows = await sql`
+      SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.reservation_type,
+             r.member_number, r.member_display_name, r.guest_email, r.guest_first_name, r.guest_last_name,
+             bp.id AS period_id, bp.period_index, bp.due_date,
+             bp.amount_due_cents, bp.amount_paid_cents
+      FROM camp_billing_periods bp
+      JOIN camp_reservations r ON r.id = bp.reservation_id
+      WHERE r.status NOT IN ('cancelled', 'completed')
+        AND bp.period_index >= 1
+        AND bp.status IN ('unpaid', 'partial')
+        AND bp.due_date = ${targetDueDate}::date
+        AND bp.amount_due_cents > bp.amount_paid_cents
+        AND bp.balance_reminder_3d_sent_at IS NULL
+      ORDER BY bp.due_date ASC
+      LIMIT 100
+    `;
+  }
+
+  return (Array.isArray(rows) ? rows : []) as BillingPeriodReminderRow[];
+}
+
+async function markBillingPeriodReminderSent(
+  periodId: string,
+  daysBefore: BalanceReminderDays
+): Promise<void> {
+  if (!sql) return;
+  if (daysBefore === 14) {
+    await sql`
+      UPDATE camp_billing_periods
+      SET balance_reminder_14d_sent_at = NOW(), updated_at = NOW()
+      WHERE id = ${periodId} AND balance_reminder_14d_sent_at IS NULL
+    `;
+  } else if (daysBefore === 7) {
+    await sql`
+      UPDATE camp_billing_periods
+      SET balance_reminder_7d_sent_at = NOW(), updated_at = NOW()
+      WHERE id = ${periodId} AND balance_reminder_7d_sent_at IS NULL
+    `;
+  } else {
+    await sql`
+      UPDATE camp_billing_periods
+      SET balance_reminder_3d_sent_at = NOW(), updated_at = NOW()
+      WHERE id = ${periodId} AND balance_reminder_3d_sent_at IS NULL
+    `;
+  }
+}
+
 export async function sendBalanceRemindersForDay(
   daysBefore: BalanceReminderDays
 ): Promise<{ sent: number; skipped: number }> {
   let sent = 0;
   let skipped = 0;
 
-  const candidates = await fetchReminderCandidates(daysBefore);
+  const candidates = await fetchBeforeArrivalCandidates(daysBefore);
   for (const row of candidates) {
-    const balance = await getReservationBalance(row.id);
-    if (balance.balanceDueCents < 1) {
+    const periods = await listBillingPeriods(row.id);
+    const checkIn = String(row.check_in_date).slice(0, 10);
+    const checkOut = String(row.check_out_date).slice(0, 10);
+    const isLongTerm = isLongTermMemberStay({
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      reservationType: row.reservation_type,
+    });
+    const beforeArrivalCents = balanceDueBeforeArrivalCents(periods, isLongTerm);
+    if (beforeArrivalCents < 1) {
       skipped++;
       continue;
     }
@@ -147,15 +263,56 @@ export async function sendBalanceRemindersForDay(
       to: recipient.email,
       campName,
       guestOrMemberName: recipient.name,
-      checkInDate: String(row.check_in_date).slice(0, 10),
-      checkOutDate: String(row.check_out_date).slice(0, 10),
-      balanceDueCents: balance.balanceDueCents,
-      daysBeforeCheckIn: daysBefore,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      balanceDueCents: beforeArrivalCents,
+      daysBefore,
       payBalanceUrl,
+      reminderKind: "before_arrival",
     });
 
     if (ok) {
-      await markReminderSent(row.id, daysBefore);
+      await markBeforeArrivalReminderSent(row.id, daysBefore);
+      sent++;
+    } else {
+      skipped++;
+    }
+  }
+
+  const periodCandidates = await fetchBillingPeriodCandidates(daysBefore);
+  for (const row of periodCandidates) {
+    const periodBalance = Math.max(0, row.amount_due_cents - row.amount_paid_cents);
+    if (periodBalance < 1) {
+      skipped++;
+      continue;
+    }
+
+    const recipient = await resolveRecipient(row);
+    if (!recipient) {
+      skipped++;
+      continue;
+    }
+
+    const campName = getCampBySlug(row.camp_slug)?.name ?? row.camp_slug;
+    const token = await createReservationPayToken(row.id);
+    const payBalanceUrl = reservationPayPageUrl(token);
+    const dueDate = String(row.due_date).slice(0, 10);
+
+    const ok = await sendReservationBalanceReminderEmail({
+      to: recipient.email,
+      campName,
+      guestOrMemberName: recipient.name,
+      checkInDate: String(row.check_in_date).slice(0, 10),
+      checkOutDate: String(row.check_out_date).slice(0, 10),
+      balanceDueCents: periodBalance,
+      daysBefore,
+      payBalanceUrl,
+      reminderKind: "billing_period",
+      paymentDueDate: dueDate,
+    });
+
+    if (ok) {
+      await markBillingPeriodReminderSent(row.period_id, daysBefore);
       sent++;
     } else {
       skipped++;
@@ -175,7 +332,7 @@ export async function sendAllBalanceReminders(): Promise<
   return results;
 }
 
-/** Reservations with balance due, check-in within N days (for MRS digest). */
+/** Reservations with a collectible balance soon (for MRS digest). */
 export async function fetchUpcomingBalanceDueReservations(withinDays = 7) {
   if (!hasDb() || !sql) return [];
   const today = new Date().toISOString().slice(0, 10);
@@ -188,10 +345,9 @@ export async function fetchUpcomingBalanceDueReservations(withinDays = 7) {
     FROM camp_reservations r
     JOIN camp_sites s ON s.id = r.site_id
     WHERE r.status NOT IN ('cancelled', 'completed')
-      AND r.check_in_date >= ${today}::date
-      AND r.check_in_date <= ${horizon}::date
+      AND r.check_out_date >= ${today}::date
     ORDER BY r.check_in_date ASC
-    LIMIT 200
+    LIMIT 300
   `;
 
   const out: Array<{
@@ -204,6 +360,7 @@ export async function fetchUpcomingBalanceDueReservations(withinDays = 7) {
     balanceDueCents: number;
     daysUntilCheckIn: number;
     siteLabel: string;
+    dueLabel: string;
   }> = [];
 
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -213,14 +370,51 @@ export async function fetchUpcomingBalanceDueReservations(withinDays = 7) {
       site_type: string;
       special_type: string | null;
     };
-    const balance = await getReservationBalance(r.id);
-    if (balance.balanceDueCents < 1) continue;
+    const checkIn = String(r.check_in_date).slice(0, 10);
+    const checkOut = String(r.check_out_date).slice(0, 10);
+    const periods = await listBillingPeriods(r.id);
+    const obligations = summarizeReservationPaymentObligations({
+      periods,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      reservationType: r.reservation_type,
+      today,
+    });
+
+    if (obligations.paidInFull) continue;
+
+    let amountCents = 0;
+    let dueLabel = "";
+    let daysUntil = 999;
+
+    if (obligations.payableNowCents > 0) {
+      amountCents = obligations.payableNowCents;
+      if (obligations.nextScheduledPayment && today >= checkIn) {
+        dueLabel = `due ${obligations.nextScheduledPayment.dueDate}`;
+        daysUntil = daysBetweenIso(today, obligations.nextScheduledPayment.dueDate);
+      } else if (obligations.balanceDueBeforeArrivalCents > 0 && today < checkIn) {
+        dueLabel = "before arrival";
+        daysUntil = daysBetweenIso(today, checkIn);
+      } else {
+        dueLabel = "due now";
+        daysUntil = 0;
+      }
+    } else if (
+      obligations.balanceDueBeforeArrivalCents > 0 &&
+      today < checkIn &&
+      checkIn <= horizon
+    ) {
+      amountCents = obligations.balanceDueBeforeArrivalCents;
+      dueLabel = "before arrival";
+      daysUntil = daysBetweenIso(today, checkIn);
+    } else {
+      continue;
+    }
+
+    if (amountCents < 1) continue;
+
     const recipient = await resolveRecipient(r);
     if (!recipient) continue;
-    const checkIn = String(r.check_in_date).slice(0, 10);
-    const todayMs = new Date(`${today}T12:00:00`).getTime();
-    const checkInMs = new Date(`${checkIn}T12:00:00`).getTime();
-    const daysUntilCheckIn = Math.round((checkInMs - todayMs) / (24 * 60 * 60 * 1000));
 
     out.push({
       campSlug: r.camp_slug,
@@ -228,17 +422,18 @@ export async function fetchUpcomingBalanceDueReservations(withinDays = 7) {
       guestLabel: recipient.name,
       email: recipient.email,
       checkIn,
-      checkOut: String(r.check_out_date).slice(0, 10),
-      balanceDueCents: balance.balanceDueCents,
-      daysUntilCheckIn,
+      checkOut,
+      balanceDueCents: amountCents,
+      daysUntilCheckIn: daysUntil,
       siteLabel: formatSiteAssignmentLabel({
         site_code: r.site_code,
         name: r.site_name,
         site_type: r.site_type,
         special_type: r.special_type,
       } as CampSiteRow),
+      dueLabel,
     });
   }
 
-  return out;
+  return out.sort((a, b) => a.daysUntilCheckIn - b.daysUntilCheckIn).slice(0, 200);
 }
