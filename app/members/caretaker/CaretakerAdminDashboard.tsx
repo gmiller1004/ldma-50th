@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ManualReservationPanel } from "./ManualReservationPanel";
+import { CampCapacitySection } from "./CampCapacitySection";
 import { AdminCampReservationsTab } from "./AdminCampReservationsTab";
 import { ViewAsCaretakerButton } from "./CaretakerAdminViewControls";
 import { ReservationBillingSection } from "./ReservationBillingSection";
@@ -646,6 +647,8 @@ export function CaretakerAdminDashboard() {
       <ColumnHelpSheet helpId={columnHelpId} onClose={() => setColumnHelpId(null)} />
 
       <ManualReservationPanel />
+
+      <CampCapacitySection />
 
       {rosterUnmapped.length > 0 && (
         <div
