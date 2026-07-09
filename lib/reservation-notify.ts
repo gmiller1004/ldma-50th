@@ -13,12 +13,12 @@ export function mrsNotifyBcc(): string[] {
 }
 
 export function reservationPayPageUrl(token: string): string {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://myldma.com";
   return `${base}/reservations/pay?token=${encodeURIComponent(token)}`;
 }
 
 export function caretakerAdminReservationsUrl(campSlug?: string): string {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://myldma.com";
   const path = "/members/caretaker";
   if (!campSlug) return `${base}${path}`;
   return `${base}${path}?camp=${encodeURIComponent(campSlug)}`;

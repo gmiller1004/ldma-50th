@@ -12,7 +12,7 @@ import {
 } from "@/lib/reservation-pricing";
 import { siteRatesFromRow } from "@/lib/reservation-billing";
 import { validateStayWithinOpenSeason } from "@/lib/camp-seasons";
-import { countNights } from "@/lib/reservation-dates";
+import { countNights, toDateOnlyStr } from "@/lib/reservation-dates";
 
 export const PUBLIC_BOOKING_IMPORT_SOURCE = "public_web";
 export const PUBLIC_BOOKING_DEPOSIT_CENTS = 10_000;
@@ -33,8 +33,8 @@ export type CampSiteRow = {
 
 export type ReservationStayRow = {
   site_id: string;
-  check_in_date: string;
-  check_out_date: string;
+  check_in_date: string | Date;
+  check_out_date: string | Date;
 };
 
 export function siteTypeGroupKey(specialType: string | null, siteType: string): string {
@@ -71,8 +71,8 @@ export function reservationOverlapsStay(
   checkIn: string,
   checkOut: string
 ): boolean {
-  const checkInStr = String(res.check_in_date).slice(0, 10);
-  const checkOutStr = String(res.check_out_date).slice(0, 10);
+  const checkInStr = toDateOnlyStr(res.check_in_date);
+  const checkOutStr = toDateOnlyStr(res.check_out_date);
   return checkInStr < checkOut && checkOutStr > checkIn;
 }
 

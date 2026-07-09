@@ -1,6 +1,6 @@
 # Public Camp Booking — Team Ops Guide
 
-One-page reference for how **self-service campsite reservations** work on myldma50.com: customer flow, payments, emails, Klaviyo, and MRS follow-up.
+One-page reference for how **self-service campsite reservations** work on myldma.com: customer flow, payments, emails, Klaviyo, and MRS follow-up.
 
 **Related docs:** `docs/CAMP_RESERVATIONS_ROADMAP.md`, `docs/KLAVIYO_CAMP_STAY_REMARKETING.md`, `docs/CARETAKER_GUEST_CHECKIN_AND_PAYMENTS.md`
 
@@ -74,7 +74,7 @@ All customer emails are **built in code** (`lib/sendgrid.ts`) and sent via the S
 | Email | When | To | MRS visibility |
 |-------|------|-----|----------------|
 | **Payment receipt** | Immediately after Stripe payment | Customer | **BCC** MRS + **CC** `gricci@goldprospectors.org` |
-| **Reservation confirmation** | ~**15 minutes** after booking | Customer | **BCC** MRS |
+| **Reservation confirmation** | Immediately after payment (webhook); cron backfills any missed after 15 min | Customer | **BCC** MRS |
 | **Balance reminder (before arrival)** | 14 / 7 / 3 days before check-in | Customer | Only if arrival-month (or full short-stay) balance remains |
 | **Balance reminder (monthly)** | 14 / 7 / 3 days before each **billing period** due date (month 2+) | Customer | Long member stays only |
 | **MRS daily digest** | Every morning (~7:30 AM UTC) | MRS inbox | New `public_web` bookings (last 24h) + collectible balances within 7 days |
@@ -87,7 +87,7 @@ All customer emails are **built in code** (`lib/sendgrid.ts`) and sent via the S
 
 ## Pay balance
 
-Secure link: `https://myldma50.com/reservations/pay?token=...`
+Secure link: `https://myldma.com/reservations/pay?token=...`
 
 - Appears in confirmation and reminder emails when a payment can be collected.
 - No login required — token valid ~120 days.
@@ -156,4 +156,4 @@ Camp page → Reserve modal → Stripe payment
 
 ---
 
-*Last updated: March 2026 — reflects public web self-service booking on myldma50.com.*
+*Last updated: March 2026 — reflects public web self-service booking on myldma.com.*

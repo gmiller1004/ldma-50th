@@ -6,7 +6,7 @@
 
 import { lookupMember } from "@/lib/salesforce";
 import { getCampBySlug } from "@/lib/directory-camps";
-import { countNights } from "@/lib/reservation-dates";
+import { countNights, toDateOnlyStr } from "@/lib/reservation-dates";
 import { ensureKlaviyoEmailSubscribed } from "@/lib/klaviyo-marketing-subscribe";
 
 const KLAVIYO_BASE = "https://a.klaviyo.com/api";
@@ -232,8 +232,8 @@ export type ReservationRowForSync = {
  */
 export async function syncReservationToKlaviyo(row: ReservationRowForSync): Promise<void> {
   const status = reservationStatusToStayStatus(row.status);
-  const checkInDate = String(row.check_in_date).slice(0, 10);
-  const checkOutDate = String(row.check_out_date).slice(0, 10);
+  const checkInDate = toDateOnlyStr(row.check_in_date);
+  const checkOutDate = toDateOnlyStr(row.check_out_date);
   const campName = getCampBySlug(row.camp_slug)?.name ?? null;
   const nights = row.nights ?? countNights(checkInDate, checkOutDate);
 
