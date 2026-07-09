@@ -1,4 +1,5 @@
 import sgMail from "@sendgrid/mail";
+import { mrsNotifyBcc } from "@/lib/reservation-notify";
 
 const SENDER_EMAIL = process.env.SENDGRID_FROM_EMAIL || "noreply@example.com";
 const SENDER_NAME = process.env.SENDGRID_FROM_NAME || "LDMA";
@@ -479,6 +480,8 @@ export async function sendPublicCampReservationConfirmationEmail(input: {
   siteTypeLabel: string;
   siteAssignmentLabel: string;
   balanceDueCents: number;
+  payBalanceUrl?: string | null;
+  notifyMrs?: boolean;
 }): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
   if (!apiKey) {
@@ -497,6 +500,10 @@ export async function sendPublicCampReservationConfirmationEmail(input: {
     input.balanceDueCents > 0
       ? `Balance due before arrival: $${(input.balanceDueCents / 100).toFixed(2)}.`
       : "Your campsite fees are paid in full for this reservation.";
+  const payLine =
+    input.balanceDueCents > 0 && input.payBalanceUrl
+      ? `\nPay your balance online: ${input.payBalanceUrl}\n`
+      : "";
 
   const textContent = `Your reservation at ${input.campName} is confirmed.
 
@@ -506,8 +513,7 @@ We received your reservation for ${input.siteTypeLabel} from ${input.checkInDate
 
 Your assigned site: ${input.siteAssignmentLabel}
 
-${balanceLine}
-
+${balanceLine}${payLine}
 A Member Relations Specialist will follow up with you if anything else is needed before your arrival.
 
 Lost Dutchman's Mining Association`;
@@ -532,6 +538,11 @@ Lost Dutchman's Mining Association`;
             <strong style="color:#f0d48f;">${escapeHtml(input.siteAssignmentLabel)}</strong>
           </p>
           <p style="margin:0 0 16px;">${escapeHtml(balanceLine)}</p>
+          ${
+            input.balanceDueCents > 0 && input.payBalanceUrl
+              ? `<p style="margin:0 0 16px;"><a href="${escapeHtml(input.payBalanceUrl)}" style="display:inline-block;padding:12px 20px;background:#d4af37;color:#1a120b;text-decoration:none;border-radius:6px;font-weight:600;">Pay balance online</a></p>`
+              : ""
+          }
           <p style="margin:0;font-size:14px;color:#e8e0d5b3;">A Member Relations Specialist will follow up with you if anything else is needed before your arrival.</p>
         </td></tr>
         <tr><td style="padding:14px 24px;background:#1a120b;border-top:1px solid #d4af3720;">
@@ -546,6 +557,7 @@ Lost Dutchman's Mining Association`;
   try {
     await sgMail.send({
       to: input.to,
+      bcc: input.notifyMrs !== false ? mrsNotifyBcc() : undefined,
       from: { email: SENDER_EMAIL, name: SENDER_NAME },
       subject: `Your ${input.campName} campsite reservation is confirmed`,
       text: textContent,
@@ -583,7 +595,8 @@ export async function sendPaymentReceiptEmail(
   totalCents: number,
   method: "cash" | "card",
   paymentDate: string,
-  reservationDetails?: PaymentReceiptReservationDetails | null
+  reservationDetails?: PaymentReceiptReservationDetails | null,
+  options?: { bccMrs?: boolean }
 ): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
   if (!apiKey) {
@@ -677,6 +690,7 @@ Lost Dutchman's Mining Association`;
     await sgMail.send({
       to,
       cc: RECEIPT_CC_EMAIL,
+      bcc: options?.bccMrs ? mrsNotifyBcc() : undefined,
       from: { email: SENDER_EMAIL, name: SENDER_NAME },
       subject: `Payment receipt — ${campName}`,
       text: textContent,
@@ -777,6 +791,214 @@ Lost Dutchman's Mining Association`;
     return true;
   } catch (e) {
     console.error("SendGrid reservation modified email error:", e);
+    return false;
+  }
+}
+
+export type BalanceReminderDays = 14 | 7 | 3;
+
+/**
+ * Remind guest/member to pay campsite balance before check-in.
+ */
+export async function sendReservationBalanceReminderEmail(input: {
+  to: string;
+  campName: string;
+  guestOrMemberName: string;
+  checkInDate: string;
+  checkOutDate: string;
+  balanceDueCents: number;
+  daysBeforeCheckIn: BalanceReminderDays;
+  payBalanceUrl: string;
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV] Balance reminder (${input.daysBeforeCheckIn}d) for ${input.to}`);
+      return true;
+    }
+    return false;
+  }
+
+  sgMail.setApiKey(apiKey);
+  const name = input.guestOrMemberName?.trim() || "there";
+  const balance = (input.balanceDueCents / 100).toFixed(2);
+  const urgency =
+    input.daysBeforeCheckIn === 3
+      ? "Your check-in is in 3 days"
+      : input.daysBeforeCheckIn === 7
+        ? "Your check-in is in one week"
+        : "Your upcoming stay at LDMA";
+
+  const textContent = `${urgency} — balance due for ${input.campName}
+
+Hi ${name},
+
+You have a campsite reservation from ${input.checkInDate} to ${input.checkOutDate}.
+
+Balance due before arrival: $${balance}
+
+Pay online: ${input.payBalanceUrl}
+
+Questions? Contact Member Relations at info@lostdutchmans.com or (888) 465-3717.
+
+Lost Dutchman's Mining Association`;
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#1a120b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#1a120b;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" style="max-width:520px;background:#2a1f14;border-radius:8px;border:1px solid #d4af3740;">
+        <tr><td style="padding:28px 24px;text-align:center;border-bottom:1px solid #d4af3720;">
+          <h1 style="margin:0;font-size:20px;color:#f0d48f;">Balance due before arrival</h1>
+          <p style="margin:8px 0 0;font-size:14px;color:#e8e0d5b3;">${escapeHtml(input.campName)} · check-in ${escapeHtml(input.checkInDate)}</p>
+        </td></tr>
+        <tr><td style="padding:28px 24px;color:#e8e0d5;font-size:16px;line-height:1.55;">
+          <p style="margin:0 0 16px;">Hi ${escapeHtml(name)},</p>
+          <p style="margin:0 0 16px;">${escapeHtml(urgency)}. Your reservation is <strong>${escapeHtml(input.checkInDate)}</strong> to <strong>${escapeHtml(input.checkOutDate)}</strong>.</p>
+          <p style="margin:0 0 20px;font-size:18px;color:#f0d48f;"><strong>Balance due: $${balance}</strong></p>
+          <p style="margin:0 0 20px;"><a href="${escapeHtml(input.payBalanceUrl)}" style="display:inline-block;padding:12px 20px;background:#d4af37;color:#1a120b;text-decoration:none;border-radius:6px;font-weight:600;">Pay balance online</a></p>
+          <p style="margin:0;font-size:14px;color:#e8e0d5b3;">Questions? <a href="mailto:info@lostdutchmans.com" style="color:#d4af37;">info@lostdutchmans.com</a> or (888) 465-3717.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+  try {
+    await sgMail.send({
+      to: input.to,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `Balance due — ${input.campName} (${input.checkInDate})`,
+      text: textContent,
+      html: htmlContent,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid balance reminder error:", e);
+    return false;
+  }
+}
+
+export type MrsDigestNewBooking = {
+  campName: string;
+  guestLabel: string;
+  email: string;
+  checkIn: string;
+  checkOut: string;
+  siteLabel: string;
+  balanceDueCents: number;
+};
+
+export type MrsDigestBalanceDue = {
+  campName: string;
+  guestLabel: string;
+  email: string;
+  checkIn: string;
+  checkOut: string;
+  balanceDueCents: number;
+  daysUntilCheckIn: number;
+};
+
+/**
+ * Daily digest for Member Relations: new web bookings + balances due soon.
+ */
+export async function sendMrsReservationDigestEmail(input: {
+  to: string;
+  newBookings: MrsDigestNewBooking[];
+  balancesDue: MrsDigestBalanceDue[];
+  adminUrl: string;
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV] MRS digest to ${input.to}: ${input.newBookings.length} new, ${input.balancesDue.length} due`);
+      return true;
+    }
+    return false;
+  }
+
+  if (input.newBookings.length === 0 && input.balancesDue.length === 0) {
+    return true;
+  }
+
+  sgMail.setApiKey(apiKey);
+
+  const formatUsd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+  const newLines =
+    input.newBookings.length === 0
+      ? "None in the last 24 hours."
+      : input.newBookings
+          .map(
+            (b) =>
+              `• ${b.campName} — ${b.guestLabel} (${b.email})\n  ${b.checkIn} to ${b.checkOut} · ${b.siteLabel}\n  Balance: ${formatUsd(b.balanceDueCents)}`
+          )
+          .join("\n\n");
+
+  const dueLines =
+    input.balancesDue.length === 0
+      ? "None in the next 7 days."
+      : input.balancesDue
+          .map(
+            (b) =>
+              `• ${b.campName} — ${b.guestLabel} (${b.email})\n  Check-in ${b.checkIn} (${b.daysUntilCheckIn}d) · Balance ${formatUsd(b.balanceDueCents)}`
+          )
+          .join("\n\n");
+
+  const textContent = `LDMA campsite reservation digest
+
+New online bookings (last 24 hours):
+${newLines}
+
+Balances due (check-in within 7 days):
+${dueLines}
+
+Caretaker portal: ${input.adminUrl}
+
+Lost Dutchman's Mining Association`;
+
+  const listHtml = (items: string) =>
+    `<pre style="margin:0 0 20px;padding:14px 16px;background:#1a120b;border-radius:6px;border:1px solid #d4af3725;color:#e8e0d5;font-size:13px;line-height:1.5;white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;">${escapeHtml(items)}</pre>`;
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#1a120b;">
+  <table role="presentation" width="100%" style="background:#1a120b;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" style="max-width:600px;background:#2a1f14;border-radius:8px;border:1px solid #d4af3740;">
+        <tr><td style="padding:24px;border-bottom:1px solid #d4af3720;">
+          <h1 style="margin:0;font-size:20px;color:#f0d48f;">Campsite reservation digest</h1>
+        </td></tr>
+        <tr><td style="padding:24px;color:#e8e0d5;">
+          <h2 style="margin:0 0 8px;font-size:14px;color:#d4af37;text-transform:uppercase;letter-spacing:.06em;">New online bookings (24h)</h2>
+          ${listHtml(newLines)}
+          <h2 style="margin:0 0 8px;font-size:14px;color:#d4af37;text-transform:uppercase;letter-spacing:.06em;">Balances due (7 days)</h2>
+          ${listHtml(dueLines)}
+          <p style="margin:0;"><a href="${escapeHtml(input.adminUrl)}" style="color:#d4af37;">Open caretaker portal</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+  try {
+    await sgMail.send({
+      to: input.to,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `LDMA campsite digest — ${input.newBookings.length} new, ${input.balancesDue.length} balances due`,
+      text: textContent,
+      html: htmlContent,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid MRS digest error:", e);
     return false;
   }
 }

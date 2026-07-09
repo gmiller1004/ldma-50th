@@ -17,6 +17,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/mrs-reservation-digest",
+      "schedule": "30 7 * * *"
+    },
+    {
       "path": "/api/cron/camp-reservation-confirmation",
       "schedule": "*/15 * * * *"
     }

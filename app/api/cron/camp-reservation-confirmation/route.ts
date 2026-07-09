@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql, hasDb } from "@/lib/db";
 import { getCampBySlug } from "@/lib/directory-camps";
 import { getReservationBalance } from "@/lib/reservation-billing";
+import { lookupMember } from "@/lib/salesforce";
 import {
   formatSiteAssignmentLabel,
   PUBLIC_BOOKING_CONFIRMATION_DELAY_MINUTES,
@@ -9,6 +10,8 @@ import {
   type CampSiteRow,
 } from "@/lib/public-camp-booking";
 import { sendPublicCampReservationConfirmationEmail } from "@/lib/sendgrid";
+import { createReservationPayToken } from "@/lib/reservation-pay-token";
+import { reservationPayPageUrl } from "@/lib/reservation-notify";
 
 /**
  * Cron: send delayed confirmation emails for public web reservations (with site assignment).
@@ -68,6 +71,11 @@ export async function GET(request: NextRequest) {
         ? r.member_display_name || (r.member_number ? `#${r.member_number}` : "Member")
         : [r.guest_first_name, r.guest_last_name].filter(Boolean).join(" ").trim() || "Guest";
 
+    if (!email && r.reservation_type === "member" && r.member_number?.trim()) {
+      const member = await lookupMember(r.member_number.trim());
+      if (member.valid && member.email?.trim()) email = member.email.trim();
+    }
+
     if (!email) {
       skipped++;
       continue;
@@ -81,6 +89,10 @@ export async function GET(request: NextRequest) {
       special_type: r.special_type,
     } as CampSiteRow);
     const balance = await getReservationBalance(r.id);
+    const payBalanceUrl =
+      balance.balanceDueCents > 0
+        ? reservationPayPageUrl(await createReservationPayToken(r.id))
+        : null;
 
     const ok = await sendPublicCampReservationConfirmationEmail({
       to: email,
@@ -91,6 +103,8 @@ export async function GET(request: NextRequest) {
       siteTypeLabel: r.booked_site_type_label || siteLabel,
       siteAssignmentLabel: siteLabel,
       balanceDueCents: balance.balanceDueCents,
+      payBalanceUrl,
+      notifyMrs: true,
     });
 
     if (ok) {

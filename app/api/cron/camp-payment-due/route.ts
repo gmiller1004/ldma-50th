@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { directoryCamps } from "@/lib/directory-camps";
 import { fetchPaymentsDueForCamp } from "@/lib/caretaker-site-ar";
+import { sendAllBalanceReminders } from "@/lib/reservation-balance-reminders";
 
 /**
  * GET /api/cron/camp-payment-due
- * Nightly: log camps with site-fee balances due (portal reads live via /payments-due).
+ * Daily: log AR summary and send 14/7/3-day balance reminder emails.
  */
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -28,5 +29,7 @@ export async function GET(request: NextRequest) {
   const totalOverdue = summary.reduce((s, c) => s + c.overdueCount, 0);
   console.log(`[cron camp-payment-due] ${totalDue} reservations with site fees due (${totalOverdue} overdue)`);
 
-  return NextResponse.json({ ok: true, summary, totalDue, totalOverdue });
+  const reminders = await sendAllBalanceReminders();
+
+  return NextResponse.json({ ok: true, summary, totalDue, totalOverdue, reminders });
 }

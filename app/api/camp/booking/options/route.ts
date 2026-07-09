@@ -5,8 +5,9 @@ import { campUsesReservations } from "@/lib/reservation-camps";
 import { getCampBySlug, getValidCampSlugs } from "@/lib/directory-camps";
 import { verifySessionToken } from "@/lib/session";
 import { lookupMember } from "@/lib/salesforce";
+import { memberQualifiesForCampBooking } from "@/lib/reservation-member";
 import { siteRatesFromRow } from "@/lib/reservation-billing";
-import { campSeasonDescription } from "@/lib/camp-seasons";
+import { campOpenSeasonSummary } from "@/lib/camp-seasons";
 import {
   buildSiteTypeAvailability,
   computePublicPaymentOptions,
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
   if (session?.memberNumber) {
     try {
       const member = await lookupMember(session.memberNumber);
-      if (member.valid) {
+      if (memberQualifiesForCampBooking(member)) {
         isMember = true;
         memberDisplayName =
           [member.firstName, member.lastName].filter(Boolean).join(" ").trim() || null;
@@ -54,26 +55,14 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const guestValidation = validatePublicBookingRequest({
+  const validation = validatePublicBookingRequest({
     campSlug,
     checkIn,
     checkOut,
-    reservationType: "guest",
+    reservationType: isMember ? "member" : "guest",
   });
-  if (!guestValidation.ok) {
-    return NextResponse.json({ error: guestValidation.error }, { status: 400 });
-  }
-
-  if (isMember) {
-    const memberValidation = validatePublicBookingRequest({
-      campSlug,
-      checkIn,
-      checkOut,
-      reservationType: "member",
-    });
-    if (!memberValidation.ok) {
-      return NextResponse.json({ error: memberValidation.error }, { status: 400 });
-    }
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
   const siteRows = await sql`
@@ -134,10 +123,10 @@ export async function GET(request: NextRequest) {
     campName: camp?.name ?? campSlug,
     checkIn,
     checkOut,
-    nights: guestValidation.nights,
+    nights: validation.nights,
     isMember,
     memberDisplayName,
-    seasonNote: campSeasonDescription(campSlug),
+    seasonNote: campOpenSeasonSummary(campSlug),
     siteTypes,
   });
 }

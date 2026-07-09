@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, X } from "lucide-react";
+import { Calendar, Loader2, X } from "lucide-react";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
 import { GUEST_MAX_CONSECUTIVE_NIGHTS } from "@/lib/public-camp-booking";
+import { campOpenSeasonSummary, validateStayWithinOpenSeason } from "@/lib/camp-seasons";
+import { validatePublicBookingRequest } from "@/lib/public-camp-booking";
 
 type PaymentOption = {
   id: "full" | "deposit";
@@ -43,6 +45,40 @@ function todayIso(): string {
   return new Date().toLocaleDateString("en-CA");
 }
 
+const dateInputClassName =
+  "w-full rounded border border-[#d4af37]/30 bg-[#0f0a06] text-[#e8e0d5] pl-3 pr-10 py-2 text-sm [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:cursor-pointer";
+
+function DateField({
+  label,
+  value,
+  min,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  min: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-xs text-[#e8e0d5]/65">
+      {label}
+      <div className="relative">
+        <input
+          type="date"
+          min={min}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={dateInputClassName}
+        />
+        <Calendar
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#d4af37]"
+          aria-hidden
+        />
+      </div>
+    </label>
+  );
+}
+
 export function CampReserveModal({
   open,
   onClose,
@@ -70,6 +106,8 @@ export function CampReserveModal({
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  const seasonNote = useMemo(() => campOpenSeasonSummary(campSlug), [campSlug]);
 
   const reset = useCallback(() => {
     setStep("dates");
@@ -127,6 +165,23 @@ export function CampReserveModal({
   async function loadOptions() {
     setLoading(true);
     setError(null);
+    const seasonCheck = validateStayWithinOpenSeason(campSlug, checkIn, checkOut);
+    if (!seasonCheck.ok) {
+      setError(seasonCheck.error);
+      setLoading(false);
+      return;
+    }
+    const bookingCheck = validatePublicBookingRequest({
+      campSlug,
+      checkIn,
+      checkOut,
+      reservationType: isMember ? "member" : "guest",
+    });
+    if (!bookingCheck.ok) {
+      setError(bookingCheck.error);
+      setLoading(false);
+      return;
+    }
     try {
       const params = new URLSearchParams({ campSlug, checkIn, checkOut });
       const res = await fetch(`/api/camp/booking/options?${params}`, { cache: "no-store" });
@@ -184,33 +239,32 @@ export function CampReserveModal({
       aria-modal="true"
       aria-labelledby="camp-reserve-title"
     >
-      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-[#d4af37]/30 bg-[#1a120b] shadow-2xl">
+      <div className="relative flex flex-col w-full max-w-md max-h-[min(85vh,520px)] rounded-xl border border-[#d4af37]/30 bg-[#1a120b] shadow-2xl overflow-hidden">
         <button
           type="button"
           onClick={() => {
             reset();
             onClose();
           }}
-          className="absolute top-3 right-3 p-2 rounded-lg text-[#e8e0d5]/70 hover:text-[#f0d48f] hover:bg-[#d4af37]/10"
+          className="absolute top-3 right-3 z-10 p-2 rounded-lg text-[#e8e0d5]/70 hover:text-[#f0d48f] hover:bg-[#d4af37]/10"
           aria-label="Close"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="p-6 sm:p-8 space-y-5">
-          <div>
-            <h2 id="camp-reserve-title" className="font-serif text-2xl text-[#f0d48f] pr-8">
-              Reserve Your Campsite
-            </h2>
-            <p className="text-sm text-[#e8e0d5]/65 mt-1">{campName}</p>
-          </div>
-
+        <div className="shrink-0 px-5 pt-5 pb-3 border-b border-[#d4af37]/15">
+          <h2 id="camp-reserve-title" className="font-serif text-xl text-[#f0d48f] pr-8">
+            Reserve Your Campsite
+          </h2>
+          <p className="text-sm text-[#e8e0d5]/65 mt-1">{campName}</p>
           {error ? (
-            <div className="rounded-lg border border-red-500/40 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+            <div className="mt-3 rounded-lg border border-red-500/40 bg-red-950/30 px-3 py-2 text-sm text-red-200">
               {error}
             </div>
           ) : null}
+        </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4">
           {step === "dates" ? (
             <div className="space-y-4">
               <p className="text-sm text-[#e8e0d5]/75">
@@ -229,27 +283,24 @@ export function CampReserveModal({
                   Booking as {memberName || "member"} — member rates apply.
                 </p>
               )}
+              {seasonNote ? (
+                <p className="text-xs text-[#d4af37]/90 bg-[#d4af37]/10 border border-[#d4af37]/25 rounded-lg px-3 py-2">
+                  <span className="font-medium text-[#f0d48f]">Seasonal camp.</span> {seasonNote}
+                </p>
+              ) : null}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="flex flex-col gap-1 text-xs text-[#e8e0d5]/65">
-                  Check-in
-                  <input
-                    type="date"
-                    min={todayIso()}
-                    value={checkIn}
-                    onChange={(e) => setCheckIn(e.target.value)}
-                    className="rounded border border-[#d4af37]/30 bg-[#0f0a06] text-[#e8e0d5] px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs text-[#e8e0d5]/65">
-                  Check-out
-                  <input
-                    type="date"
-                    min={checkIn || todayIso()}
-                    value={checkOut}
-                    onChange={(e) => setCheckOut(e.target.value)}
-                    className="rounded border border-[#d4af37]/30 bg-[#0f0a06] text-[#e8e0d5] px-3 py-2 text-sm"
-                  />
-                </label>
+                <DateField
+                  label="Check-in"
+                  min={todayIso()}
+                  value={checkIn}
+                  onChange={setCheckIn}
+                />
+                <DateField
+                  label="Check-out"
+                  min={checkIn || todayIso()}
+                  value={checkOut}
+                  onChange={setCheckOut}
+                />
               </div>
               <button
                 type="button"
@@ -264,15 +315,18 @@ export function CampReserveModal({
           ) : null}
 
           {step === "siteType" && options ? (
-            <div className="space-y-4">
-              <p className="text-sm text-[#e8e0d5]/75">
-                {options.nights} night{options.nights === 1 ? "" : "s"} · {options.checkIn} –{" "}
-                {options.checkOut}
-              </p>
-              {options.seasonNote ? (
-                <p className="text-xs text-[#e8e0d5]/50">{options.seasonNote}</p>
-              ) : null}
-              <div className="space-y-2">
+            <div className="flex flex-col gap-3 min-h-0">
+              <div className="shrink-0 space-y-1">
+                <p className="text-sm text-[#e8e0d5]/75">
+                  {options.nights} night{options.nights === 1 ? "" : "s"} · {options.checkIn} –{" "}
+                  {options.checkOut}
+                </p>
+                {options.seasonNote ? (
+                  <p className="text-xs text-[#e8e0d5]/50">{options.seasonNote}</p>
+                ) : null}
+                <p className="text-xs text-[#e8e0d5]/55">Choose a site type</p>
+              </div>
+              <div className="min-h-0 max-h-[min(42vh,280px)] overflow-y-auto overscroll-contain -mx-1 px-1 space-y-1.5">
                 {options.siteTypes.map((t) => {
                   const price =
                     useMemberRate && isMember ? t.memberTotalCents : t.guestTotalCents;
@@ -286,16 +340,16 @@ export function CampReserveModal({
                         setSelectedTypeKey(t.siteTypeKey);
                         setStep("details");
                       }}
-                      className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
+                      className={`w-full text-left rounded-lg border px-3 py-2.5 transition-colors ${
                         disabled
                           ? "border-[#e8e0d5]/15 opacity-50 cursor-not-allowed"
                           : "border-[#d4af37]/25 hover:border-[#d4af37]/50 hover:bg-[#d4af37]/5"
                       }`}
                     >
-                      <div className="flex justify-between gap-3 items-start">
-                        <div>
-                          <p className="text-sm font-medium text-[#f0d48f]">{t.label}</p>
-                          <p className="text-xs text-[#e8e0d5]/50 mt-0.5">
+                      <div className="flex justify-between gap-3 items-center">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[#f0d48f] leading-snug">{t.label}</p>
+                          <p className="text-[11px] text-[#e8e0d5]/50 mt-0.5">
                             {disabled
                               ? "Sold out"
                               : `${t.availableCount} site${t.availableCount === 1 ? "" : "s"} available`}
@@ -304,7 +358,7 @@ export function CampReserveModal({
                         <p className="text-sm font-semibold text-[#e8e0d5] tabular-nums shrink-0">
                           {formatCentsAsCurrency(price)}
                           {t.usesMonthlyMemberRate && useMemberRate && isMember ? (
-                            <span className="block text-[10px] font-normal text-[#e8e0d5]/45">
+                            <span className="block text-[10px] font-normal text-[#e8e0d5]/45 text-right">
                               first month
                             </span>
                           ) : null}
@@ -314,22 +368,24 @@ export function CampReserveModal({
                   );
                 })}
               </div>
-              {!isMember ? (
-                <p className="text-xs text-[#e8e0d5]/55">
-                  Showing guest rates.{" "}
-                  <Link href="/members/login" className="text-[#d4af37] underline">
-                    Log in
-                  </Link>{" "}
-                  for member pricing.
-                </p>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setStep("dates")}
-                className="text-sm text-[#e8e0d5]/55 hover:text-[#d4af37]"
-              >
-                ← Change dates
-              </button>
+              <div className="shrink-0 space-y-2 pt-1 border-t border-[#d4af37]/10">
+                {!isMember ? (
+                  <p className="text-xs text-[#e8e0d5]/55">
+                    Showing guest rates.{" "}
+                    <Link href="/members/login" className="text-[#d4af37] underline">
+                      Log in
+                    </Link>{" "}
+                    for member pricing.
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setStep("dates")}
+                  className="text-sm text-[#e8e0d5]/55 hover:text-[#d4af37]"
+                >
+                  ← Change dates
+                </button>
+              </div>
             </div>
           ) : null}
 

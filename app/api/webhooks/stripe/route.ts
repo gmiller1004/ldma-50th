@@ -382,7 +382,8 @@ export async function POST(request: NextRequest) {
     amountCents,
     "card",
     paymentDate,
-    reservationDetails ?? null
+    reservationDetails ?? null,
+    { bccMrs: isSelfService }
   ).catch((e) => {
     console.error("[webhook] Receipt email failed:", e);
     return false;

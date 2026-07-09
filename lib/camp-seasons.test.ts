@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  campOpenSeasonSummary,
   isDateInCampClosedSeason,
   validateStayWithinOpenSeason,
 } from "./camp-seasons.ts";
@@ -27,12 +28,22 @@ describe("isDateInCampClosedSeason", () => {
   });
 });
 
+describe("campOpenSeasonSummary", () => {
+  it("describes Stanton open and closed windows", () => {
+    const summary = campOpenSeasonSummary("stanton-arizona");
+    assert.match(summary ?? "", /Open October 1 – May 31/);
+    assert.match(summary ?? "", /Closed June 1 – September 30/);
+  });
+});
+
 describe("validateStayWithinOpenSeason", () => {
-  it("rejects stays overlapping closed nights", () => {
+  it("rejects stays overlapping closed nights with open season details", () => {
     const result = validateStayWithinOpenSeason("stanton-arizona", "2026-09-28", "2026-10-03");
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.match(result.error, /closed/i);
+      assert.match(result.error, /Open October 1/i);
+      assert.match(result.error, /Closed June 1/i);
     }
   });
 

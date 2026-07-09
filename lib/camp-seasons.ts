@@ -67,20 +67,46 @@ export function validateStayWithinOpenSeason(
     isDateInCampClosedSeason(campSlug, d)
   );
   if (closedNight) {
+    const summary = campOpenSeasonSummary(campSlug);
     return {
       ok: false,
-      error: "Selected dates include nights when this camp is closed for the season.",
+      error: summary
+        ? `Selected dates include nights when this camp is closed for the season. ${summary}`
+        : "Selected dates include nights when this camp is closed for the season.",
     };
   }
   return { ok: true };
 }
 
-export function campSeasonDescription(campSlug: string): string | null {
+function monthLong(month: number): string {
+  return new Date(2000, month - 1, 1).toLocaleString("en-US", { month: "long" });
+}
+
+function lastDayOfMonth(month: number): number {
+  return new Date(2000, month, 0).getDate();
+}
+
+/** User-facing open/closed season summary for seasonal camps. */
+export function campOpenSeasonSummary(campSlug: string): string | null {
   const rule = CAMP_SEASON_RULES[campSlug];
   if (!rule) return null;
-  const monthName = (m: number) =>
-    new Date(2000, m - 1, 1).toLocaleString("en-US", { month: "long" });
-  return `Open ${monthName(rule.openMonth)} ${rule.openDay} – ${monthName(
-    rule.closedMonth === 1 ? 12 : rule.closedMonth - 1
-  )} (closed ${monthName(rule.closedMonth)} ${rule.closedDay} – ${monthName(rule.openMonth)} ${rule.openDay - 1 || "end of month"})`;
+
+  const closedEndMonth = rule.openMonth === 1 ? 12 : rule.openMonth - 1;
+  const closedEndDay =
+    rule.openDay === 1 ? lastDayOfMonth(closedEndMonth) : rule.openDay - 1;
+
+  const openEndMonth = rule.closedMonth === 1 ? 12 : rule.closedMonth - 1;
+  const openEndDay =
+    rule.closedDay === 1 ? lastDayOfMonth(openEndMonth) : rule.closedDay - 1;
+
+  return `Open ${monthLong(rule.openMonth)} ${rule.openDay} – ${monthLong(openEndMonth)} ${openEndDay}. Closed ${monthLong(rule.closedMonth)} ${rule.closedDay} – ${monthLong(closedEndMonth)} ${closedEndDay}.`;
+}
+
+export function campHasSeasonalClosure(campSlug: string): boolean {
+  return campSlug in CAMP_SEASON_RULES;
+}
+
+/** @deprecated Use campOpenSeasonSummary */
+export function campSeasonDescription(campSlug: string): string | null {
+  return campOpenSeasonSummary(campSlug);
 }

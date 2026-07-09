@@ -6,6 +6,7 @@ import { campUsesReservations } from "@/lib/reservation-camps";
 import { getCampBySlug, getValidCampSlugs } from "@/lib/directory-camps";
 import { verifySessionToken } from "@/lib/session";
 import { lookupMember } from "@/lib/salesforce";
+import { memberQualifiesForCampBooking } from "@/lib/reservation-member";
 import { siteRatesFromRow } from "@/lib/reservation-billing";
 import { computeStayPricing } from "@/lib/reservation-pricing";
 import {
@@ -95,8 +96,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Log in to book at the member rate." }, { status: 401 });
     }
     const member = await lookupMember(session.memberNumber);
-    if (!member.valid) {
-      return NextResponse.json({ error: "Member account not found. Log in again." }, { status: 401 });
+    if (!memberQualifiesForCampBooking(member)) {
+      return NextResponse.json({ error: "Active LDMA membership required for member rates." }, { status: 401 });
     }
     reservationType = "member";
     memberContactId = member.contactId ?? session.contactId ?? null;
