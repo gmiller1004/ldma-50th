@@ -1,4 +1,5 @@
 import sgMail from "@sendgrid/mail";
+import { campCancellationPolicyUrl } from "@/lib/camp-cancellation-policy";
 import { mrsNotifyBcc } from "@/lib/reservation-notify";
 
 const SENDER_EMAIL = process.env.SENDGRID_FROM_EMAIL || "noreply@example.com";
@@ -405,6 +406,7 @@ export async function sendReservationConfirmationEmail(
   sgMail.setApiKey(apiKey);
 
   const name = guestOrMemberName?.trim() || "there";
+  const cancellationPolicyUrl = campCancellationPolicyUrl();
   const textContent = `Your reservation at ${campName} is confirmed.
 
 Hi ${name},
@@ -412,6 +414,8 @@ Hi ${name},
 You're reserved at ${siteName} from ${checkInDate} to ${checkOutDate}. We look forward to seeing you.
 
 If you need to change or cancel your reservation, please contact the camp caretaker.
+
+Cancellation & refund policy: ${cancellationPolicyUrl}
 
 Lost Dutchman's Mining Association`;
 
@@ -437,7 +441,8 @@ Lost Dutchman's Mining Association`;
             <td style="padding: 32px 24px;">
               <p style="margin: 0 0 16px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">Hi ${escapeHtml(name)},</p>
               <p style="margin: 0 0 24px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">You're reserved at <strong>${escapeHtml(siteName)}</strong> from <strong>${escapeHtml(checkInDate)}</strong> to <strong>${escapeHtml(checkOutDate)}</strong>. We look forward to seeing you.</p>
-              <p style="margin: 0; font-size: 14px; color: #e8e0d5b3; line-height: 1.5;">If you need to change or cancel your reservation, please contact the camp caretaker.</p>
+              <p style="margin: 0 0 12px; font-size: 14px; color: #e8e0d5b3; line-height: 1.5;">If you need to change or cancel your reservation, please contact the camp caretaker.</p>
+              <p style="margin: 0; font-size: 14px; color: #e8e0d5b3; line-height: 1.5;">By completing this reservation you agree to our <a href="${escapeHtml(cancellationPolicyUrl)}" style="color: #d4af37; text-decoration: underline;">cancellation &amp; refund policy</a>.</p>
             </td>
           </tr>
           <tr>
@@ -544,6 +549,7 @@ export async function sendPublicCampReservationConfirmationEmail(input: {
 
   const name = input.guestOrMemberName?.trim() || "there";
   const { balanceLine, showPayButton } = buildConfirmationPaymentCopy(input.payment);
+  const cancellationPolicyUrl = campCancellationPolicyUrl();
   const payLine =
     showPayButton && input.payBalanceUrl
       ? `\nPay online: ${input.payBalanceUrl}\n`
@@ -559,6 +565,9 @@ Your assigned site: ${input.siteAssignmentLabel}
 
 ${balanceLine}${payLine}
 A Member Relations Specialist will follow up with you if anything else is needed before your arrival.
+
+By completing this reservation you agree to our cancellation & refund policy:
+${cancellationPolicyUrl}
 
 Lost Dutchman's Mining Association`;
 
@@ -587,7 +596,8 @@ Lost Dutchman's Mining Association`;
               ? `<p style="margin:0 0 16px;"><a href="${escapeHtml(input.payBalanceUrl)}" style="display:inline-block;padding:12px 20px;background:#d4af37;color:#1a120b;text-decoration:none;border-radius:6px;font-weight:600;">Pay online</a></p>`
               : ""
           }
-          <p style="margin:0;font-size:14px;color:#e8e0d5b3;">A Member Relations Specialist will follow up with you if anything else is needed before your arrival.</p>
+          <p style="margin:0 0 12px;font-size:14px;color:#e8e0d5b3;">A Member Relations Specialist will follow up with you if anything else is needed before your arrival.</p>
+          <p style="margin:0;font-size:13px;color:#e8e0d5b3;line-height:1.5;">By completing this reservation you agree to our <a href="${escapeHtml(cancellationPolicyUrl)}" style="color:#d4af37;text-decoration:underline;">cancellation &amp; refund policy</a>.</p>
         </td></tr>
         <tr><td style="padding:14px 24px;background:#1a120b;border-top:1px solid #d4af3720;">
           <p style="margin:0;font-size:12px;color:#e8e0d560;">Lost Dutchman's Mining Association</p>
