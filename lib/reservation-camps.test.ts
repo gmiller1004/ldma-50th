@@ -4,6 +4,9 @@ import {
   campUsesReservations,
   caretakerAllowsCashCheckIn,
   caretakerEarliestCheckInDate,
+  isHookupSiteType,
+  parseCapacitySiteFilter,
+  siteMatchesCapacityFilter,
 } from "./reservation-camps.ts";
 
 describe("campUsesReservations", () => {
@@ -32,5 +35,31 @@ describe("caretakerAllowsCashCheckIn", () => {
 describe("caretakerEarliestCheckInDate", () => {
   it("is 7 days before today", () => {
     assert.equal(caretakerEarliestCheckInDate("2026-05-19"), "2026-05-12");
+  });
+});
+
+describe("capacity site filter", () => {
+  it("parses hookup and dry filters", () => {
+    assert.equal(parseCapacitySiteFilter("hookup"), "hookup");
+    assert.equal(parseCapacitySiteFilter("dry"), "dry");
+    assert.equal(parseCapacitySiteFilter("all"), "all");
+    assert.equal(parseCapacitySiteFilter(null), "all");
+    assert.equal(parseCapacitySiteFilter("invalid"), "all");
+  });
+
+  it("classifies hookup site types", () => {
+    assert.equal(isHookupSiteType("30 Amp Full Hook-Up"), true);
+    assert.equal(isHookupSiteType("50 Amp"), true);
+    assert.equal(isHookupSiteType("Dry Camping"), false);
+    assert.equal(isHookupSiteType("Dry"), false);
+  });
+
+  it("filters sites by hookup vs dry", () => {
+    assert.equal(siteMatchesCapacityFilter("30 Amp", "all"), true);
+    assert.equal(siteMatchesCapacityFilter("Dry", "all"), true);
+    assert.equal(siteMatchesCapacityFilter("30 Amp", "hookup"), true);
+    assert.equal(siteMatchesCapacityFilter("Dry", "hookup"), false);
+    assert.equal(siteMatchesCapacityFilter("Dry Camping", "dry"), true);
+    assert.equal(siteMatchesCapacityFilter("30 Amp", "dry"), false);
   });
 });

@@ -66,3 +66,17 @@ export function isHookupSiteType(siteType: string): boolean {
   const t = (siteType || "").toLowerCase();
   return /hook|30\s*amp|50\s*amp|amp\s*\/|electric|water\s*hook/.test(t);
 }
+
+export type CapacitySiteFilter = "all" | "hookup" | "dry";
+
+export function parseCapacitySiteFilter(value: string | null | undefined): CapacitySiteFilter {
+  const v = (value || "").trim().toLowerCase();
+  if (v === "hookup" || v === "dry") return v;
+  return "all";
+}
+
+export function siteMatchesCapacityFilter(siteType: string, filter: CapacitySiteFilter): boolean {
+  if (filter === "all") return true;
+  const hookup = isHookupSiteType(siteType);
+  return filter === "hookup" ? hookup : !hookup;
+}

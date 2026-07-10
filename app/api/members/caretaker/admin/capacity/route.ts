@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCaretakerAccess } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
-import { campUsesReservations, isNonBookableSite } from "@/lib/reservation-camps";
+import {
+  campUsesReservations,
+  isNonBookableSite,
+  parseCapacitySiteFilter,
+  siteMatchesCapacityFilter,
+} from "@/lib/reservation-camps";
 import { getCampBySlug, getValidCampSlugs } from "@/lib/directory-camps";
 import {
   computeCapacityStats,
@@ -14,10 +19,11 @@ type SiteRow = {
   id: string;
   name: string;
   site_code: string | null;
+  site_type: string;
 };
 
 /**
- * GET /api/members/caretaker/admin/capacity?campSlug=...&from=YYYY-MM-DD&to=YYYY-MM-DD
+ * GET /api/members/caretaker/admin/capacity?campSlug=...&from=YYYY-MM-DD&to=YYYY-MM-DD&siteFilter=all|hookup|dry
  * Booked vs available bookable sites for a camp over a date range.
  */
 export async function GET(request: NextRequest) {
@@ -32,6 +38,7 @@ export async function GET(request: NextRequest) {
   const campSlug = request.nextUrl.searchParams.get("campSlug")?.trim() ?? "";
   const from = request.nextUrl.searchParams.get("from")?.trim() ?? "";
   const to = request.nextUrl.searchParams.get("to")?.trim() ?? "";
+  const siteFilter = parseCapacitySiteFilter(request.nextUrl.searchParams.get("siteFilter"));
 
   if (!campSlug || !getValidCampSlugs().includes(campSlug)) {
     return NextResponse.json({ error: "Valid campSlug required" }, { status: 400 });
@@ -44,13 +51,15 @@ export async function GET(request: NextRequest) {
   }
 
   const siteRows = await sql`
-    SELECT id, name, site_code
+    SELECT id, name, site_code, site_type
     FROM camp_sites
     WHERE camp_slug = ${campSlug}
     ORDER BY sort_order ASC, name ASC
   `;
   const bookable = ((Array.isArray(siteRows) ? siteRows : []) as SiteRow[]).filter(
-    (s) => !isNonBookableSite(campSlug, s.name, s.site_code)
+    (s) =>
+      !isNonBookableSite(campSlug, s.name, s.site_code) &&
+      siteMatchesCapacityFilter(s.site_type, siteFilter)
   );
 
   const rangeEndExclusive = addDays(to, 1);
@@ -103,6 +112,7 @@ export async function GET(request: NextRequest) {
     campName: camp?.name ?? campSlug,
     from,
     to,
+    siteFilter,
     ...siteStats,
     siteNights,
   });

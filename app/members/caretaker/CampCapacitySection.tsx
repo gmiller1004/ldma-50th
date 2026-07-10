@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { directoryCamps } from "@/lib/directory-camps";
-import { campUsesReservations } from "@/lib/reservation-camps";
+import { campUsesReservations, type CapacitySiteFilter } from "@/lib/reservation-camps";
 import { currentMonthValue, isValidDateRange, monthDateRange } from "@/lib/camp-capacity";
 
 type SiteNightStats = {
@@ -20,6 +20,7 @@ type CapacityPayload = {
   campName: string;
   from: string;
   to: string;
+  siteFilter: CapacitySiteFilter;
   totalSites: number;
   bookedSites: number;
   availableSites: number;
@@ -29,6 +30,12 @@ type CapacityPayload = {
 };
 
 type RangeMode = "month" | "custom";
+
+const SITE_FILTER_OPTIONS: { value: CapacitySiteFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "hookup", label: "Hookup sites" },
+  { value: "dry", label: "Dry" },
+];
 
 function formatLocalIso(d: Date): string {
   return d.toLocaleDateString("en-CA");
@@ -126,6 +133,7 @@ export function CampCapacitySection() {
   );
 
   const [campSlug, setCampSlug] = useState(() => reservationCamps[0]?.slug ?? "");
+  const [siteFilter, setSiteFilter] = useState<CapacitySiteFilter>("all");
   const [rangeMode, setRangeMode] = useState<RangeMode>("month");
   const [monthValue, setMonthValue] = useState(() => currentMonthValue());
   const [fromInput, setFromInput] = useState("");
@@ -161,6 +169,7 @@ export function CampCapacitySection() {
       campSlug,
       from: activeRange.from,
       to: activeRange.to,
+      siteFilter,
     });
 
     fetch(`/api/members/caretaker/admin/capacity?${params}`, { cache: "no-store" })
@@ -190,7 +199,10 @@ export function CampCapacitySection() {
     return () => {
       cancelled = true;
     };
-  }, [campSlug, activeRange?.from, activeRange?.to]);
+  }, [campSlug, activeRange?.from, activeRange?.to, siteFilter]);
+
+  const siteFilterLabel =
+    SITE_FILTER_OPTIONS.find((o) => o.value === siteFilter)?.label ?? "All";
 
   const rangeLabel = activeRange
     ? activeRange.from === activeRange.to
@@ -223,6 +235,26 @@ export function CampCapacitySection() {
             ))}
           </select>
         </label>
+
+        <div className="flex flex-col gap-1 text-xs text-[#e8e0d5]/65">
+          <span>Site type</span>
+          <div className="flex flex-wrap gap-2">
+            {SITE_FILTER_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setSiteFilter(option.value)}
+                className={`rounded border px-3 py-1.5 text-xs ${
+                  siteFilter === option.value
+                    ? "border-[#d4af37]/50 bg-[#d4af37]/15 text-[#f0d48f]"
+                    : "border-[#d4af37]/25 text-[#e8e0d5]/80 hover:bg-[#d4af37]/10"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="flex flex-col gap-1 text-xs text-[#e8e0d5]/65">
           <span>Period</span>
@@ -309,7 +341,10 @@ export function CampCapacitySection() {
         )}
       </div>
 
-      <p className="text-[11px] text-[#e8e0d5]/45">{rangeLabel}</p>
+      <p className="text-[11px] text-[#e8e0d5]/45">
+        {rangeLabel}
+        {siteFilter !== "all" ? ` · ${siteFilterLabel}` : ""}
+      </p>
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-[#e8e0d5]/65 py-6">
@@ -344,7 +379,7 @@ export function CampCapacitySection() {
                   <span className="text-[#e8e0d5]/55"> · {capacity.availablePercent}%</span>
                 </>
               }
-              footnote={`${capacity.totalSites} bookable site${capacity.totalSites === 1 ? "" : "s"}`}
+              footnote={`${capacity.totalSites} bookable ${siteFilter === "all" ? "site" : siteFilterLabel.toLowerCase()}${capacity.totalSites === 1 ? "" : "s"}`}
             />
             <CapacityChartCard
               title="Site-night occupancy"
@@ -370,7 +405,7 @@ export function CampCapacitySection() {
                   <span className="text-[#e8e0d5]/55"> · {capacity.siteNights.availablePercent}%</span>
                 </>
               }
-              footnote={`${capacity.siteNights.rangeNights} nights × ${capacity.totalSites} sites = ${capacity.siteNights.totalSiteNights.toLocaleString()} total site-nights`}
+              footnote={`${capacity.siteNights.rangeNights} nights × ${capacity.totalSites} ${siteFilter === "all" ? "sites" : siteFilterLabel.toLowerCase()} = ${capacity.siteNights.totalSiteNights.toLocaleString()} total site-nights`}
             />
           </div>
         </div>
