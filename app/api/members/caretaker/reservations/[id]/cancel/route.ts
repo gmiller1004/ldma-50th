@@ -6,6 +6,7 @@ import { executeCancellation } from "@/lib/cancel-reservation";
 /**
  * POST /api/members/caretaker/reservations/[id]/cancel
  * Cancel reservation and process site-fee refund per policy.
+ * Body (optional): { waiveCancellationFee?: boolean }
  */
 export async function POST(
   request: NextRequest,
@@ -20,10 +21,19 @@ export async function POST(
   }
 
   const { id } = await params;
+  let waiveCancellationFee = false;
+  try {
+    const body = await request.json();
+    waiveCancellationFee = body?.waiveCancellationFee === true;
+  } catch {
+    // empty body is fine
+  }
+
   const result = await executeCancellation({
     reservationId: id,
     campSlug: caretaker.campSlug,
     createdByContactId: caretaker.contactId,
+    waiveCancellationFee,
   });
 
   if (!result.ok) {

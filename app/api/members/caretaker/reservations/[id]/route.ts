@@ -48,6 +48,9 @@ type ReservationRow = {
   price_override_flag?: boolean | null;
   cancelled_at?: string | null;
   cancellation_refund_cents?: number | null;
+  cancellation_fee_waived?: boolean | null;
+  cancellation_fee_waived_cents?: number | null;
+  cancellation_fee_waived_at?: string | null;
 };
 
 function rowToJson(row: ReservationRow) {
@@ -77,6 +80,9 @@ function rowToJson(row: ReservationRow) {
     priceOverrideFlag: Boolean(row.price_override_flag),
     cancelledAt: row.cancelled_at ?? null,
     cancellationRefundCents: row.cancellation_refund_cents ?? null,
+    cancellationFeeWaived: Boolean(row.cancellation_fee_waived),
+    cancellationFeeWaivedCents: row.cancellation_fee_waived_cents ?? null,
+    cancellationFeeWaivedAt: row.cancellation_fee_waived_at ?? null,
   };
 }
 
@@ -108,7 +114,8 @@ export async function GET(
            r.guest_first_name, r.guest_last_name, r.guest_email, r.guest_phone,
            r.status, r.checked_in_at, r.created_at, r.updated_at,
            r.invoice_number, r.calculated_total_cents, r.amount_override_cents, r.override_reason, r.price_override_flag,
-           r.cancelled_at, r.cancellation_refund_cents
+           r.cancelled_at, r.cancellation_refund_cents,
+           r.cancellation_fee_waived, r.cancellation_fee_waived_cents, r.cancellation_fee_waived_at
     FROM camp_reservations r
     LEFT JOIN camp_sites s ON s.id = r.site_id
     WHERE r.id = ${id} AND r.camp_slug = ${caretaker.campSlug}

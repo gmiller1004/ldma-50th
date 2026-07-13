@@ -56,7 +56,25 @@ describe("computeCancellationRefund", () => {
     assert.equal(r.nightsStayed, 5);
     assert.equal(r.earnedCents, 5 * 20 * 100);
     assert.equal(r.cancellationFeeCents, CANCELLATION_FEE_HOOKUP_CENTS);
+    assert.equal(r.policyCancellationFeeCents, CANCELLATION_FEE_HOOKUP_CENTS);
+    assert.equal(r.cancellationFeeWaived, false);
     assert.equal(r.refundCents, 100000 - r.earnedCents - CANCELLATION_FEE_HOOKUP_CENTS);
+  });
+
+  it("waives cancellation fee when caretaker opts in", () => {
+    const r = computeCancellationRefund({
+      ...base,
+      checkOutDate: "2026-08-01",
+      totalNights: 52,
+      isHookupSite: true,
+      cancelDate: "2026-06-15",
+      totalPaidCents: 100000,
+      waiveCancellationFee: true,
+    });
+    assert.equal(r.policyCancellationFeeCents, CANCELLATION_FEE_HOOKUP_CENTS);
+    assert.equal(r.cancellationFeeCents, 0);
+    assert.equal(r.cancellationFeeWaived, true);
+    assert.equal(r.refundCents, 100000 - r.earnedCents);
   });
 
   it("caps refund at paid minus already refunded", () => {

@@ -4,7 +4,7 @@ import { campUsesReservations } from "@/lib/reservation-camps";
 import { buildCancelPreview } from "@/lib/cancel-reservation";
 
 /**
- * GET /api/members/caretaker/reservations/[id]/cancel-preview
+ * GET /api/members/caretaker/reservations/[id]/cancel-preview?waiveCancellationFee=1
  * Refund preview before cancelling.
  */
 export async function GET(
@@ -20,7 +20,10 @@ export async function GET(
   }
 
   const { id } = await params;
-  const preview = await buildCancelPreview(id, caretaker.campSlug);
+  const waive =
+    request.nextUrl.searchParams.get("waiveCancellationFee") === "1" ||
+    request.nextUrl.searchParams.get("waiveCancellationFee") === "true";
+  const preview = await buildCancelPreview(id, caretaker.campSlug, undefined, waive);
   if (!preview) {
     return NextResponse.json({ error: "Reservation not found or already cancelled" }, { status: 404 });
   }

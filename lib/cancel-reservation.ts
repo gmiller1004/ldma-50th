@@ -87,7 +87,8 @@ function allocateRefund(refundCents: number, cardPaid: number, cashPaid: number,
 export async function buildCancelPreview(
   reservationId: string,
   campSlug: string,
-  cancelDate?: string
+  cancelDate?: string,
+  waiveCancellationFee = false
 ): Promise<CancelPreview | null> {
   if (!hasDb() || !sql) return null;
 
@@ -127,6 +128,7 @@ export async function buildCancelPreview(
     memberRateDaily: res.member_rate_daily,
     totalPaidCents: totals.paid,
     totalRefundedCents: totals.refunded,
+    waiveCancellationFee,
   });
 
   const { stripeRefundCents, cashRefundCents } = allocateRefund(
@@ -151,6 +153,7 @@ export async function executeCancellation(input: {
   campSlug: string;
   createdByContactId: string;
   cancelDate?: string;
+  waiveCancellationFee?: boolean;
 }): Promise<{ ok: true; preview: CancelPreview } | { ok: false; error: string }> {
   if (!hasDb() || !sql) return { ok: false, error: "Database not available" };
 
@@ -159,11 +162,11 @@ export async function executeCancellation(input: {
   } catch (e) {
     console.error("[cancel] executeCancellation failed:", e);
     const msg = e instanceof Error ? e.message : String(e);
-    if (/payment_type|refunded_payment_id|cancelled_at|cancellation_refund/i.test(msg)) {
+    if (/payment_type|refunded_payment_id|cancelled_at|cancellation_refund|cancellation_fee_waived/i.test(msg)) {
       return {
         ok: false,
         error:
-          "Cancellation database schema is out of date. Run scripts/migrate-camp-cancellation-refunds.sql and try again.",
+          "Cancellation database schema is out of date. Run npm run db:migrate:camp-cancellation-fee-waiver (and cancellation-refunds if needed) and try again.",
       };
     }
     return { ok: false, error: "Cancellation failed" };
@@ -175,10 +178,17 @@ async function executeCancellationInner(input: {
   campSlug: string;
   createdByContactId: string;
   cancelDate?: string;
+  waiveCancellationFee?: boolean;
 }): Promise<{ ok: true; preview: CancelPreview } | { ok: false; error: string }> {
   if (!sql) return { ok: false, error: "Database not available" };
 
-  const preview = await buildCancelPreview(input.reservationId, input.campSlug, input.cancelDate);
+  const waive = Boolean(input.waiveCancellationFee);
+  const preview = await buildCancelPreview(
+    input.reservationId,
+    input.campSlug,
+    input.cancelDate,
+    waive
+  );
   if (!preview) return { ok: false, error: "Reservation not found or already cancelled" };
 
   const resRows = await sql`
@@ -299,11 +309,33 @@ async function executeCancellationInner(input: {
     }
   }
 
-  await sql`
-    UPDATE camp_reservations
-    SET status = 'cancelled', cancelled_at = NOW(), cancellation_refund_cents = ${preview.refundCents}, updated_at = NOW()
-    WHERE id = ${input.reservationId}
-  `;
+  if (preview.cancellationFeeWaived) {
+    await sql`
+      UPDATE camp_reservations
+      SET status = 'cancelled',
+          cancelled_at = NOW(),
+          cancellation_refund_cents = ${preview.refundCents},
+          cancellation_fee_waived = TRUE,
+          cancellation_fee_waived_cents = ${preview.policyCancellationFeeCents},
+          cancellation_fee_waived_at = NOW(),
+          cancellation_fee_waived_by_contact_id = ${input.createdByContactId},
+          updated_at = NOW()
+      WHERE id = ${input.reservationId}
+    `;
+  } else {
+    await sql`
+      UPDATE camp_reservations
+      SET status = 'cancelled',
+          cancelled_at = NOW(),
+          cancellation_refund_cents = ${preview.refundCents},
+          cancellation_fee_waived = FALSE,
+          cancellation_fee_waived_cents = NULL,
+          cancellation_fee_waived_at = NULL,
+          cancellation_fee_waived_by_contact_id = NULL,
+          updated_at = NOW()
+      WHERE id = ${input.reservationId}
+    `;
+  }
   await sql`
     UPDATE camp_billing_periods SET status = 'cancelled', updated_at = NOW()
     WHERE reservation_id = ${input.reservationId} AND status IN ('unpaid', 'partial')

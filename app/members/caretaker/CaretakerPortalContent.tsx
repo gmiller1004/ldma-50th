@@ -103,6 +103,9 @@ type Reservation = {
   createdAt?: string;
   cancelledAt?: string | null;
   cancellationRefundCents?: number | null;
+  cancellationFeeWaived?: boolean;
+  cancellationFeeWaivedCents?: number | null;
+  cancellationFeeWaivedAt?: string | null;
   invoiceNumber?: string | null;
   calculatedTotalCents?: number | null;
   amountOverrideCents?: number | null;
@@ -398,6 +401,8 @@ export function CaretakerPortalContent({
     totalPaidCents: number;
     earnedCents: number;
     cancellationFeeCents: number;
+    policyCancellationFeeCents: number;
+    cancellationFeeWaived: boolean;
     nightsStayed: number;
     pricingMode: string;
     stripeRefundCents: number;
@@ -405,6 +410,7 @@ export function CaretakerPortalContent({
   } | null>(null);
   const [resCancelPreviewLoading, setResCancelPreviewLoading] = useState(false);
   const [resCancelError, setResCancelError] = useState<string | null>(null);
+  const [resCancelWaiveFee, setResCancelWaiveFee] = useState(false);
   const [checkingInReservation, setCheckingInReservation] = useState<Reservation | null>(null);
   const [resCheckInSubmitting, setResCheckInSubmitting] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
@@ -1802,24 +1808,31 @@ export function CaretakerPortalContent({
     setCancellingReservation(r);
     setResCancelPreview(null);
     setResCancelError(null);
+    setResCancelWaiveFee(false);
     setResCancelModalOpen(true);
+    void loadResCancelPreview(r.id, false);
+  }
+
+  async function loadResCancelPreview(reservationId: string, waiveCancellationFee: boolean) {
     setResCancelPreviewLoading(true);
-    const campQ = `?campSlug=${encodeURIComponent(campSlug)}`;
-    fetch(`/api/members/caretaker/reservations/${r.id}/cancel-preview${campQ}`)
-      .then(async (res) => {
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setResCancelError((data as { error?: string }).error ?? "Could not load refund preview");
-          return;
-        }
-        const data = await res.json();
-        setResCancelPreview(data.preview ?? null);
-      })
-      .catch(() => {
+    setResCancelError(null);
+    const campQ = `?campSlug=${encodeURIComponent(campSlug)}${waiveCancellationFee ? "&waiveCancellationFee=1" : ""}`;
+    try {
+      const res = await fetch(`/api/members/caretaker/reservations/${reservationId}/cancel-preview${campQ}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setResCancelError((data as { error?: string }).error ?? "Could not load refund preview");
         setResCancelPreview(null);
-        setResCancelError("Could not load refund preview");
-      })
-      .finally(() => setResCancelPreviewLoading(false));
+        return;
+      }
+      const data = await res.json();
+      setResCancelPreview(data.preview ?? null);
+    } catch {
+      setResCancelPreview(null);
+      setResCancelError("Could not load refund preview");
+    } finally {
+      setResCancelPreviewLoading(false);
+    }
   }
 
   async function handleResCancelConfirm() {
@@ -1830,7 +1843,11 @@ export function CaretakerPortalContent({
       const campQ = `?campSlug=${encodeURIComponent(campSlug)}`;
       const res = await fetch(
         `/api/members/caretaker/reservations/${cancellingReservation.id}/cancel${campQ}`,
-        { method: "POST" }
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ waiveCancellationFee: resCancelWaiveFee }),
+        }
       );
       const text = await res.text();
       let data: { error?: string };
@@ -1848,6 +1865,7 @@ export function CaretakerPortalContent({
       setCancellingReservation(null);
       setResCancelPreview(null);
       setResCancelError(null);
+      setResCancelWaiveFee(false);
       setResError(null);
       loadReservations();
     } catch {
@@ -2299,6 +2317,9 @@ export function CaretakerPortalContent({
                       {r.status === "cancelled" ? (
                         <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-red-950/60 text-red-300">Cancelled</span>
                       ) : null}
+                      {r.cancellationFeeWaived ? (
+                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-200">Cancel fee waived</span>
+                      ) : null}
                       {r.eventProductHandle ? <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#d4af37]/20 text-[#f0d48f]">Event{r.eventSiteType === "upgrade_hookup" ? " (hookup)" : ""}</span> : null}
                     </span>
                     <div className="flex items-center gap-2">
@@ -2564,6 +2585,12 @@ export function CaretakerPortalContent({
                       <p className="text-[#e8e0d5]">{toDateOnly(detailsReservation.cancelledAt)}</p>
                     </div>
                   )}
+                  {detailsReservation.cancellationFeeWaived && (
+                    <div>
+                      <p className="text-[#e8e0d5]/60 mb-0.5">Cancel fee</p>
+                      <p className="text-amber-200">Waived{detailsReservation.cancellationFeeWaivedCents != null ? ` (${formatCentsAsCurrency(detailsReservation.cancellationFeeWaivedCents)})` : ""}</p>
+                    </div>
+                  )}
                   {detailsReservation.createdAt && (
                     <div>
                       <p className="text-[#e8e0d5]/60 mb-0.5">Created</p>
@@ -2581,6 +2608,18 @@ export function CaretakerPortalContent({
                   <div className="rounded border border-amber-500/30 bg-amber-950/20 p-2 text-xs text-amber-100/90">
                     Price override: charged {formatCentsAsCurrency(detailsReservation.amountOverrideCents ?? 0)} vs calculated {formatCentsAsCurrency(detailsReservation.calculatedTotalCents ?? 0)}
                     {detailsReservation.overrideReason ? ` — ${detailsReservation.overrideReason}` : ""}
+                  </div>
+                )}
+                {detailsReservation.cancellationFeeWaived && (
+                  <div className="rounded border border-amber-500/30 bg-amber-950/20 p-2 text-xs text-amber-100/90">
+                    Cancellation fee waived
+                    {detailsReservation.cancellationFeeWaivedCents != null
+                      ? ` (${formatCentsAsCurrency(detailsReservation.cancellationFeeWaivedCents)})`
+                      : ""}
+                    {detailsReservation.cancellationFeeWaivedAt
+                      ? ` on ${toDateOnly(detailsReservation.cancellationFeeWaivedAt)}`
+                      : ""}
+                    .
                   </div>
                 )}
                 {detailsReservation.eventProductHandle ? (
@@ -3080,11 +3119,11 @@ export function CaretakerPortalContent({
 
         {/* Cancel reservation modal */}
         {resCancelModalOpen && cancellingReservation && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null), setResCancelError(null))}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null), setResCancelError(null), setResCancelWaiveFee(false))}>
             <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-[#f0d48f]">Cancel reservation</h3>
-                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null), setResCancelError(null))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null), setResCancelError(null), setResCancelWaiveFee(false))} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
               </div>
               <p className="text-[#e8e0d5]/90 text-sm mb-3">
                 Cancel this reservation for {cancellingReservation.siteName} — {cancellingReservation.reservationType === "member" ? cancellingReservation.memberDisplayName : `${cancellingReservation.guestFirstName} ${cancellingReservation.guestLastName}`}?
@@ -3105,11 +3144,14 @@ export function CaretakerPortalContent({
                       <span>−{formatCentsAsCurrency(resCancelPreview.earnedCents)}</span>
                     </div>
                   )}
-                  {resCancelPreview.cancellationFeeCents > 0 && (
-                    <div className="flex justify-between text-[#e8e0d5]/80">
+                  {resCancelPreview.policyCancellationFeeCents > 0 && (
+                    <div className={`flex justify-between ${resCancelPreview.cancellationFeeWaived ? "text-[#e8e0d5]/50 line-through" : "text-[#e8e0d5]/80"}`}>
                       <span>Cancellation fee</span>
-                      <span>−{formatCentsAsCurrency(resCancelPreview.cancellationFeeCents)}</span>
+                      <span>−{formatCentsAsCurrency(resCancelPreview.policyCancellationFeeCents)}</span>
                     </div>
+                  )}
+                  {resCancelPreview.cancellationFeeWaived && (
+                    <p className="text-amber-200/90 text-xs">Cancellation fee waived by caretaker.</p>
                   )}
                   <div className="flex justify-between text-[#f0d48f] font-semibold pt-1 border-t border-[#d4af37]/20">
                     <span>Refund</span>
@@ -3129,9 +3171,28 @@ export function CaretakerPortalContent({
               ) : (
                 <p className="text-[#e8e0d5]/50 text-xs mb-4">Refund preview unavailable; cancellation will still apply policy rules.</p>
               )}
+              {(resCancelPreview?.policyCancellationFeeCents ?? 0) > 0 && (
+                <label className="mb-4 flex items-start gap-2 text-sm text-[#e8e0d5]/90 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={resCancelWaiveFee}
+                    disabled={resCancelSubmitting || resCancelPreviewLoading}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setResCancelWaiveFee(next);
+                      if (cancellingReservation) void loadResCancelPreview(cancellingReservation.id, next);
+                    }}
+                  />
+                  <span>
+                    Waive cancellation fee ({formatCentsAsCurrency(resCancelPreview?.policyCancellationFeeCents ?? 0)}).
+                    This will be flagged on the reservation.
+                  </span>
+                </label>
+              )}
               {resCancelError && <p className="mb-4 text-red-400 text-sm">{resCancelError}</p>}
               <div className="flex gap-2">
-                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null), setResCancelError(null))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Keep</button>
+                <button type="button" onClick={() => !resCancelSubmitting && (setResCancelModalOpen(false), setCancellingReservation(null), setResCancelPreview(null), setResCancelError(null), setResCancelWaiveFee(false))} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Keep</button>
                 <button type="button" onClick={handleResCancelConfirm} disabled={resCancelSubmitting || resCancelPreviewLoading} className="flex-1 py-2.5 bg-red-800/80 text-red-100 font-semibold rounded-lg hover:bg-red-700/80 disabled:opacity-50 flex items-center justify-center gap-2">
                   {resCancelSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Yes, cancel
                 </button>

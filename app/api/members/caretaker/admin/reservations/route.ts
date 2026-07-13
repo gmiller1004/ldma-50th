@@ -20,6 +20,8 @@ type ReservationRow = {
   checked_in_at: string | null;
   created_at: string;
   invoice_number: string | null;
+  cancellation_fee_waived?: boolean | null;
+  cancellation_fee_waived_cents?: number | null;
 };
 
 function rowToJson(row: ReservationRow) {
@@ -39,6 +41,8 @@ function rowToJson(row: ReservationRow) {
     checkedInAt: row.checked_in_at,
     createdAt: row.created_at,
     invoiceNumber: row.invoice_number,
+    cancellationFeeWaived: Boolean(row.cancellation_fee_waived),
+    cancellationFeeWaivedCents: row.cancellation_fee_waived_cents ?? null,
   };
 }
 
@@ -64,7 +68,8 @@ export async function GET(request: NextRequest) {
     SELECT r.id, s.name AS site_name, r.check_in_date, r.check_out_date, r.nights,
            r.reservation_type, r.member_display_name, r.member_number,
            r.guest_first_name, r.guest_last_name, r.guest_email,
-           r.status, r.checked_in_at, r.created_at, r.invoice_number
+           r.status, r.checked_in_at, r.created_at, r.invoice_number,
+           r.cancellation_fee_waived, r.cancellation_fee_waived_cents
     FROM camp_reservations r
     LEFT JOIN camp_sites s ON s.id = r.site_id
     WHERE r.camp_slug = ${campSlug}

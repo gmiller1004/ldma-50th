@@ -41,6 +41,9 @@ type ReservationRow = {
   updated_at: string;
   event_product_handle?: string | null;
   event_site_type?: string | null;
+  cancelled_at?: string | null;
+  cancellation_fee_waived?: boolean | null;
+  cancellation_fee_waived_cents?: number | null;
 };
 
 function rowToJson(row: ReservationRow) {
@@ -66,6 +69,9 @@ function rowToJson(row: ReservationRow) {
     updatedAt: row.updated_at,
     eventProductHandle: row.event_product_handle ?? null,
     eventSiteType: row.event_site_type ?? null,
+    cancelledAt: row.cancelled_at ?? null,
+    cancellationFeeWaived: Boolean(row.cancellation_fee_waived),
+    cancellationFeeWaivedCents: row.cancellation_fee_waived_cents ?? null,
   };
 }
 
@@ -106,7 +112,8 @@ export async function GET(request: NextRequest) {
       SELECT r.id, r.site_id, s.name AS site_name, r.camp_slug, r.check_in_date, r.check_out_date, r.nights,
              r.reservation_type, r.member_contact_id, r.member_number, r.member_display_name,
              r.guest_first_name, r.guest_last_name, r.guest_email, r.guest_phone,
-             r.status, r.checked_in_at, r.created_at, r.updated_at, r.event_product_handle, r.event_site_type
+             r.status, r.checked_in_at, r.created_at, r.updated_at, r.event_product_handle, r.event_site_type,
+             r.cancelled_at, r.cancellation_fee_waived, r.cancellation_fee_waived_cents
       FROM camp_reservations r
       LEFT JOIN camp_sites s ON s.id = r.site_id
       WHERE r.camp_slug = ${caretaker.campSlug} AND (r.check_out_date < ${today} OR r.status = 'cancelled')
@@ -118,7 +125,8 @@ export async function GET(request: NextRequest) {
       SELECT r.id, r.site_id, s.name AS site_name, r.camp_slug, r.check_in_date, r.check_out_date, r.nights,
              r.reservation_type, r.member_contact_id, r.member_number, r.member_display_name,
              r.guest_first_name, r.guest_last_name, r.guest_email, r.guest_phone,
-             r.status, r.checked_in_at, r.created_at, r.updated_at, r.event_product_handle, r.event_site_type
+             r.status, r.checked_in_at, r.created_at, r.updated_at, r.event_product_handle, r.event_site_type,
+             r.cancelled_at, r.cancellation_fee_waived, r.cancellation_fee_waived_cents
       FROM camp_reservations r
       LEFT JOIN camp_sites s ON s.id = r.site_id
       WHERE r.camp_slug = ${caretaker.campSlug}

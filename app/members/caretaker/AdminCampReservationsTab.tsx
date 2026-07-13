@@ -21,6 +21,8 @@ export type AdminReservationListRow = {
   status: string;
   balanceDueCents?: number;
   hasOverdueSiteFee?: boolean;
+  cancellationFeeWaived?: boolean;
+  cancellationFeeWaivedCents?: number | null;
 };
 
 type ReservationDetail = AdminReservationListRow & {
@@ -34,6 +36,9 @@ type CancelPreview = {
   earnedCents: number;
   nightsStayed: number;
   refundCents: number;
+  cancellationFeeCents: number;
+  policyCancellationFeeCents: number;
+  cancellationFeeWaived: boolean;
 };
 
 type MoveSite = {
@@ -92,6 +97,7 @@ export function AdminCampReservationsTab({
   const [cancelPreview, setCancelPreview] = useState<CancelPreview | null>(null);
   const [cancelPreviewLoading, setCancelPreviewLoading] = useState(false);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelWaiveFee, setCancelWaiveFee] = useState(false);
 
   const [moving, setMoving] = useState<ReservationDetail | null>(null);
   const [moveSites, setMoveSites] = useState<MoveSite[]>([]);
@@ -287,10 +293,18 @@ export function AdminCampReservationsTab({
     if (row.status === "cancelled") return;
     setCancelling(row);
     setCancelPreview(null);
+    setCancelWaiveFee(false);
+    await refreshCancelPreview(row.id, false);
+  }
+
+  async function refreshCancelPreview(reservationId: string, waiveCancellationFee: boolean) {
     setCancelPreviewLoading(true);
     try {
+      const waiveQ = waiveCancellationFee
+        ? `${apiQs.includes("?") ? "&" : "?"}waiveCancellationFee=1`
+        : "";
       const res = await fetch(
-        `/api/members/caretaker/reservations/${row.id}/cancel-preview${apiQs}`
+        `/api/members/caretaker/reservations/${reservationId}/cancel-preview${apiQs}${waiveQ}`
       );
       const data = await res.json();
       if (!res.ok) {
@@ -313,7 +327,11 @@ export function AdminCampReservationsTab({
     try {
       const res = await fetch(
         `/api/members/caretaker/reservations/${cancelling.id}/cancel${apiQs}`,
-        { method: "POST" }
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ waiveCancellationFee: cancelWaiveFee }),
+        }
       );
       const data = await res.json();
       if (!res.ok) {
@@ -322,6 +340,7 @@ export function AdminCampReservationsTab({
       }
       setCancelling(null);
       setCancelPreview(null);
+      setCancelWaiveFee(false);
       onUpdated();
     } catch {
       alert("Cancel failed");
@@ -580,7 +599,14 @@ export function AdminCampReservationsTab({
                     <span className="ct-cell-muted">Paid</span>
                   )}
                 </td>
-                <td className="p-2 capitalize">{r.status.replace(/_/g, " ")}</td>
+                <td className="p-2 capitalize">
+                  {r.status.replace(/_/g, " ")}
+                  {r.cancellationFeeWaived ? (
+                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-200 normal-case">
+                      Cancel fee waived
+                    </span>
+                  ) : null}
+                </td>
                 <td className="p-2">
                   {r.status !== "cancelled" ? (
                     <div className="flex flex-wrap gap-1.5">
@@ -883,7 +909,7 @@ export function AdminCampReservationsTab({
       {cancelling && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
-          onClick={() => !cancelSubmitting && (setCancelling(null), setCancelPreview(null))}
+          onClick={() => !cancelSubmitting && (setCancelling(null), setCancelPreview(null), setCancelWaiveFee(false))}
         >
           <div
             className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-md w-full p-6"
@@ -894,7 +920,7 @@ export function AdminCampReservationsTab({
               <button
                 type="button"
                 onClick={() =>
-                  !cancelSubmitting && (setCancelling(null), setCancelPreview(null))
+                  !cancelSubmitting && (setCancelling(null), setCancelPreview(null), setCancelWaiveFee(false))
                 }
                 className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"
               >
@@ -914,16 +940,52 @@ export function AdminCampReservationsTab({
                   <span>Site fees paid</span>
                   <span>{formatCentsAsCurrency(cancelPreview.totalPaidCents)}</span>
                 </div>
+                {cancelPreview.earnedCents > 0 && (
+                  <div className="flex justify-between text-[#e8e0d5]/80">
+                    <span>Earned ({cancelPreview.nightsStayed} nights)</span>
+                    <span>−{formatCentsAsCurrency(cancelPreview.earnedCents)}</span>
+                  </div>
+                )}
+                {cancelPreview.policyCancellationFeeCents > 0 && (
+                  <div
+                    className={`flex justify-between ${cancelPreview.cancellationFeeWaived ? "text-[#e8e0d5]/50 line-through" : "text-[#e8e0d5]/80"}`}
+                  >
+                    <span>Cancellation fee</span>
+                    <span>−{formatCentsAsCurrency(cancelPreview.policyCancellationFeeCents)}</span>
+                  </div>
+                )}
+                {cancelPreview.cancellationFeeWaived && (
+                  <p className="text-amber-200/90 text-xs">Cancellation fee waived by caretaker.</p>
+                )}
                 <div className="flex justify-between text-[#f0d48f] font-medium">
                   <span>Refund</span>
                   <span>{formatCentsAsCurrency(cancelPreview.refundCents)}</span>
                 </div>
               </div>
             ) : null}
+            {(cancelPreview?.policyCancellationFeeCents ?? 0) > 0 && (
+              <label className="mb-4 flex items-start gap-2 text-sm text-[#e8e0d5]/90 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={cancelWaiveFee}
+                  disabled={cancelSubmitting || cancelPreviewLoading}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setCancelWaiveFee(next);
+                    if (cancelling) void refreshCancelPreview(cancelling.id, next);
+                  }}
+                />
+                <span>
+                  Waive cancellation fee ({formatCentsAsCurrency(cancelPreview?.policyCancellationFeeCents ?? 0)}).
+                  This will be flagged on the reservation.
+                </span>
+              </label>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => (setCancelling(null), setCancelPreview(null))}
+                onClick={() => (setCancelling(null), setCancelPreview(null), setCancelWaiveFee(false))}
                 disabled={cancelSubmitting}
                 className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]"
               >

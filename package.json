@@ -19,6 +19,7 @@
     "db:migrate:camp-reservations-v2": "node --env-file=.env.local scripts/migrate-camp-reservations-v2.mjs",
     "db:migrate:camp-reservations-import": "node --env-file=.env.local scripts/migrate-camp-reservations-import.mjs",
     "db:migrate:camp-cancellation-refunds": "node --env-file=.env.local scripts/migrate-camp-cancellation-refunds.mjs",
+    "db:migrate:camp-cancellation-fee-waiver": "node --env-file=.env.local scripts/migrate-camp-cancellation-fee-waiver.mjs",
     "db:migrate:camp-invoice-price-override": "node --env-file=.env.local scripts/migrate-camp-invoice-price-override.mjs",
     "db:migrate:camp-public-booking": "node --env-file=.env.local scripts/migrate-camp-public-booking.mjs",
     "db:migrate:camp-balance-reminders": "node --env-file=.env.local scripts/migrate-camp-balance-reminders.mjs",

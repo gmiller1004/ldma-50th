@@ -22,6 +22,8 @@ export type CancellationRefundInput = {
   memberRateDaily: number | null;
   totalPaidCents: number;
   totalRefundedCents: number;
+  /** When true, policy fee is not deducted from the refund. */
+  waiveCancellationFee?: boolean;
 };
 
 export type CancellationRefundResult = {
@@ -29,7 +31,11 @@ export type CancellationRefundResult = {
   totalPaidCents: number;
   totalRefundedCents: number;
   earnedCents: number;
+  /** Fee actually applied (0 when waived or full-refund window). */
   cancellationFeeCents: number;
+  /** Policy fee before caretaker waiver (0 in full-refund window). */
+  policyCancellationFeeCents: number;
+  cancellationFeeWaived: boolean;
   nightsStayed: number;
   pricingMode: "full_refund" | "daily" | "monthly_member";
   daysUntilCheckIn: number;
@@ -80,6 +86,7 @@ export function computeCancellationRefund(input: CancellationRefundInput): Cance
     memberRateDaily,
     totalPaidCents,
     totalRefundedCents,
+    waiveCancellationFee = false,
   } = input;
 
   const daysBefore = daysUntilCheckIn(cancelDate, checkInDate);
@@ -96,6 +103,8 @@ export function computeCancellationRefund(input: CancellationRefundInput): Cance
       totalRefundedCents,
       earnedCents: 0,
       cancellationFeeCents: 0,
+      policyCancellationFeeCents: 0,
+      cancellationFeeWaived: false,
       nightsStayed: 0,
       pricingMode: "full_refund",
       daysUntilCheckIn: daysBefore,
@@ -104,17 +113,19 @@ export function computeCancellationRefund(input: CancellationRefundInput): Cance
 
   const dailyRate = memberRateDaily ?? 0;
   const earnedCents = Math.round(nightsStayed * dailyRate * 100);
-  const feeCents = cancellationFeeCents(isHookupSite, monthlyMember);
+  const policyFeeCents = cancellationFeeCents(isHookupSite, monthlyMember);
+  const feeWaived = Boolean(waiveCancellationFee) && policyFeeCents > 0;
+  const appliedFeeCents = feeWaived ? 0 : policyFeeCents;
 
   let rawRefund = 0;
   let pricingMode: CancellationRefundResult["pricingMode"] = "daily";
 
   if (monthlyMember) {
     pricingMode = "monthly_member";
-    rawRefund = Math.max(0, totalPaidCents - earnedCents - feeCents);
+    rawRefund = Math.max(0, totalPaidCents - earnedCents - appliedFeeCents);
   } else if (dailyPriced) {
     pricingMode = "daily";
-    rawRefund = Math.max(0, totalPaidCents - earnedCents - feeCents);
+    rawRefund = Math.max(0, totalPaidCents - earnedCents - appliedFeeCents);
   }
 
   const refundCents = Math.min(Math.max(0, rawRefund), maxRefundable);
@@ -124,7 +135,9 @@ export function computeCancellationRefund(input: CancellationRefundInput): Cance
     totalPaidCents,
     totalRefundedCents,
     earnedCents,
-    cancellationFeeCents: feeCents,
+    cancellationFeeCents: appliedFeeCents,
+    policyCancellationFeeCents: policyFeeCents,
+    cancellationFeeWaived: feeWaived,
     nightsStayed,
     pricingMode,
     daysUntilCheckIn: daysBefore,
