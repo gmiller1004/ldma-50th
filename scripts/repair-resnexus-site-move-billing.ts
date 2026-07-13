@@ -15,6 +15,11 @@ import {
   buildReservationFromRows,
   extractSiteCode,
 } from "../lib/resnexus-import";
+import {
+  ensureResNexusPaymentLedger,
+  lockResNexusBillingAmounts,
+  resnexusBillingTotals,
+} from "../lib/resnexus-billing-repair";
 import { resyncReservationBillingFromDb } from "../lib/reservation-billing";
 
 const { Client } = pg;
@@ -65,38 +70,23 @@ async function ensurePaymentLedger(
   reservationId: string,
   campSlug: string,
   resNumber: string,
-  guestName: string,
-  paidTotalCents: number,
+  parsed: Awaited<ReturnType<typeof buildReservationFromRows>>,
+  rows: ReturnType<typeof parseResNexusCsv>,
   execute: boolean
 ) {
-  if (paidTotalCents <= 0) return 0;
-
-  const existing = await client.query(
-    `SELECT COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation'), 0)::int AS paid
-     FROM camp_payments WHERE reservation_id = $1`,
-    [reservationId]
+  if (!parsed) return 0;
+  if (!execute) {
+    const paidTotal = resnexusBillingTotals(parsed).allocatedPaidCents;
+    return paidTotal;
+  }
+  return ensureResNexusPaymentLedger(
+    client,
+    reservationId,
+    campSlug,
+    parsed,
+    rows,
+    CREATED_BY
   );
-  const ledgerPaid = Number(existing.rows[0]?.paid ?? 0);
-  if (ledgerPaid >= paidTotalCents) return 0;
-
-  const amountCents = paidTotalCents - ledgerPaid;
-  if (!execute) return amountCents;
-
-  await client.query(
-    `INSERT INTO camp_payments (
-       camp_slug, payment_type, method, amount_cents, reservation_id,
-       member_email, recipient_display_name, created_by_contact_id, created_at
-     ) VALUES ($1, 'reservation', 'cash', $2, $3, $4, $5, $6, NOW())`,
-    [
-      campSlug,
-      amountCents,
-      reservationId,
-      `resnexus+${resNumber}@import.ldma.org`,
-      guestName || "Guest",
-      CREATED_BY,
-    ]
-  );
-  return amountCents;
 }
 
 async function run() {
@@ -200,13 +190,21 @@ async function run() {
           reservation.id,
           campSlug,
           resNumber,
-          guestName,
-          paidTotal,
+          parsed,
+          rows,
           execute
         );
         if (inserted > 0) {
           console.log(`  → inserted camp_payment $${(inserted / 100).toFixed(2)}`);
         }
+
+        const { totalDueCents } = resnexusBillingTotals(parsed);
+        await lockResNexusBillingAmounts(
+          client,
+          reservation.id,
+          totalDueCents,
+          null
+        );
 
         const balance = await resyncReservationBillingFromDb(reservation.id);
         console.log(

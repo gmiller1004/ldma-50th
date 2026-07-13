@@ -286,7 +286,7 @@ export async function PATCH(
             {
               error: cashAllowed
                 ? "Additional site fees are due. Pay with cash here or use card."
-                : "Additional site fees are due. Card only (cash when check-in is today or within 7 days).",
+                : "Additional site fees are due. Card only (cash not allowed for check-in more than 7 days ago).",
               amountDueCents: balanceAfterSync.balanceDueCents,
               requirePayment: true,
             },
@@ -295,7 +295,7 @@ export async function PATCH(
         }
         if (paymentMethod === "cash" && !cashAllowed) {
           return NextResponse.json(
-            { error: "Cash only allowed when check-in is today or within the past 7 days." },
+            { error: "Cash not allowed when check-in is more than 7 days in the past." },
             { status: 400 }
           );
         }

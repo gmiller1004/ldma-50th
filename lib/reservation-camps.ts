@@ -18,10 +18,9 @@ export function campUsesReservations(campSlug: string): boolean {
   return CAMPS_WITH_RESERVATIONS.has(campSlug);
 }
 
-/** Cash allowed when check-in is today or within the backdate window (not future). */
+/** Cash allowed for future, same-day, and backdated check-in within the caretaker backdate window. */
 export function caretakerAllowsCashCheckIn(checkInDate: string, today?: string): boolean {
   const t = today ?? new Date().toISOString().slice(0, 10);
-  if (checkInDate > t) return false;
   const earliest = addDays(t, -CARETAKER_BACKDATE_MAX_DAYS);
   return checkInDate >= earliest;
 }

@@ -9,6 +9,7 @@ import { lookupMember } from "@/lib/salesforce";
 import { getCampBySlug } from "@/lib/directory-camps";
 import { createReservationPayToken } from "@/lib/reservation-pay-token";
 import { reservationPayPageUrl } from "@/lib/reservation-notify";
+import { toDateOnlyStr } from "@/lib/reservation-dates";
 import {
   sendReservationBalanceReminderEmail,
   type BalanceReminderDays,
@@ -370,8 +371,8 @@ export async function fetchUpcomingBalanceDueReservations(withinDays = 7) {
       site_type: string;
       special_type: string | null;
     };
-    const checkIn = String(r.check_in_date).slice(0, 10);
-    const checkOut = String(r.check_out_date).slice(0, 10);
+    const checkIn = toDateOnlyStr(r.check_in_date);
+    const checkOut = toDateOnlyStr(r.check_out_date);
     const periods = await listBillingPeriods(r.id);
     const obligations = summarizeReservationPaymentObligations({
       periods,

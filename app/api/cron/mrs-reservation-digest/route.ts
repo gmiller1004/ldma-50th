@@ -10,6 +10,7 @@ import {
 import { fetchUpcomingBalanceDueReservations } from "@/lib/reservation-balance-reminders";
 import { formatSiteAssignmentLabel, PUBLIC_BOOKING_IMPORT_SOURCE, type CampSiteRow } from "@/lib/public-camp-booking";
 import { summarizeReservationPaymentObligations } from "@/lib/reservation-balance-due";
+import { toDateOnlyStr } from "@/lib/reservation-dates";
 import {
   sendMrsReservationDigestEmail,
   type MrsDigestBalanceDue,
@@ -88,8 +89,8 @@ export async function GET(request: NextRequest) {
     const periods = await listBillingPeriods(r.id);
     const obligations = summarizeReservationPaymentObligations({
       periods,
-      checkInDate: String(r.check_in_date).slice(0, 10),
-      checkOutDate: String(r.check_out_date).slice(0, 10),
+      checkInDate: toDateOnlyStr(r.check_in_date),
+      checkOutDate: toDateOnlyStr(r.check_out_date),
       reservationType: r.reservation_type,
     });
     const siteLabel =
@@ -105,8 +106,8 @@ export async function GET(request: NextRequest) {
       campName: getCampBySlug(r.camp_slug)?.name ?? r.camp_slug,
       guestLabel,
       email,
-      checkIn: String(r.check_in_date).slice(0, 10),
-      checkOut: String(r.check_out_date).slice(0, 10),
+      checkIn: toDateOnlyStr(r.check_in_date),
+      checkOut: toDateOnlyStr(r.check_out_date),
       siteLabel,
       balanceDueCents:
         obligations.balanceDueBeforeArrivalCents > 0

@@ -17,6 +17,13 @@ import {
   extractSiteCode,
   type ParsedReservation,
 } from "../lib/resnexus-import";
+import {
+  ensureResNexusPaymentLedger,
+  lockResNexusBillingAmounts,
+  resnexusBillingTotals,
+  upsertResNexusBillingPeriods,
+} from "../lib/resnexus-billing-repair";
+import { computeStayPricing } from "../lib/reservation-pricing";
 
 const { Client } = pg;
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -64,11 +71,6 @@ function loadSiteRatesFromMasterCsv(): Map<string, SiteRow> {
     });
   }
   return map;
-}
-
-function pricingBasisForPeriod(isMember: boolean, nights: number) {
-  if (!isMember) return "guest_daily";
-  return nights >= 30 ? "member_monthly_prorated" : "member_daily";
 }
 
 async function loadSiteMapFromDb(client: pg.Client, campSlug: string) {
@@ -168,73 +170,6 @@ async function upsertReservation(client: pg.Client, parsed: ParsedReservation, s
   }
 
   return reservationId;
-}
-
-async function upsertBillingPeriods(client: pg.Client, reservationId: string, parsed: ParsedReservation) {
-  const isMember = parsed.reservationType === "member";
-  for (let i = 0; i < parsed.periods.length; i++) {
-    const p = parsed.periods[i];
-    const basis = pricingBasisForPeriod(isMember, p.nights);
-    await client.query(
-      `INSERT INTO camp_billing_periods (
-         reservation_id, period_index, period_start, period_end, nights,
-         amount_due_cents, amount_paid_cents, due_date, status, pricing_basis
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       ON CONFLICT (reservation_id, period_start) DO UPDATE SET
-         period_index = EXCLUDED.period_index,
-         period_end = EXCLUDED.period_end,
-         nights = EXCLUDED.nights,
-         amount_due_cents = EXCLUDED.amount_due_cents,
-         amount_paid_cents = EXCLUDED.amount_paid_cents,
-         due_date = EXCLUDED.due_date,
-         status = EXCLUDED.status,
-         pricing_basis = EXCLUDED.pricing_basis,
-         updated_at = NOW()`,
-      [
-        reservationId,
-        i,
-        p.periodStart,
-        p.periodEnd,
-        p.nights,
-        p.amountDueCents,
-        p.amountPaidCents,
-        p.periodStart,
-        p.status,
-        basis,
-      ]
-    );
-  }
-}
-
-/** Record ResNexus paid amounts in camp_payments so site moves and sync preserve credits. */
-async function ensureResNexusPaymentLedger(
-  client: pg.Client,
-  reservationId: string,
-  campSlug: string,
-  parsed: ParsedReservation
-) {
-  const paidTotal = parsed.periods.reduce((s, p) => s + p.amountPaidCents, 0);
-  if (paidTotal <= 0) return;
-
-  const existing = await client.query(
-    `SELECT COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation'), 0)::int AS paid
-     FROM camp_payments WHERE reservation_id = $1`,
-    [reservationId]
-  );
-  const ledgerPaid = Number(existing.rows[0]?.paid ?? 0);
-  if (ledgerPaid >= paidTotal) return;
-
-  const amountCents = paidTotal - ledgerPaid;
-  const recipientName = parsed.guestName || "Guest";
-  const recipientEmail = `resnexus+${parsed.resNumber}@import.ldma.org`;
-
-  await client.query(
-    `INSERT INTO camp_payments (
-       camp_slug, payment_type, method, amount_cents, reservation_id,
-       member_email, recipient_display_name, created_by_contact_id, created_at
-     ) VALUES ($1, 'reservation', 'cash', $2, $3, $4, $5, $6, NOW())`,
-    [campSlug, amountCents, reservationId, recipientEmail, recipientName, CREATED_BY]
-  );
 }
 
 async function run() {
@@ -339,8 +274,32 @@ async function run() {
 
       if (execute && siteId && client) {
         const reservationId = await upsertReservation(client, parsed, siteId);
-        await upsertBillingPeriods(client, reservationId, parsed);
-        await ensureResNexusPaymentLedger(client, reservationId, campSlug, parsed);
+        await upsertResNexusBillingPeriods(client, reservationId, parsed);
+        await ensureResNexusPaymentLedger(
+          client,
+          reservationId,
+          campSlug,
+          parsed,
+          rows,
+          CREATED_BY
+        );
+        const { totalDueCents } = resnexusBillingTotals(parsed);
+        const calculatedTotalCents = computeStayPricing({
+          checkInDate: parsed.checkInDate,
+          checkOutDate: parsed.checkOutDate,
+          isMember: parsed.reservationType === "member",
+          rates: {
+            memberRateDaily,
+            memberRateMonthly,
+            nonMemberRateDaily,
+          },
+        }).totalCents;
+        await lockResNexusBillingAmounts(
+          client,
+          reservationId,
+          totalDueCents,
+          calculatedTotalCents
+        );
       }
 
       summary.reservations++;

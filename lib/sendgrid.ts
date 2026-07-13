@@ -4,6 +4,7 @@ import { mrsNotifyBcc } from "@/lib/reservation-notify";
 
 const SENDER_EMAIL = process.env.SENDGRID_FROM_EMAIL || "noreply@example.com";
 const SENDER_NAME = process.env.SENDGRID_FROM_NAME || "LDMA";
+const LDMA_MEMBER_SERVICES_PHONE = "888-465-3717";
 
 export async function sendLoginCode(email: string, code: string): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
@@ -534,6 +535,7 @@ export async function sendPublicCampReservationConfirmationEmail(input: {
   payment: PublicReservationConfirmationPayment;
   payBalanceUrl?: string | null;
   notifyMrs?: boolean;
+  caretakerCc?: string[];
 }): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
   if (!apiKey) {
@@ -609,8 +611,11 @@ Lost Dutchman's Mining Association`;
 </html>`.trim();
 
   try {
+    const cc =
+      input.caretakerCc && input.caretakerCc.length > 0 ? input.caretakerCc : undefined;
     await sgMail.send({
       to: input.to,
+      cc,
       bcc: input.notifyMrs !== false ? mrsNotifyBcc() : undefined,
       from: { email: SENDER_EMAIL, name: SENDER_NAME },
       subject: `Your ${input.campName} campsite reservation is confirmed`,
@@ -845,6 +850,110 @@ Lost Dutchman's Mining Association`;
     return true;
   } catch (e) {
     console.error("SendGrid reservation modified email error:", e);
+    return false;
+  }
+}
+
+/**
+ * Notify guest/member when a caretaker moves their reservation to a different site.
+ */
+export async function sendReservationSiteMovedEmail(input: {
+  to: string;
+  campName: string;
+  newSiteLabel: string;
+  previousSiteLabel?: string | null;
+  checkInDate: string;
+  checkOutDate: string;
+  guestOrMemberName: string;
+  caretakerCc?: string[];
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        `[DEV] Site moved email for ${input.to}: ${input.newSiteLabel}, ${input.checkInDate}–${input.checkOutDate}`
+      );
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping site moved email");
+    return false;
+  }
+
+  sgMail.setApiKey(apiKey);
+
+  const name = input.guestOrMemberName?.trim() || "there";
+  const fromLine =
+    input.previousSiteLabel && input.previousSiteLabel !== input.newSiteLabel
+      ? `from ${input.previousSiteLabel} to ${input.newSiteLabel}`
+      : `to ${input.newSiteLabel}`;
+
+  const textContent = `Your campsite assignment at ${input.campName} has been updated.
+
+Hi ${name},
+
+The caretaker at ${input.campName} has moved your reservation ${fromLine}.
+
+Check-in:  ${input.checkInDate}
+Check-out: ${input.checkOutDate}
+
+If you have questions, please call ${LDMA_MEMBER_SERVICES_PHONE}.
+
+Lost Dutchman's Mining Association`;
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #1a120b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #1a120b; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #2a1f14; border-radius: 8px; border: 1px solid #d4af3740; overflow: hidden;">
+          <tr>
+            <td style="padding: 32px 24px; text-align: center; border-bottom: 1px solid #d4af3720;">
+              <h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #f0d48f; letter-spacing: 0.05em;">LDMA</h1>
+              <p style="margin: 8px 0 0; font-size: 14px; color: #e8e0d5b3;">Campsite moved — ${escapeHtml(input.campName)}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 24px;">
+              <p style="margin: 0 0 16px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">Hi ${escapeHtml(name)},</p>
+              <p style="margin: 0 0 16px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">The caretaker at <strong>${escapeHtml(input.campName)}</strong> has moved your reservation ${escapeHtml(fromLine)}.</p>
+              <p style="margin: 0 0 8px; font-size: 16px; color: #e8e0d5;">Check-in: <strong>${escapeHtml(input.checkInDate)}</strong></p>
+              <p style="margin: 0 0 24px; font-size: 16px; color: #e8e0d5;">Check-out: <strong>${escapeHtml(input.checkOutDate)}</strong></p>
+              <p style="margin: 0; font-size: 14px; color: #e8e0d5b3;">If you have questions, please call <strong>${LDMA_MEMBER_SERVICES_PHONE}</strong>.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 24px; background-color: #1a120b; border-top: 1px solid #d4af3720;">
+              <p style="margin: 0; font-size: 12px; color: #e8e0d560;">Lost Dutchman's Mining Association &bull; 1976–2026</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+
+  try {
+    const cc =
+      input.caretakerCc && input.caretakerCc.length > 0 ? input.caretakerCc : undefined;
+    await sgMail.send({
+      to: input.to,
+      cc,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `Your ${input.campName} campsite has been moved to ${input.newSiteLabel}`,
+      text: textContent,
+      html: htmlContent,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid site moved email error:", e);
     return false;
   }
 }

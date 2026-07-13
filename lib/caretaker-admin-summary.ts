@@ -219,6 +219,36 @@ export async function fetchCaretakerRosterFromSalesforce(): Promise<CaretakerRos
   return out.filter((r) => r.contactId.length > 0);
 }
 
+/** Emails for caretakers assigned to a camp (deduped, optional exclude e.g. guest recipient). */
+export function uniqueCaretakerEmailsForCamp(
+  roster: Array<Pick<CaretakerRosterRow, "campSlug" | "email">>,
+  campSlug: string,
+  excludeEmail?: string | null
+): string[] {
+  const exclude = excludeEmail?.trim().toLowerCase() || null;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const row of roster) {
+    if (row.campSlug !== campSlug) continue;
+    const email = row.email?.trim();
+    if (!email) continue;
+    const key = email.toLowerCase();
+    if (exclude && key === exclude) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(email);
+  }
+  return out;
+}
+
+export async function fetchCaretakerEmailsForCamp(
+  campSlug: string,
+  excludeEmail?: string | null
+): Promise<string[]> {
+  const roster = await fetchCaretakerRosterFromSalesforce();
+  return uniqueCaretakerEmailsForCamp(roster, campSlug, excludeEmail);
+}
+
 async function campDbMetrics(
   dbSql: NonNullable<typeof sql>,
   slug: string,

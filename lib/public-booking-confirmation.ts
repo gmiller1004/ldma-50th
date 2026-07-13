@@ -12,6 +12,7 @@ import {
   type CampSiteRow,
 } from "@/lib/public-camp-booking";
 import { sendPublicCampReservationConfirmationEmail } from "@/lib/sendgrid";
+import { fetchCaretakerEmailsForCamp } from "@/lib/caretaker-admin-summary";
 import { createReservationPayToken } from "@/lib/reservation-pay-token";
 import { reservationPayPageUrl } from "@/lib/reservation-notify";
 import { summarizeReservationPaymentObligations } from "@/lib/reservation-balance-due";
@@ -107,6 +108,8 @@ export async function sendPublicReservationConfirmationIfPending(
       ? reservationPayPageUrl(await createReservationPayToken(r.id))
       : null;
 
+  const caretakerCc = await fetchCaretakerEmailsForCamp(r.camp_slug, recipient.email);
+
   const ok = await sendPublicCampReservationConfirmationEmail({
     to: recipient.email,
     campName,
@@ -125,6 +128,7 @@ export async function sendPublicReservationConfirmationIfPending(
     },
     payBalanceUrl,
     notifyMrs: true,
+    caretakerCc,
   });
 
   if (!ok) {

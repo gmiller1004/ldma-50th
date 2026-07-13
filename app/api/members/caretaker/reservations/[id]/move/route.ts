@@ -18,7 +18,8 @@ import {
   refundReservationSiteFees,
 } from "@/lib/reservation-refund";
 import { lookupMember } from "@/lib/salesforce";
-import { sendPaymentReceiptEmail, sendReservationModifiedEmail } from "@/lib/sendgrid";
+import { sendPaymentReceiptEmail, sendReservationSiteMovedEmail } from "@/lib/sendgrid";
+import { fetchCaretakerEmailsForCamp } from "@/lib/caretaker-admin-summary";
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -123,6 +124,42 @@ export async function POST(
     }
 
     const sameSite = newSite.id === res.site_id;
+    const oldSiteRows = sameSite
+      ? null
+      : await sql`SELECT name FROM camp_sites WHERE id = ${res.site_id} LIMIT 1`;
+    const previousSiteName =
+      (Array.isArray(oldSiteRows) ? oldSiteRows[0] : undefined) as { name: string } | undefined;
+    const previousSiteLabel = previousSiteName?.name ?? null;
+
+    async function notifySiteMoved(): Promise<void> {
+      const partyName =
+        res.reservation_type === "member"
+          ? res.member_display_name || (res.member_number ? `#${res.member_number}` : "Member")
+          : [res.guest_first_name, res.guest_last_name].filter(Boolean).join(" ").trim() || "Guest";
+      let notifyEmail: string | null = null;
+      if (res.reservation_type === "member" && res.member_number) {
+        const member = await lookupMember(String(res.member_number).trim());
+        notifyEmail = member.valid && member.email?.trim() ? member.email.trim() : null;
+      } else if (res.reservation_type === "guest") {
+        notifyEmail = res.guest_email?.trim() || null;
+      }
+      if (!notifyEmail) return;
+
+      const caretakerCc = await fetchCaretakerEmailsForCamp(caretaker.campSlug, notifyEmail);
+      await sendReservationSiteMovedEmail({
+        to: notifyEmail,
+        campName: caretaker.campName,
+        newSiteLabel: newSite.name,
+        previousSiteLabel,
+        checkInDate,
+        checkOutDate,
+        guestOrMemberName: partyName,
+        caretakerCc,
+      }).catch((e) => {
+        console.error("[caretaker] site moved email failed:", e);
+      });
+    }
+
     if (!sameSite) {
       const overlap = await sql`
         SELECT id FROM camp_reservations
@@ -198,6 +235,7 @@ export async function POST(
       const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
       const cashAllowed = caretakerAllowsCashCheckIn(checkInDate, today);
       if (!paymentMethod) {
+        await notifySiteMoved();
         return NextResponse.json({
           ok: true,
           moved: true,
@@ -211,7 +249,7 @@ export async function POST(
       }
       if (!cashAllowed) {
         return NextResponse.json(
-          { error: "Cash only allowed when check-in is today or within the past 7 days. Use card." },
+          { error: "Cash not allowed when check-in is more than 7 days in the past. Use card." },
           { status: 400 }
         );
       }
@@ -285,31 +323,8 @@ export async function POST(
       }
     }
 
-    // Notify the member/guest of the site change (best effort).
-    const partyName =
-      res.reservation_type === "member"
-        ? res.member_display_name || (res.member_number ? `#${res.member_number}` : "Member")
-        : [res.guest_first_name, res.guest_last_name].filter(Boolean).join(" ").trim() || "Guest";
-    try {
-      let notifyEmail: string | null = null;
-      if (res.reservation_type === "member" && res.member_number) {
-        const member = await lookupMember(String(res.member_number).trim());
-        notifyEmail = member.valid && member.email?.trim() ? member.email.trim() : null;
-      } else if (res.reservation_type === "guest") {
-        notifyEmail = res.guest_email?.trim() || null;
-      }
-      if (notifyEmail) {
-        await sendReservationModifiedEmail(
-          notifyEmail,
-          caretaker.campName,
-          newSite.name,
-          checkInDate,
-          checkOutDate,
-          partyName
-        );
-      }
-    } catch (e) {
-      console.error("[caretaker] move modified email failed:", e);
+    if (!sameSite) {
+      await notifySiteMoved();
     }
 
     const updated = await sql`

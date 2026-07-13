@@ -930,7 +930,7 @@ export function CaretakerPortalContent({
         return;
       }
       if (!resMemberLookup.email?.trim()) {
-        setResError("Member email is required for receipt; not on file. Use cash (same-day only) or add email in Salesforce.");
+        setResError("Member email is required for receipt; not on file. Use cash or add email in Salesforce.");
         return;
       }
     } else {
@@ -2506,9 +2506,7 @@ export function CaretakerPortalContent({
                       </p>
                     )}
                     <p className="text-[#e8e0d5]/60 text-xs">
-                      {resAllowsCash
-                        ? "Cash allowed for check-in today or within the past 7 days. Card for future check-in."
-                        : "Card payment required for future check-in."}
+                      Pay with cash at the camp or send a card checkout link.
                     </p>
                   </div>
                 )}

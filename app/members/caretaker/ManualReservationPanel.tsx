@@ -696,9 +696,6 @@ export function ManualReservationPanel() {
           </>
         )}
       </div>
-      {!allowsCash && checkInDate && (
-        <p className="text-[#e8e0d5]/50 text-xs">Cash only when check-in is today or within the past 7 days.</p>
-      )}
     </section>
   );
 }

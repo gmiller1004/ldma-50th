@@ -7,6 +7,11 @@ import {
   classifyReservationType,
   parseResNexusCsv,
 } from "./resnexus-import.ts";
+import {
+  isResNexusBillingPaidInFull,
+  resnexusBillingTotals,
+  resnexusRawPaidCents,
+} from "./resnexus-billing-repair.ts";
 import { computeStayPricing } from "./reservation-pricing.ts";
 
 const STANTON_RATES = {
@@ -57,11 +62,22 @@ describe("classifyReservationType", () => {
     assert.ok(guestTotal > paidTotal * 2);
   });
 
-  it("still picks guest when amounts clearly match guest daily", () => {
-    const result = classifyReservationType(
-      [{ amountDueCents: 45_562, nights: 1 }],
-      STANTON_RATES
+  it("classifies Loud Mine Joey Muller stay as paid in full from ResNexus CSV", () => {
+    const csv = readFileSync(
+      join(process.cwd(), "data/camp-reservations/Loud Mine Future Reservations.csv"),
+      "utf8"
     );
-    assert.equal(result.type, "guest");
+    const rows = parseResNexusCsv(csv).filter((r) => r.resNumber === "13691");
+    const parsed = buildReservationFromRows("loud-mine-georgia", "13691", rows, {
+      memberRateDaily: 14,
+      memberRateMonthly: 360,
+      nonMemberRateDaily: 30,
+    });
+    assert.ok(parsed);
+    assert.equal(isResNexusBillingPaidInFull(parsed), true);
+    const { totalDueCents, allocatedPaidCents } = resnexusBillingTotals(parsed);
+    assert.equal(totalDueCents, 36_000);
+    assert.equal(allocatedPaidCents, 36_000);
+    assert.equal(resnexusRawPaidCents(rows), 72_000);
   });
 });

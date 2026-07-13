@@ -27,8 +27,9 @@ describe("caretakerAllowsCashCheckIn", () => {
     assert.equal(caretakerAllowsCashCheckIn("2026-05-11", today), false);
   });
 
-  it("disallows future check-in", () => {
-    assert.equal(caretakerAllowsCashCheckIn("2026-05-20", today), false);
+  it("allows future check-in", () => {
+    assert.equal(caretakerAllowsCashCheckIn("2026-05-20", today), true);
+    assert.equal(caretakerAllowsCashCheckIn("2026-12-01", today), true);
   });
 });
 

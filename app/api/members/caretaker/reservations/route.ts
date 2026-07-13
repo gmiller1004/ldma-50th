@@ -173,7 +173,7 @@ async function sendReservationConfirmation(
 
 /**
  * POST /api/members/caretaker/reservations
- * Create reservation with billing periods. Cash when check-in is today or backdated within policy.
+ * Create reservation with billing periods. Cash or card checkout.
  */
 export async function POST(request: NextRequest) {
   let body: {
@@ -287,13 +287,13 @@ export async function POST(request: NextRequest) {
   if (!isComp) {
     if (!paymentMethod || paymentMethod === "none") {
       return NextResponse.json(
-        { error: "Payment required. For same-day or recent check-in pay cash; otherwise use card checkout." },
+        { error: "Payment required. Pay with cash or use card checkout." },
         { status: 400 }
       );
     }
     if (!caretakerAllowsCashCheckIn(checkInDate, today)) {
       return NextResponse.json(
-        { error: "Cash payment is only allowed when check-in is today or within the past 7 days. Use card for future check-in." },
+        { error: "Cash payment is not allowed when check-in is more than 7 days in the past. Use card." },
         { status: 400 }
       );
     }
