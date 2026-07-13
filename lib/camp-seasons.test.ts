@@ -23,6 +23,14 @@ describe("isDateInCampClosedSeason", () => {
     assert.equal(isDateInCampClosedSeason("burnt-river-oregon", "2026-10-31"), false);
   });
 
+  it("Italian Bar is closed Dec 1 – last day of February", () => {
+    assert.equal(isDateInCampClosedSeason("italian-bar-california", "2026-12-01"), true);
+    assert.equal(isDateInCampClosedSeason("italian-bar-california", "2027-01-15"), true);
+    assert.equal(isDateInCampClosedSeason("italian-bar-california", "2027-02-28"), true);
+    assert.equal(isDateInCampClosedSeason("italian-bar-california", "2027-03-01"), false);
+    assert.equal(isDateInCampClosedSeason("italian-bar-california", "2026-11-30"), false);
+  });
+
   it("year-round camps have no closed season", () => {
     assert.equal(isDateInCampClosedSeason("oconee-south-carolina", "2026-07-04"), false);
   });

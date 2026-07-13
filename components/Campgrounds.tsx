@@ -24,7 +24,7 @@ const featuredCamps = [
       "Showers & Restrooms",
       "Clubhouse & Fire Pit",
       "160 Patented Acres",
-      "Trash & Dump Station",
+      "Dump Station",
     ],
     address: "24997 Italian Bar Rd, Columbia, CA 95310",
     image: "/images/home/campgrounds/italian-bar.jpg",

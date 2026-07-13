@@ -17,6 +17,7 @@ export const CAMP_SEASON_RULES: Record<string, CampSeasonRule> = {
   "stanton-arizona": { closedMonth: 6, closedDay: 1, openMonth: 10, openDay: 1 },
   "burnt-river-oregon": { closedMonth: 11, closedDay: 1, openMonth: 4, openDay: 1 },
   "blue-bucket-oregon": { closedMonth: 11, closedDay: 1, openMonth: 4, openDay: 1 },
+  "italian-bar-california": { closedMonth: 12, closedDay: 1, openMonth: 3, openDay: 1 },
 };
 
 function parseParts(iso: string): { month: number; day: number } {

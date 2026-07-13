@@ -85,7 +85,7 @@ export const italianBarData: CampPageData = {
   goldProspecting: {
     text: "Gold panning and sluicing in the Stanislaus River. Designated area for self-contained recirculating units and dry washers. Many members find their first gold here.",
     seasonalNote:
-      "Open March 15 through October 31. Closed November 1 – March 14. Road is tight — rigs up to 30 feet recommended.",
+      "Open March 1 through November 30. Closed December 1 – February 28/29. Road is tight — rigs up to 30 feet recommended.",
   },
   address: "24997 Italian Bar Rd, Columbia, CA 95310",
   mapsSearchUrl:
