@@ -15,7 +15,7 @@ import {
   isSameDay,
   getDay,
 } from "date-fns";
-import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate } from "@/lib/reservation-camps";
+import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
 import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
 import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
 import { countNights } from "@/lib/reservation-dates";
@@ -666,6 +666,9 @@ export function CaretakerPortalContent({
 
   const today = new Date().toISOString().slice(0, 10);
   const earliestCheckIn = caretakerEarliestCheckInDate(today);
+  const resEditCheckInMin = editingReservation
+    ? caretakerEarliestCheckInDateForEdit(toDateOnly(editingReservation.checkInDate), today)
+    : earliestCheckIn;
   const resNights =
     resQuotedNights ??
     (resCheckInDate && resCheckOutDate && resCheckInDate < resCheckOutDate
@@ -3010,7 +3013,7 @@ export function CaretakerPortalContent({
               ) : (
                 <form onSubmit={handleResEditSubmit}>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Check-in date</label>
-                  <DatePickerWithCalendar value={resEditCheckInDate} onChange={setResEditCheckInDate} min={earliestCheckIn} id="edit-res-check-in" />
+                  <DatePickerWithCalendar value={resEditCheckInDate} onChange={setResEditCheckInDate} min={resEditCheckInMin} id="edit-res-check-in" />
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-2 mt-3">Check-out date</label>
                   <DatePickerWithCalendar value={resEditCheckOutDate} onChange={setResEditCheckOutDate} min={resEditCheckInDate || today} id="edit-res-check-out" />
                   <p className="text-[#e8e0d5]/50 text-xs mb-4 mt-2">Shortening the stay does not issue a refund. Extending requires paying the difference.</p>

@@ -32,6 +32,19 @@ export function caretakerEarliestCheckInDate(today?: string): string {
 }
 
 /**
+ * When editing an existing reservation, keep its current check-in selectable even if it is
+ * older than the create/backdate window (needed for mid-stay early check-out edits).
+ */
+export function caretakerEarliestCheckInDateForEdit(
+  existingCheckInDate: string,
+  today?: string
+): string {
+  const earliest = caretakerEarliestCheckInDate(today);
+  const existing = existingCheckInDate.slice(0, 10);
+  return existing < earliest ? existing : earliest;
+}
+
+/**
  * Camp-specific site names that should never be bookable.
  * Used for caretaker-only spaces (e.g. Vein Mountain "Upper 1" / UC-01).
  */

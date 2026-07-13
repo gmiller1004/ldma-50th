@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, X } from "lucide-react";
-import { caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate } from "@/lib/reservation-camps";
+import { caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
 import { countNights } from "@/lib/reservation-dates";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
 
@@ -84,6 +84,9 @@ export function AdminCampReservationsTab({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const earliestCheckIn = caretakerEarliestCheckInDate(today);
+  const editCheckInMin = editing
+    ? caretakerEarliestCheckInDateForEdit(toDateOnly(editing.checkInDate), today)
+    : earliestCheckIn;
 
   const [editing, setEditing] = useState<ReservationDetail | null>(null);
   const [editCheckIn, setEditCheckIn] = useState("");
@@ -711,7 +714,7 @@ export function AdminCampReservationsTab({
                   type="date"
                   value={editCheckIn}
                   onChange={(e) => setEditCheckIn(e.target.value)}
-                  min={earliestCheckIn}
+                  min={editCheckInMin}
                   className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
                 />
                 <label className="block text-sm font-medium text-[#e8e0d5] mb-2 mt-3">Check-out date</label>

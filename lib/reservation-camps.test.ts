@@ -4,6 +4,7 @@ import {
   campUsesReservations,
   caretakerAllowsCashCheckIn,
   caretakerEarliestCheckInDate,
+  caretakerEarliestCheckInDateForEdit,
   isHookupSiteType,
   parseCapacitySiteFilter,
   siteMatchesCapacityFilter,
@@ -36,6 +37,22 @@ describe("caretakerAllowsCashCheckIn", () => {
 describe("caretakerEarliestCheckInDate", () => {
   it("is 7 days before today", () => {
     assert.equal(caretakerEarliestCheckInDate("2026-05-19"), "2026-05-12");
+  });
+});
+
+describe("caretakerEarliestCheckInDateForEdit", () => {
+  it("keeps existing check-in when older than the backdate window", () => {
+    assert.equal(
+      caretakerEarliestCheckInDateForEdit("2026-06-24", "2026-07-13"),
+      "2026-06-24"
+    );
+  });
+
+  it("uses the normal backdate floor when existing check-in is within the window", () => {
+    assert.equal(
+      caretakerEarliestCheckInDateForEdit("2026-07-10", "2026-07-13"),
+      "2026-07-06"
+    );
   });
 });
 
