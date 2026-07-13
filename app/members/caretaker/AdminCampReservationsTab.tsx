@@ -92,6 +92,29 @@ export function AdminCampReservationsTab({
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [paymentDueCents, setPaymentDueCents] = useState<number | null>(null);
   const [memberEmail, setMemberEmail] = useState<string | null>(null);
+  const [editPreview, setEditPreview] = useState<{
+    available: boolean;
+    datesUnchanged: boolean;
+    current: {
+      checkInDate: string;
+      checkOutDate: string;
+      nights: number;
+      totalCents: number;
+      pricingBasis: string;
+    };
+    proposed: {
+      checkInDate: string;
+      checkOutDate: string;
+      nights: number;
+      totalCents: number;
+      pricingBasis: string;
+    };
+    netPaidCents: number;
+    additionalDueCents: number;
+    creditCents: number;
+  } | null>(null);
+  const [editPreviewLoading, setEditPreviewLoading] = useState(false);
+  const [editPreviewError, setEditPreviewError] = useState<string | null>(null);
 
   const [cancelling, setCancelling] = useState<AdminReservationListRow | null>(null);
   const [cancelPreview, setCancelPreview] = useState<CancelPreview | null>(null);
@@ -126,6 +149,8 @@ export function AdminCampReservationsTab({
     if (row.status === "cancelled") return;
     setEditLoading(true);
     setPaymentDueCents(null);
+    setEditPreview(null);
+    setEditPreviewError(null);
     try {
       const res = await fetch(`/api/members/caretaker/reservations/${row.id}${apiQs}`);
       const data = await res.json();
@@ -163,13 +188,53 @@ export function AdminCampReservationsTab({
   function closeEdit() {
     setEditing(null);
     setPaymentDueCents(null);
+    setEditPreview(null);
+    setEditPreviewError(null);
   }
 
-  async function handleEditSubmit(e: React.FormEvent) {
+  function pricingBasisLabel(basis: string): string {
+    if (basis === "member_monthly_prorated") return "Monthly (prorated)";
+    if (basis === "member_daily") return "Daily member rate";
+    if (basis === "guest_daily") return "Daily guest rate";
+    return basis;
+  }
+
+  async function handleEditPreview(e: React.FormEvent) {
     e.preventDefault();
     if (!editing) return;
+    setEditPreviewLoading(true);
+    setEditPreviewError(null);
+    setEditPreview(null);
+    try {
+      const params = new URLSearchParams({
+        checkInDate: editCheckIn,
+        checkOutDate: editCheckOut,
+      });
+      const res = await fetch(
+        `/api/members/caretaker/reservations/${editing.id}/edit-preview${apiQs}&${params}`
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setEditPreviewError(data.error ?? "Could not preview date change");
+        return;
+      }
+      setEditPreview(data);
+    } catch {
+      setEditPreviewError("Could not preview date change");
+    } finally {
+      setEditPreviewLoading(false);
+    }
+  }
+
+  async function handleEditConfirmSave() {
+    if (!editing || !editPreview) return;
+    if (!editPreview.available) {
+      setEditPreviewError("Site is not available for the new dates");
+      return;
+    }
     setEditSubmitting(true);
     setPaymentDueCents(null);
+    setEditPreviewError(null);
     try {
       const res = await fetch(`/api/members/caretaker/reservations/${editing.id}${apiQs}`, {
         method: "PATCH",
@@ -182,13 +247,13 @@ export function AdminCampReservationsTab({
           setPaymentDueCents(data.amountDueCents);
           return;
         }
-        alert(data.error ?? "Update failed");
+        setEditPreviewError(data.error ?? "Update failed");
         return;
       }
       closeEdit();
       onUpdated();
     } catch {
-      alert("Update failed");
+      setEditPreviewError("Update failed");
     } finally {
       setEditSubmitting(false);
     }
@@ -657,16 +722,20 @@ export function AdminCampReservationsTab({
           onClick={() => !editSubmitting && closeEdit()}
         >
           <div
-            className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-4">
+          className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-md w-full p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-[#f0d48f]">
-                {paymentDueCents != null ? "Pay for additional nights" : "Edit reservation dates"}
+                {paymentDueCents != null
+                  ? "Pay for additional nights"
+                  : editPreview
+                    ? "Review date change"
+                    : "Edit reservation dates"}
               </h3>
               <button
                 type="button"
-                onClick={() => !editSubmitting && closeEdit()}
+                onClick={() => !editSubmitting && !editPreviewLoading && closeEdit()}
                 className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"
               >
                 <X className="w-5 h-5" />
@@ -702,19 +771,95 @@ export function AdminCampReservationsTab({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setPaymentDueCents(null)}
+                  onClick={() => { setPaymentDueCents(null); setEditPreview(null); }}
                   className="w-full py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]"
                 >
                   Back to dates
                 </button>
               </div>
+            ) : editPreview ? (
+              <div className="space-y-4">
+                <div className="bg-[#0f0a06]/80 border border-[#d4af37]/15 rounded-lg p-3 text-sm space-y-1.5">
+                  <div className="flex justify-between text-[#e8e0d5]/80">
+                    <span>Current</span>
+                    <span>
+                      {editPreview.current.nights} nights · {formatCentsAsCurrency(editPreview.current.totalCents)}
+                    </span>
+                  </div>
+                  <p className="text-[#e8e0d5]/50 text-xs">
+                    {editPreview.current.checkInDate} → {editPreview.current.checkOutDate} ·{" "}
+                    {pricingBasisLabel(editPreview.current.pricingBasis)}
+                  </p>
+                  <div className="flex justify-between text-[#f0d48f] font-medium pt-1 border-t border-[#d4af37]/20">
+                    <span>New total</span>
+                    <span>
+                      {editPreview.proposed.nights} nights · {formatCentsAsCurrency(editPreview.proposed.totalCents)}
+                    </span>
+                  </div>
+                  <p className="text-[#e8e0d5]/50 text-xs">
+                    {editPreview.proposed.checkInDate} → {editPreview.proposed.checkOutDate} ·{" "}
+                    {pricingBasisLabel(editPreview.proposed.pricingBasis)}
+                  </p>
+                  <div className="flex justify-between text-[#e8e0d5]/80 pt-1">
+                    <span>Already paid</span>
+                    <span>{formatCentsAsCurrency(editPreview.netPaidCents)}</span>
+                  </div>
+                  {editPreview.additionalDueCents > 0 && (
+                    <div className="flex justify-between text-amber-200 font-medium">
+                      <span>Amount due</span>
+                      <span>{formatCentsAsCurrency(editPreview.additionalDueCents)}</span>
+                    </div>
+                  )}
+                  {editPreview.creditCents > 0 && (
+                    <div className="flex justify-between text-[#6dd472] font-medium">
+                      <span>Credit left on reservation</span>
+                      <span>{formatCentsAsCurrency(editPreview.creditCents)}</span>
+                    </div>
+                  )}
+                </div>
+                {!editPreview.available && (
+                  <p className="text-red-400 text-sm">Site is not available for these dates.</p>
+                )}
+                {editPreview.creditCents > 0 && (
+                  <p className="text-[#e8e0d5]/50 text-xs">
+                    Saving will rerate the stay but will not issue a refund. Use Cancel (with fee waiver if needed) to refund.
+                  </p>
+                )}
+                {editPreviewError && <p className="text-red-400 text-sm">{editPreviewError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setEditPreview(null); setEditPreviewError(null); }}
+                    disabled={editSubmitting}
+                    className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleEditConfirmSave}
+                    disabled={
+                      editSubmitting ||
+                      !editPreview.available ||
+                      editPreview.datesUnchanged
+                    }
+                    className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {editSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Confirm save
+                  </button>
+                </div>
+              </div>
             ) : (
-              <form onSubmit={handleEditSubmit}>
+              <form onSubmit={handleEditPreview}>
                 <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Check-in date</label>
                 <input
                   type="date"
                   value={editCheckIn}
-                  onChange={(e) => setEditCheckIn(e.target.value)}
+                  onChange={(e) => {
+                    setEditCheckIn(e.target.value);
+                    setEditPreview(null);
+                    setEditPreviewError(null);
+                  }}
                   min={editCheckInMin}
                   className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
                 />
@@ -722,13 +867,18 @@ export function AdminCampReservationsTab({
                 <input
                   type="date"
                   value={editCheckOut}
-                  onChange={(e) => setEditCheckOut(e.target.value)}
+                  onChange={(e) => {
+                    setEditCheckOut(e.target.value);
+                    setEditPreview(null);
+                    setEditPreviewError(null);
+                  }}
                   min={editCheckIn || today}
                   className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
                 />
                 <p className="text-[#e8e0d5]/50 text-xs mb-4 mt-2">
-                  Shortening the stay does not issue a refund. Extending requires paying the difference.
+                  Preview the rerate before saving. Shortening does not auto-refund.
                 </p>
+                {editPreviewError && <p className="mb-3 text-red-400 text-sm">{editPreviewError}</p>}
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -740,14 +890,14 @@ export function AdminCampReservationsTab({
                   <button
                     type="submit"
                     disabled={
-                      editSubmitting ||
+                      editPreviewLoading ||
                       !editCheckIn ||
                       !editCheckOut ||
                       editCheckIn >= editCheckOut
                     }
                     className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    {editSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save
+                    {editPreviewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Preview
                   </button>
                 </div>
               </form>

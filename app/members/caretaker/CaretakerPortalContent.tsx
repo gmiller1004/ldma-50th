@@ -373,6 +373,30 @@ export function CaretakerPortalContent({
   const [resEditMemberLookup, setResEditMemberLookup] = useState<LookupResult | null>(null);
   const [resEditPaymentDueCents, setResEditPaymentDueCents] = useState<number | null>(null);
   const [resEditPayAmountCents, setResEditPayAmountCents] = useState(0);
+  const [resEditPreview, setResEditPreview] = useState<{
+    available: boolean;
+    datesUnchanged: boolean;
+    current: {
+      checkInDate: string;
+      checkOutDate: string;
+      nights: number;
+      totalCents: number;
+      calculatedTotalCents: number;
+      pricingBasis: string;
+    };
+    proposed: {
+      checkInDate: string;
+      checkOutDate: string;
+      nights: number;
+      totalCents: number;
+      pricingBasis: string;
+    };
+    netPaidCents: number;
+    additionalDueCents: number;
+    creditCents: number;
+  } | null>(null);
+  const [resEditPreviewLoading, setResEditPreviewLoading] = useState(false);
+  const [resEditPreviewError, setResEditPreviewError] = useState<string | null>(null);
   const [movingReservation, setMovingReservation] = useState<Reservation | null>(null);
   const [resMoveModalOpen, setResMoveModalOpen] = useState(false);
   const [resMoveNewSiteId, setResMoveNewSiteId] = useState("");
@@ -1282,6 +1306,8 @@ export function CaretakerPortalContent({
     setResEditCheckOutDate(toDateOnly(r.checkOutDate));
     setResEditPaymentDueCents(null);
     setResEditPayAmountCents(0);
+    setResEditPreview(null);
+    setResEditPreviewError(null);
     setResEditMemberLookup(null);
     setResEditModalOpen(true);
     if (r.reservationType === "member" && r.memberNumber) {
@@ -1296,16 +1322,66 @@ export function CaretakerPortalContent({
     }
   }
 
-  async function handleResEditSubmit(e: React.FormEvent) {
+  function closeResEditModal() {
+    setResEditModalOpen(false);
+    setEditingReservation(null);
+    setResEditPaymentDueCents(null);
+    setResEditPayAmountCents(0);
+    setResEditPreview(null);
+    setResEditPreviewError(null);
+  }
+
+  function pricingBasisLabel(basis: string): string {
+    if (basis === "member_monthly_prorated") return "Monthly (prorated)";
+    if (basis === "member_daily") return "Daily member rate";
+    if (basis === "guest_daily") return "Daily guest rate";
+    return basis;
+  }
+
+  async function handleResEditPreview(e: React.FormEvent) {
     e.preventDefault();
     if (!editingReservation) return;
+    setResEditPreviewLoading(true);
+    setResEditPreviewError(null);
+    setResEditPreview(null);
+    try {
+      const params = new URLSearchParams({
+        checkInDate: resEditCheckInDate,
+        checkOutDate: resEditCheckOutDate,
+      });
+      const res = await fetch(
+        `/api/members/caretaker/reservations/${editingReservation.id}/edit-preview?${params}`
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setResEditPreviewError(data.error ?? "Could not preview date change");
+        return;
+      }
+      setResEditPreview(data);
+    } catch {
+      setResEditPreviewError("Could not preview date change");
+    } finally {
+      setResEditPreviewLoading(false);
+    }
+  }
+
+  async function handleResEditConfirmSave() {
+    if (!editingReservation || !resEditPreview) return;
+    if (!resEditPreview.available) {
+      setResEditPreviewError("Site is not available for the new dates");
+      return;
+    }
     setResEditSubmitting(true);
     setResEditPaymentDueCents(null);
+    setResEditPreviewError(null);
     try {
       const res = await fetch(`/api/members/caretaker/reservations/${editingReservation.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ checkInDate: resEditCheckInDate, checkOutDate: resEditCheckOutDate }),
+        body: JSON.stringify({
+          checkInDate: resEditCheckInDate,
+          checkOutDate: resEditCheckOutDate,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1314,15 +1390,13 @@ export function CaretakerPortalContent({
           setResEditPayAmountCents(data.amountDueCents);
           return;
         }
-        alert(data.error ?? "Update failed");
+        setResEditPreviewError(data.error ?? "Update failed");
         return;
       }
-      setResEditModalOpen(false);
-      setEditingReservation(null);
-      setResEditPaymentDueCents(null);
+      closeResEditModal();
       loadReservations();
     } catch {
-      alert("Update failed");
+      setResEditPreviewError("Update failed");
     } finally {
       setResEditSubmitting(false);
     }
@@ -1732,9 +1806,7 @@ export function CaretakerPortalContent({
         alert(data.error ?? "Payment failed");
         return;
       }
-      setResEditModalOpen(false);
-      setEditingReservation(null);
-      setResEditPaymentDueCents(null);
+      closeResEditModal();
       loadReservations();
     } catch {
       alert("Payment failed");
@@ -2969,11 +3041,17 @@ export function CaretakerPortalContent({
 
         {/* Edit reservation modal */}
         {resEditModalOpen && editingReservation && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setResEditModalOpen(false)}>
-            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !resEditSubmitting && !resEditPreviewLoading && closeResEditModal()}>
+            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-[#f0d48f]">{resEditPaymentDueCents != null ? "Pay for additional nights" : "Edit reservation dates"}</h3>
-                <button type="button" onClick={() => { setResEditModalOpen(false); setResEditPaymentDueCents(null); setResEditPayAmountCents(0); }} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
+                <h3 className="font-semibold text-[#f0d48f]">
+                  {resEditPaymentDueCents != null
+                    ? "Pay for additional nights"
+                    : resEditPreview
+                      ? "Review date change"
+                      : "Edit reservation dates"}
+                </h3>
+                <button type="button" onClick={() => !resEditSubmitting && !resEditPreviewLoading && closeResEditModal()} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
               </div>
               <p className="text-[#e8e0d5]/80 text-sm mb-4">{editingReservation.siteName} — {editingReservation.reservationType === "member" ? editingReservation.memberDisplayName : `${editingReservation.guestFirstName} ${editingReservation.guestLastName}`}</p>
               {resEditPaymentDueCents != null ? (
@@ -3008,19 +3086,114 @@ export function CaretakerPortalContent({
                       {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay card
                     </button>
                   </div>
-                  <button type="button" onClick={() => setResEditPaymentDueCents(null)} className="w-full py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Back to dates</button>
+                  <button type="button" onClick={() => { setResEditPaymentDueCents(null); setResEditPreview(null); }} className="w-full py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Back to dates</button>
+                </div>
+              ) : resEditPreview ? (
+                <div className="space-y-4">
+                  <div className="bg-[#0f0a06]/80 border border-[#d4af37]/15 rounded-lg p-3 text-sm space-y-1.5">
+                    <div className="flex justify-between text-[#e8e0d5]/80">
+                      <span>Current</span>
+                      <span>
+                        {resEditPreview.current.nights} nights · {formatCentsAsCurrency(resEditPreview.current.totalCents)}
+                      </span>
+                    </div>
+                    <p className="text-[#e8e0d5]/50 text-xs">
+                      {resEditPreview.current.checkInDate} → {resEditPreview.current.checkOutDate} · {pricingBasisLabel(resEditPreview.current.pricingBasis)}
+                    </p>
+                    <div className="flex justify-between text-[#f0d48f] font-medium pt-1 border-t border-[#d4af37]/20">
+                      <span>New total</span>
+                      <span>
+                        {resEditPreview.proposed.nights} nights · {formatCentsAsCurrency(resEditPreview.proposed.totalCents)}
+                      </span>
+                    </div>
+                    <p className="text-[#e8e0d5]/50 text-xs">
+                      {resEditPreview.proposed.checkInDate} → {resEditPreview.proposed.checkOutDate} · {pricingBasisLabel(resEditPreview.proposed.pricingBasis)}
+                    </p>
+                    <div className="flex justify-between text-[#e8e0d5]/80 pt-1">
+                      <span>Already paid</span>
+                      <span>{formatCentsAsCurrency(resEditPreview.netPaidCents)}</span>
+                    </div>
+                    {resEditPreview.additionalDueCents > 0 && (
+                      <div className="flex justify-between text-amber-200 font-medium">
+                        <span>Amount due</span>
+                        <span>{formatCentsAsCurrency(resEditPreview.additionalDueCents)}</span>
+                      </div>
+                    )}
+                    {resEditPreview.creditCents > 0 && (
+                      <div className="flex justify-between text-[#6dd472] font-medium">
+                        <span>Credit left on reservation</span>
+                        <span>{formatCentsAsCurrency(resEditPreview.creditCents)}</span>
+                      </div>
+                    )}
+                  </div>
+                  {!resEditPreview.available && (
+                    <p className="text-red-400 text-sm">Site is not available for these dates.</p>
+                  )}
+                  {resEditPreview.creditCents > 0 && (
+                    <p className="text-[#e8e0d5]/50 text-xs">
+                      Saving will rerate the stay but will not issue a refund. Use Cancel (with fee waiver if needed) to refund.
+                    </p>
+                  )}
+                  {resEditPreview.additionalDueCents > 0 && (
+                    <p className="text-[#e8e0d5]/50 text-xs">
+                      Confirming will ask for payment of the additional amount.
+                    </p>
+                  )}
+                  {resEditPreviewError && <p className="text-red-400 text-sm">{resEditPreviewError}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setResEditPreview(null); setResEditPreviewError(null); }}
+                      disabled={resEditSubmitting}
+                      className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResEditConfirmSave}
+                      disabled={
+                        resEditSubmitting ||
+                        !resEditPreview.available ||
+                        resEditPreview.datesUnchanged
+                      }
+                      className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Confirm save
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <form onSubmit={handleResEditSubmit}>
+                <form onSubmit={handleResEditPreview}>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Check-in date</label>
-                  <DatePickerWithCalendar value={resEditCheckInDate} onChange={setResEditCheckInDate} min={resEditCheckInMin} id="edit-res-check-in" />
+                  <DatePickerWithCalendar
+                    value={resEditCheckInDate}
+                    onChange={(v) => { setResEditCheckInDate(v); setResEditPreview(null); setResEditPreviewError(null); }}
+                    min={resEditCheckInMin}
+                    id="edit-res-check-in"
+                  />
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-2 mt-3">Check-out date</label>
-                  <DatePickerWithCalendar value={resEditCheckOutDate} onChange={setResEditCheckOutDate} min={resEditCheckInDate || today} id="edit-res-check-out" />
-                  <p className="text-[#e8e0d5]/50 text-xs mb-4 mt-2">Shortening the stay does not issue a refund. Extending requires paying the difference.</p>
+                  <DatePickerWithCalendar
+                    value={resEditCheckOutDate}
+                    onChange={(v) => { setResEditCheckOutDate(v); setResEditPreview(null); setResEditPreviewError(null); }}
+                    min={resEditCheckInDate || today}
+                    id="edit-res-check-out"
+                  />
+                  <p className="text-[#e8e0d5]/50 text-xs mb-4 mt-2">Preview the rerate before saving. Shortening does not auto-refund.</p>
+                  {resEditPreviewError && <p className="mb-3 text-red-400 text-sm">{resEditPreviewError}</p>}
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setResEditModalOpen(false)} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
-                    <button type="submit" disabled={resEditSubmitting || !resEditCheckInDate || !resEditCheckOutDate || resEditCheckInDate >= resEditCheckOutDate} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
-                      {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save
+                    <button type="button" onClick={closeResEditModal} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
+                    <button
+                      type="submit"
+                      disabled={
+                        resEditPreviewLoading ||
+                        !resEditCheckInDate ||
+                        !resEditCheckOutDate ||
+                        resEditCheckInDate >= resEditCheckOutDate
+                      }
+                      className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {resEditPreviewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Preview
                     </button>
                   </div>
                 </form>
