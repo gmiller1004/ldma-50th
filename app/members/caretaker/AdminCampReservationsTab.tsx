@@ -84,9 +84,6 @@ export function AdminCampReservationsTab({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const earliestCheckIn = caretakerEarliestCheckInDate(today);
-  const editCheckInMin = editing
-    ? caretakerEarliestCheckInDateForEdit(toDateOnly(editing.checkInDate), today)
-    : earliestCheckIn;
 
   const [editing, setEditing] = useState<ReservationDetail | null>(null);
   const [editCheckIn, setEditCheckIn] = useState("");
@@ -112,6 +109,10 @@ export function AdminCampReservationsTab({
   const [moveCashAllowed, setMoveCashAllowed] = useState(false);
   const [moveMemberEmail, setMoveMemberEmail] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+
+  const editCheckInMin = editing
+    ? caretakerEarliestCheckInDateForEdit(toDateOnly(editing.checkInDate), today)
+    : earliestCheckIn;
 
   const editNights =
     editCheckIn && editCheckOut && editCheckIn < editCheckOut
