@@ -91,16 +91,17 @@ export async function POST(
     `;
     const res = (Array.isArray(resRows) ? resRows[0] : undefined) as ReservationRow | undefined;
     if (!res) return NextResponse.json({ error: "Reservation not found" }, { status: 404 });
-    if (res.status === "cancelled") {
+    const reservation = res;
+    if (reservation.status === "cancelled") {
       return NextResponse.json({ error: "Cannot move a cancelled reservation" }, { status: 400 });
     }
 
-    const checkInDate = toDateOnlyStr(res.check_in_date);
-    const checkOutDate = toDateOnlyStr(res.check_out_date);
+    const checkInDate = toDateOnlyStr(reservation.check_in_date);
+    const checkOutDate = toDateOnlyStr(reservation.check_out_date);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(checkInDate) || !/^\d{4}-\d{2}-\d{2}$/.test(checkOutDate)) {
       return NextResponse.json({ error: "Reservation has invalid dates" }, { status: 400 });
     }
-    const isMember = res.reservation_type === "member";
+    const isMember = reservation.reservation_type === "member";
 
     const siteRows = await sql`
       SELECT id, name, site_code, member_rate_daily, member_rate_monthly, non_member_rate_daily
@@ -119,37 +120,42 @@ export async function POST(
         }
       | undefined;
     if (!newSite) return NextResponse.json({ error: "Destination site not found" }, { status: 404 });
-    if (isNonBookableSite(caretaker.campSlug, newSite.name, newSite.site_code)) {
+    const destinationSite = newSite;
+    if (isNonBookableSite(caretaker.campSlug, destinationSite.name, destinationSite.site_code)) {
       return NextResponse.json({ error: "Destination site cannot be booked" }, { status: 400 });
     }
 
-    const sameSite = newSite.id === res.site_id;
+    const sameSite = destinationSite.id === reservation.site_id;
     const oldSiteRows = sameSite
       ? null
-      : await sql`SELECT name FROM camp_sites WHERE id = ${res.site_id} LIMIT 1`;
+      : await sql`SELECT name FROM camp_sites WHERE id = ${reservation.site_id} LIMIT 1`;
     const previousSiteName =
       (Array.isArray(oldSiteRows) ? oldSiteRows[0] : undefined) as { name: string } | undefined;
     const previousSiteLabel = previousSiteName?.name ?? null;
+    const caretakerCampSlug = caretaker.campSlug;
+    const caretakerCampName = caretaker.campName;
 
     async function notifySiteMoved(): Promise<void> {
       const partyName =
-        res.reservation_type === "member"
-          ? res.member_display_name || (res.member_number ? `#${res.member_number}` : "Member")
-          : [res.guest_first_name, res.guest_last_name].filter(Boolean).join(" ").trim() || "Guest";
+        reservation.reservation_type === "member"
+          ? reservation.member_display_name ||
+            (reservation.member_number ? `#${reservation.member_number}` : "Member")
+          : [reservation.guest_first_name, reservation.guest_last_name].filter(Boolean).join(" ").trim() ||
+            "Guest";
       let notifyEmail: string | null = null;
-      if (res.reservation_type === "member" && res.member_number) {
-        const member = await lookupMember(String(res.member_number).trim());
+      if (reservation.reservation_type === "member" && reservation.member_number) {
+        const member = await lookupMember(String(reservation.member_number).trim());
         notifyEmail = member.valid && member.email?.trim() ? member.email.trim() : null;
-      } else if (res.reservation_type === "guest") {
-        notifyEmail = res.guest_email?.trim() || null;
+      } else if (reservation.reservation_type === "guest") {
+        notifyEmail = reservation.guest_email?.trim() || null;
       }
       if (!notifyEmail) return;
 
-      const caretakerCc = await fetchCaretakerEmailsForCamp(caretaker.campSlug, notifyEmail);
+      const caretakerCc = await fetchCaretakerEmailsForCamp(caretakerCampSlug, notifyEmail);
       await sendReservationSiteMovedEmail({
         to: notifyEmail,
-        campName: caretaker.campName,
-        newSiteLabel: newSite.name,
+        campName: caretakerCampName,
+        newSiteLabel: destinationSite.name,
         previousSiteLabel,
         checkInDate,
         checkOutDate,
@@ -280,7 +286,7 @@ export async function POST(
         )
         VALUES (
           ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${id},
-          ${res.member_contact_id}, ${res.member_number}, ${recipientEmail}, ${recipientDisplayName},
+          ${reservation.member_contact_id}, ${reservation.member_number}, ${recipientEmail}, ${recipientDisplayName},
           ${caretaker.contactId}, NOW()
         )
       `;
