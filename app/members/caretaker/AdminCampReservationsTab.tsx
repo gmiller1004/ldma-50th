@@ -112,9 +112,11 @@ export function AdminCampReservationsTab({
     netPaidCents: number;
     additionalDueCents: number;
     creditCents: number;
+    refundBreakdown: { stripeRefundCents: number; cashRefundCents: number };
   } | null>(null);
   const [editPreviewLoading, setEditPreviewLoading] = useState(false);
   const [editPreviewError, setEditPreviewError] = useState<string | null>(null);
+  const [editIssueRefund, setEditIssueRefund] = useState(false);
 
   const [cancelling, setCancelling] = useState<AdminReservationListRow | null>(null);
   const [cancelPreview, setCancelPreview] = useState<CancelPreview | null>(null);
@@ -151,6 +153,7 @@ export function AdminCampReservationsTab({
     setPaymentDueCents(null);
     setEditPreview(null);
     setEditPreviewError(null);
+    setEditIssueRefund(false);
     try {
       const res = await fetch(`/api/members/caretaker/reservations/${row.id}${apiQs}`);
       const data = await res.json();
@@ -190,6 +193,7 @@ export function AdminCampReservationsTab({
     setPaymentDueCents(null);
     setEditPreview(null);
     setEditPreviewError(null);
+    setEditIssueRefund(false);
   }
 
   function pricingBasisLabel(basis: string): string {
@@ -205,6 +209,7 @@ export function AdminCampReservationsTab({
     setEditPreviewLoading(true);
     setEditPreviewError(null);
     setEditPreview(null);
+    setEditIssueRefund(false);
     try {
       const params = new URLSearchParams({
         checkInDate: editCheckIn,
@@ -219,6 +224,7 @@ export function AdminCampReservationsTab({
         return;
       }
       setEditPreview(data);
+      setEditIssueRefund(false);
     } catch {
       setEditPreviewError("Could not preview date change");
     } finally {
@@ -239,7 +245,11 @@ export function AdminCampReservationsTab({
       const res = await fetch(`/api/members/caretaker/reservations/${editing.id}${apiQs}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ checkInDate: editCheckIn, checkOutDate: editCheckOut }),
+        body: JSON.stringify({
+          checkInDate: editCheckIn,
+          checkOutDate: editCheckOut,
+          issueRefund: editIssueRefund && editPreview.creditCents > 0,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -812,24 +822,57 @@ export function AdminCampReservationsTab({
                   )}
                   {editPreview.creditCents > 0 && (
                     <div className="flex justify-between text-[#6dd472] font-medium">
-                      <span>Credit left on reservation</span>
+                      <span>Credit / refund available</span>
                       <span>{formatCentsAsCurrency(editPreview.creditCents)}</span>
                     </div>
+                  )}
+                  {editPreview.creditCents > 0 && (
+                    <p className="text-[#e8e0d5]/50 text-xs pt-1">
+                      {editPreview.refundBreakdown.stripeRefundCents > 0 &&
+                        `Card: ${formatCentsAsCurrency(editPreview.refundBreakdown.stripeRefundCents)}`}
+                      {editPreview.refundBreakdown.stripeRefundCents > 0 &&
+                        editPreview.refundBreakdown.cashRefundCents > 0 &&
+                        " · "}
+                      {editPreview.refundBreakdown.cashRefundCents > 0 &&
+                        `Cash: ${formatCentsAsCurrency(editPreview.refundBreakdown.cashRefundCents)}`}
+                    </p>
                   )}
                 </div>
                 {!editPreview.available && (
                   <p className="text-red-400 text-sm">Site is not available for these dates.</p>
                 )}
                 {editPreview.creditCents > 0 && (
+                  <label className="flex items-start gap-2 text-sm text-[#e8e0d5]/90 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={editIssueRefund}
+                      disabled={editSubmitting}
+                      onChange={(e) => setEditIssueRefund(e.target.checked)}
+                    />
+                    <span>
+                      Issue refund of {formatCentsAsCurrency(editPreview.creditCents)} on save
+                      {editPreview.refundBreakdown.stripeRefundCents > 0
+                        ? " (card first, then cash)"
+                        : " (cash)"}
+                      .
+                    </span>
+                  </label>
+                )}
+                {editPreview.creditCents > 0 && !editIssueRefund && (
                   <p className="text-[#e8e0d5]/50 text-xs">
-                    Saving will rerate the stay but will not issue a refund. Use Cancel (with fee waiver if needed) to refund.
+                    If unchecked, the credit stays on the reservation (no refund issued).
                   </p>
                 )}
                 {editPreviewError && <p className="text-red-400 text-sm">{editPreviewError}</p>}
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => { setEditPreview(null); setEditPreviewError(null); }}
+                    onClick={() => {
+                      setEditPreview(null);
+                      setEditPreviewError(null);
+                      setEditIssueRefund(false);
+                    }}
                     disabled={editSubmitting}
                     className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]"
                   >

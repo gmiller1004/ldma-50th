@@ -394,9 +394,11 @@ export function CaretakerPortalContent({
     netPaidCents: number;
     additionalDueCents: number;
     creditCents: number;
+    refundBreakdown: { stripeRefundCents: number; cashRefundCents: number };
   } | null>(null);
   const [resEditPreviewLoading, setResEditPreviewLoading] = useState(false);
   const [resEditPreviewError, setResEditPreviewError] = useState<string | null>(null);
+  const [resEditIssueRefund, setResEditIssueRefund] = useState(false);
   const [movingReservation, setMovingReservation] = useState<Reservation | null>(null);
   const [resMoveModalOpen, setResMoveModalOpen] = useState(false);
   const [resMoveNewSiteId, setResMoveNewSiteId] = useState("");
@@ -1308,6 +1310,7 @@ export function CaretakerPortalContent({
     setResEditPayAmountCents(0);
     setResEditPreview(null);
     setResEditPreviewError(null);
+    setResEditIssueRefund(false);
     setResEditMemberLookup(null);
     setResEditModalOpen(true);
     if (r.reservationType === "member" && r.memberNumber) {
@@ -1329,6 +1332,7 @@ export function CaretakerPortalContent({
     setResEditPayAmountCents(0);
     setResEditPreview(null);
     setResEditPreviewError(null);
+    setResEditIssueRefund(false);
   }
 
   function pricingBasisLabel(basis: string): string {
@@ -1344,6 +1348,7 @@ export function CaretakerPortalContent({
     setResEditPreviewLoading(true);
     setResEditPreviewError(null);
     setResEditPreview(null);
+    setResEditIssueRefund(false);
     try {
       const params = new URLSearchParams({
         checkInDate: resEditCheckInDate,
@@ -1358,6 +1363,7 @@ export function CaretakerPortalContent({
         return;
       }
       setResEditPreview(data);
+      setResEditIssueRefund(false);
     } catch {
       setResEditPreviewError("Could not preview date change");
     } finally {
@@ -1381,6 +1387,7 @@ export function CaretakerPortalContent({
         body: JSON.stringify({
           checkInDate: resEditCheckInDate,
           checkOutDate: resEditCheckOutDate,
+          issueRefund: resEditIssueRefund && (resEditPreview.creditCents ?? 0) > 0,
         }),
       });
       const data = await res.json();
@@ -3121,17 +3128,46 @@ export function CaretakerPortalContent({
                     )}
                     {resEditPreview.creditCents > 0 && (
                       <div className="flex justify-between text-[#6dd472] font-medium">
-                        <span>Credit left on reservation</span>
+                        <span>Credit / refund available</span>
                         <span>{formatCentsAsCurrency(resEditPreview.creditCents)}</span>
                       </div>
+                    )}
+                    {resEditPreview.creditCents > 0 && (
+                      <p className="text-[#e8e0d5]/50 text-xs pt-1">
+                        {resEditPreview.refundBreakdown.stripeRefundCents > 0 &&
+                          `Card: ${formatCentsAsCurrency(resEditPreview.refundBreakdown.stripeRefundCents)}`}
+                        {resEditPreview.refundBreakdown.stripeRefundCents > 0 &&
+                          resEditPreview.refundBreakdown.cashRefundCents > 0 &&
+                          " · "}
+                        {resEditPreview.refundBreakdown.cashRefundCents > 0 &&
+                          `Cash: ${formatCentsAsCurrency(resEditPreview.refundBreakdown.cashRefundCents)}`}
+                      </p>
                     )}
                   </div>
                   {!resEditPreview.available && (
                     <p className="text-red-400 text-sm">Site is not available for these dates.</p>
                   )}
                   {resEditPreview.creditCents > 0 && (
+                    <label className="flex items-start gap-2 text-sm text-[#e8e0d5]/90 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={resEditIssueRefund}
+                        disabled={resEditSubmitting}
+                        onChange={(e) => setResEditIssueRefund(e.target.checked)}
+                      />
+                      <span>
+                        Issue refund of {formatCentsAsCurrency(resEditPreview.creditCents)} on save
+                        {resEditPreview.refundBreakdown.stripeRefundCents > 0
+                          ? " (card first, then cash)"
+                          : " (cash)"}
+                        .
+                      </span>
+                    </label>
+                  )}
+                  {resEditPreview.creditCents > 0 && !resEditIssueRefund && (
                     <p className="text-[#e8e0d5]/50 text-xs">
-                      Saving will rerate the stay but will not issue a refund. Use Cancel (with fee waiver if needed) to refund.
+                      If unchecked, the credit stays on the reservation (no refund issued).
                     </p>
                   )}
                   {resEditPreview.additionalDueCents > 0 && (
@@ -3143,7 +3179,7 @@ export function CaretakerPortalContent({
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => { setResEditPreview(null); setResEditPreviewError(null); }}
+                      onClick={() => { setResEditPreview(null); setResEditPreviewError(null); setResEditIssueRefund(false); }}
                       disabled={resEditSubmitting}
                       className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]"
                     >

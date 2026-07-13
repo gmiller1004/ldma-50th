@@ -21,6 +21,7 @@ import {
 } from "@/lib/sendgrid";
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
+import { refundReservationSiteFees } from "@/lib/reservation-refund";
 
 type ReservationRow = {
   id: string;
@@ -174,6 +175,7 @@ export async function PATCH(
       amountCents?: number;
       recipientEmail?: string;
       recipientDisplayName?: string;
+      issueRefund?: boolean;
     };
     try {
       body = await request.json();
@@ -254,6 +256,9 @@ export async function PATCH(
     const today = new Date().toISOString().slice(0, 10);
     const rates = siteRatesFromRow(existingRow);
     const isMember = existingRow.reservation_type === "member";
+    let refundResult:
+      | { stripeRefundCents: number; cashRefundCents: number; totalRefundedCents: number }
+      | null = null;
 
     if (datesChanged) {
       const overlap = await sql`
@@ -284,6 +289,37 @@ export async function PATCH(
         isMember,
         rates,
       });
+
+      const creditCents = Math.max(
+        0,
+        balanceAfterSync.totalPaidCents - balanceAfterSync.totalDueCents
+      );
+      if (body.issueRefund === true && creditCents > 0) {
+        const refund = await refundReservationSiteFees({
+          reservationId: id,
+          campSlug: caretaker.campSlug,
+          createdByContactId: caretaker.contactId,
+          refundCents: creditCents,
+        });
+        if (!refund.ok) {
+          return NextResponse.json(
+            {
+              error: `Dates were updated, but the refund failed: ${refund.error}`,
+              datesUpdated: true,
+              creditCents,
+            },
+            { status: 400 }
+          );
+        }
+        refundResult = refund;
+        await syncBillingPeriodsForReservation({
+          reservationId: id,
+          checkInDate: newCheckIn,
+          checkOutDate: newCheckOut,
+          isMember,
+          rates,
+        });
+      }
 
       if (balanceAfterSync.balanceDueCents > 0) {
         const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
@@ -492,6 +528,7 @@ export async function PATCH(
       billingPeriods,
       balance,
       ...(setCheckIn ? { welcomeEmailSent, pointsAwarded } : {}),
+      ...(refundResult ? { refund: refundResult } : {}),
     };
     return NextResponse.json(payload);
   } catch (e) {

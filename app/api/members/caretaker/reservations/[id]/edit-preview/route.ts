@@ -8,7 +8,10 @@ import {
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
 import { getReservationBalance, siteRatesFromRow } from "@/lib/reservation-billing";
-import { getReservationSiteFeeTotals } from "@/lib/reservation-refund";
+import {
+  allocateRefundSplit,
+  getReservationSiteFeeTotals,
+} from "@/lib/reservation-refund";
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -107,6 +110,11 @@ export async function GET(
     const balanceAfter = proposedTotalCents - totals.netPaidCents;
     const additionalDueCents = balanceAfter > 0 ? balanceAfter : 0;
     const creditCents = balanceAfter < 0 ? -balanceAfter : 0;
+    const { stripeRefundCents, cashRefundCents } = allocateRefundSplit(
+      creditCents,
+      totals.cardPaidCents,
+      totals.refundedCents
+    );
 
     const today = new Date().toISOString().slice(0, 10);
     const datesUnchanged = checkInDate === currentCheckIn && checkOutDate === currentCheckOut;
@@ -133,6 +141,7 @@ export async function GET(
       netPaidCents: totals.netPaidCents,
       additionalDueCents,
       creditCents,
+      refundBreakdown: { stripeRefundCents, cashRefundCents },
       issuesRefund: false,
       cashAllowed: caretakerAllowsCashCheckIn(checkInDate, today),
     });
