@@ -29,12 +29,12 @@ export type BillingPeriodSummary = {
 type PeriodRow = {
   id: string;
   period_index: number;
-  period_start: string;
-  period_end: string;
+  period_start: string | Date;
+  period_end: string | Date;
   nights: number;
   amount_due_cents: number;
   amount_paid_cents: number;
-  due_date: string;
+  due_date: string | Date;
   status: string;
   pricing_basis: string;
 };
@@ -60,12 +60,12 @@ export function periodRowToSummary(row: PeriodRow): BillingPeriodSummary {
   return {
     id: row.id,
     periodIndex: row.period_index,
-    periodStart: String(row.period_start).slice(0, 10),
-    periodEnd: String(row.period_end).slice(0, 10),
+    periodStart: toDateOnlyStr(row.period_start),
+    periodEnd: toDateOnlyStr(row.period_end),
     nights: row.nights,
     amountDueCents: row.amount_due_cents,
     amountPaidCents: row.amount_paid_cents,
-    dueDate: String(row.due_date).slice(0, 10),
+    dueDate: toDateOnlyStr(row.due_date),
     status: row.status,
     pricingBasis: row.pricing_basis,
   };

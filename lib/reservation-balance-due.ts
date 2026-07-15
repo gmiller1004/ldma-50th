@@ -74,21 +74,27 @@ export function nextScheduledPayment(
   periods: BillingPeriodSummary[],
   today?: string
 ): { dueDate: string; amountCents: number } | null {
-  const todayStr = today ?? new Date().toISOString().slice(0, 10);
+  const todayStr = (today ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
   const upcoming = periods
-    .filter(
-      (p) =>
+    .filter((p) => {
+      const dueDate = p.dueDate.slice(0, 10);
+      return (
         p.status !== "cancelled" &&
         (p.status === "unpaid" || p.status === "partial") &&
-        p.dueDate > todayStr
-    )
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.periodIndex - b.periodIndex);
+        dueDate > todayStr
+      );
+    })
+    .sort(
+      (a, b) =>
+        a.dueDate.slice(0, 10).localeCompare(b.dueDate.slice(0, 10)) ||
+        a.periodIndex - b.periodIndex
+    );
 
   const next = upcoming[0];
   if (!next) return null;
   const amountCents = Math.max(0, next.amountDueCents - next.amountPaidCents);
   if (amountCents < 1) return null;
-  return { dueDate: next.dueDate, amountCents };
+  return { dueDate: next.dueDate.slice(0, 10), amountCents };
 }
 
 /**

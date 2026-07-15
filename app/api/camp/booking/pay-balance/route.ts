@@ -8,6 +8,7 @@ import { verifyReservationPayToken } from "@/lib/reservation-pay-token";
 import { formatSiteAssignmentLabel, type CampSiteRow } from "@/lib/public-camp-booking";
 import { PUBLIC_BOOKING_IMPORT_SOURCE } from "@/lib/public-camp-booking";
 import { summarizeReservationPaymentObligations } from "@/lib/reservation-balance-due";
+import { toDateOnlyStr } from "@/lib/reservation-dates";
 
 function publicBookingActorId(): string {
   return process.env.PUBLIC_BOOKING_ACTOR_CONTACT_ID?.trim() || "public-web-self-service";
@@ -99,8 +100,8 @@ export async function GET(request: NextRequest) {
   }
 
   const periods = await listBillingPeriods(row.id);
-  const checkInDate = String(row.check_in_date).slice(0, 10);
-  const checkOutDate = String(row.check_out_date).slice(0, 10);
+  const checkInDate = toDateOnlyStr(row.check_in_date);
+  const checkOutDate = toDateOnlyStr(row.check_out_date);
   const obligations = summarizeReservationPaymentObligations({
     periods,
     checkInDate,
@@ -167,8 +168,8 @@ export async function POST(request: NextRequest) {
   }
 
   const periods = await listBillingPeriods(row.id);
-  const checkInDate = String(row.check_in_date).slice(0, 10);
-  const checkOutDate = String(row.check_out_date).slice(0, 10);
+  const checkInDate = toDateOnlyStr(row.check_in_date);
+  const checkOutDate = toDateOnlyStr(row.check_out_date);
   const obligations = summarizeReservationPaymentObligations({
     periods,
     checkInDate,
@@ -232,7 +233,7 @@ export async function POST(request: NextRequest) {
             unit_amount: chargeCents,
             product_data: {
               name: `${campName} — Campsite balance`,
-              description: `Balance due for stay ${String(row.check_in_date).slice(0, 10)} to ${String(row.check_out_date).slice(0, 10)}`,
+              description: `Balance due for stay ${toDateOnlyStr(row.check_in_date)} to ${toDateOnlyStr(row.check_out_date)}`,
             },
           },
         },

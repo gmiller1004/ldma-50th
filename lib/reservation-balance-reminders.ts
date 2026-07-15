@@ -237,8 +237,8 @@ export async function sendBalanceRemindersForDay(
   const candidates = await fetchBeforeArrivalCandidates(daysBefore);
   for (const row of candidates) {
     const periods = await listBillingPeriods(row.id);
-    const checkIn = String(row.check_in_date).slice(0, 10);
-    const checkOut = String(row.check_out_date).slice(0, 10);
+    const checkIn = toDateOnlyStr(row.check_in_date);
+    const checkOut = toDateOnlyStr(row.check_out_date);
     const isLongTerm = isLongTermMemberStay({
       checkInDate: checkIn,
       checkOutDate: checkOut,
@@ -297,14 +297,14 @@ export async function sendBalanceRemindersForDay(
     const campName = getCampBySlug(row.camp_slug)?.name ?? row.camp_slug;
     const token = await createReservationPayToken(row.id);
     const payBalanceUrl = reservationPayPageUrl(token);
-    const dueDate = String(row.due_date).slice(0, 10);
+    const dueDate = toDateOnlyStr(row.due_date);
 
     const ok = await sendReservationBalanceReminderEmail({
       to: recipient.email,
       campName,
       guestOrMemberName: recipient.name,
-      checkInDate: String(row.check_in_date).slice(0, 10),
-      checkOutDate: String(row.check_out_date).slice(0, 10),
+      checkInDate: toDateOnlyStr(row.check_in_date),
+      checkOutDate: toDateOnlyStr(row.check_out_date),
       balanceDueCents: periodBalance,
       daysBefore,
       payBalanceUrl,
