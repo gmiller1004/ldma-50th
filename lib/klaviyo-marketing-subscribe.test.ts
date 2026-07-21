@@ -39,12 +39,15 @@ describe("klaviyoListIdForSignupSource", () => {
     assert.equal(klaviyoListIdForSignupSource("home"), "events-list");
   });
 
-  it("writes first name to Klaviyo's native profile field", async () => {
+  it("writes first name via profile-import, not the subscribe job", async () => {
     process.env.KLAVIYO_PRIVATE_API_KEY = "test-key";
     process.env.KLAVIYO_HOME_LIST_ID = "home-list";
-    const requestBodies: unknown[] = [];
-    global.fetch = async (_input, init) => {
-      requestBodies.push(JSON.parse(String(init?.body)));
+    const requestBodies: Array<{ url: string; body: unknown }> = [];
+    global.fetch = async (input, init) => {
+      requestBodies.push({
+        url: String(input),
+        body: JSON.parse(String(init?.body)),
+      });
       return new Response(null, { status: 202 });
     };
 
@@ -56,18 +59,18 @@ describe("klaviyoListIdForSignupSource", () => {
     );
 
     assert.equal(result.ok, true);
+    const subscribeBody = requestBodies[0].body as {
+      data: { attributes: { profiles: { data: Array<{ attributes: Record<string, unknown> }> } } };
+    };
     assert.equal(
-      (
-        requestBodies[0] as {
-          data: { attributes: { profiles: { data: Array<{ attributes: { first_name: string } }> } } };
-        }
-      ).data.attributes.profiles.data[0].attributes.first_name,
-      "Carl"
+      subscribeBody.data.attributes.profiles.data[0].attributes.first_name,
+      undefined
     );
     assert.equal(
-      (requestBodies[1] as { data: { attributes: { first_name: string } } }).data.attributes
+      (requestBodies[1].body as { data: { attributes: { first_name: string } } }).data.attributes
         .first_name,
       "Carl"
     );
+    assert.match(requestBodies[1].url, /profile-import/);
   });
 });

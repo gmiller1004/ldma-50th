@@ -33,18 +33,7 @@ async function subscribeEmailToMarketingList(
   firstName?: string
 ): Promise<{ ok: boolean; status?: number }> {
   const listId = klaviyoListIdForSignupSource(signupSource);
-  const profileAttributes = {
-    email,
-    ...(firstName ? { first_name: firstName } : {}),
-    subscriptions: {
-      email: {
-        marketing: {
-          consent: "SUBSCRIBED",
-        },
-      },
-    },
-  };
-
+  // Subscription bulk-create only accepts email + subscriptions (not first_name).
   const payload: {
     data: {
       type: string;
@@ -62,7 +51,16 @@ async function subscribeEmailToMarketingList(
           data: [
             {
               type: "profile",
-              attributes: profileAttributes,
+              attributes: {
+                email,
+                subscriptions: {
+                  email: {
+                    marketing: {
+                      consent: "SUBSCRIBED",
+                    },
+                  },
+                },
+              },
             },
           ],
         },
