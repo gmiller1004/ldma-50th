@@ -16,13 +16,22 @@ export type KlaviyoMarketingSignupSource =
   | "membership_quote"
   | "camp_reservation";
 
+export function klaviyoListIdForSignupSource(
+  signupSource: KlaviyoMarketingSignupSource
+): string | undefined {
+  if (signupSource === "home") {
+    return process.env.KLAVIYO_HOME_LIST_ID?.trim() || process.env.KLAVIYO_LIST_ID?.trim();
+  }
+  return process.env.KLAVIYO_LIST_ID?.trim() || undefined;
+}
+
 async function subscribeEmailToMarketingList(
   apiKey: string,
   email: string,
   signupSource: KlaviyoMarketingSignupSource,
   extraProperties?: Record<string, string>
 ): Promise<{ ok: boolean; status?: number }> {
-  const listId = process.env.KLAVIYO_LIST_ID;
+  const listId = klaviyoListIdForSignupSource(signupSource);
 
   const payload: {
     data: {
