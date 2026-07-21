@@ -8,11 +8,11 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
   MapPin,
+  Pickaxe,
   Play,
   Radio,
-  Sparkles,
-  Trophy,
   Users,
   X,
 } from "lucide-react";
@@ -33,32 +33,36 @@ const INTRO_VIDEO_ID = "e1hFTZsqStw";
 
 const EVENT_TYPE_CARDS = [
   {
-    id: "gold_diggings",
-    icon: Trophy,
-    title: "Gold Diggin's",
-    desc: "Multi-day flagship gatherings — panning, detecting, paydirt, prizes, and the full camp experience. No experience required.",
+    id: "family-friendly",
+    icon: Users,
+    title: "Family Friendly",
+    desc: "Welcoming events where kids, parents, and grandparents can discover gold and make memories together.",
     image: "/images/about-events/dirt-fest.jpg",
+    href: "/discover-events/family-friendly",
   },
   {
-    id: "dirt_party",
-    icon: Sparkles,
-    title: "Dirt Party",
-    desc: "High-energy weekends with activities, community, and adventure on real gold claims. Great for groups and first-timers.",
-    image: "/images/about-events/other-events.jpg",
-  },
-  {
-    id: "detector",
+    id: "detecting",
     icon: Radio,
-    title: "Detector Events",
-    desc: "Focused metal-detecting days and demos — often with manufacturer partners. Perfect for honing your skills.",
+    title: "Detecting",
+    desc: "Detector hunts, demonstrations, and events built for everyone from first-time users to seasoned detectorists.",
     image: "/images/about-events/detector-events.jpg",
+    href: "/discover-events/detecting",
   },
   {
-    id: "other",
-    icon: Calendar,
-    title: "Specialty",
-    desc: "Dredge Quest, Desert Chaos, Push Digs, BBQ weekends, and camp-specific gatherings across 8 states.",
+    id: "hardcore-mining",
+    icon: Pickaxe,
+    title: "Hardcore Mining",
+    desc: "Roll up your sleeves for push digs, dredging, and serious hands-on mining on real LDMA claims.",
     image: "/images/about-events/adventure.jpg",
+    href: "/discover-events/hardcore-mining",
+  },
+  {
+    id: "training",
+    icon: GraduationCap,
+    title: "Training",
+    desc: "Build practical prospecting skills with experienced miners through guided, hands-on instruction.",
+    image: "/images/about-events/other-events.jpg",
+    href: "/discover-events/training",
   },
 ] as const;
 
@@ -151,7 +155,6 @@ type LeadConfig = {
 
 export function DiscoverEventsContent({ events }: { events: EventProduct[] }) {
   const heroRef = useRef<HTMLElement>(null);
-  const typeCarouselRef = useRef<HTMLDivElement>(null);
   const eventsCarouselRef = useRef<HTMLDivElement>(null);
   const testimonialRef = useRef<HTMLDivElement>(null);
   const campsRef = useRef<HTMLDivElement>(null);
@@ -318,79 +321,58 @@ export function DiscoverEventsContent({ events }: { events: EventProduct[] }) {
         </div>
       </section>
 
-      {/* ── Event types carousel ── */}
+      {/* ── Event types ── */}
       <section className="py-20 md:py-28 border-t border-[#d4af37]/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10">
+          <div className="mb-10">
             <h2 className="font-serif text-3xl md:text-4xl font-bold text-[#f0d48f]">
-              What kind of event is this?
+              What kind of adventure calls to you?
             </h2>
             <p className="mt-2 text-[#e8e0d5]/75 max-w-xl">
-              LDMA hosts different weekends for different vibes — from flagship Gold Diggin&apos;s to
-              detector hunts and one-of-a-kind adventures.
+              Whether you&apos;re bringing the family, chasing targets, moving serious dirt, or
+              learning the ropes, there&apos;s an LDMA event built for you.
             </p>
           </div>
-          <div className="flex gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => scrollCarousel(typeCarouselRef, -1)}
-              className="p-2.5 rounded-lg border border-[#d4af37]/30 text-[#d4af37] hover:bg-[#d4af37]/10"
-              aria-label="Previous"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollCarousel(typeCarouselRef, 1)}
-              className="p-2.5 rounded-lg border border-[#d4af37]/30 text-[#d4af37] hover:bg-[#d4af37]/10"
-              aria-label="Next"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-        <div
-          ref={typeCarouselRef}
-          className="flex gap-5 overflow-x-auto snap-x snap-mandatory scroll-smooth px-4 sm:px-6 lg:px-10 pb-4 scrollbar-hide"
-          style={{ scrollbarWidth: "none" }}
-        >
-          {EVENT_TYPE_CARDS.map((card, i) => (
-            <motion.article
-              key={card.id}
-              className="snap-start shrink-0 w-[min(85vw,340px)] rounded-2xl overflow-hidden border border-[#d4af37]/20 bg-[#0f0a06]/60 hover:border-[#d4af37]/40 transition-colors group"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <div className="relative aspect-[4/3] overflow-hidden">
-                <Image src={card.image} alt={card.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" sizes="340px" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1a120b] via-[#1a120b]/30 to-transparent" />
-                <span className="absolute top-4 left-4 inline-flex w-10 h-10 rounded-lg bg-[#d4af37]/20 items-center justify-center text-[#d4af37]">
-                  <card.icon className="w-5 h-5" />
-                </span>
-              </div>
-              <div className="p-5">
-                <h3 className="font-serif text-xl font-semibold text-[#f0d48f] mb-2">{card.title}</h3>
-                <p className="text-sm text-[#e8e0d5]/80 leading-relaxed mb-4">{card.desc}</p>
-                <button
-                  type="button"
-                  onClick={() =>
-                    openLead({
-                      title: `Learn about ${card.title}`,
-                      description: `Tell us where to reach you — we'll send info about ${card.title} events, dates, and how to register.`,
-                      interestPath: card.id,
-                      referrerCta: `type_${card.id}`,
-                      eventTypeInterest: card.id,
-                    })
-                  }
-                  className="text-sm font-semibold text-[#d4af37] hover:text-[#f0d48f] transition-colors"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {EVENT_TYPE_CARDS.map((card, i) => (
+              <motion.div
+                key={card.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <Link
+                  href={card.href}
+                  onClick={() => trackDiscoverCtaClick(`type_${card.id}`, card.id)}
+                  className="h-full block rounded-2xl overflow-hidden border border-[#d4af37]/20 bg-[#0f0a06]/60 hover:border-[#d4af37]/50 transition-all group"
                 >
-                  Learn more &amp; get alerts →
-                </button>
-              </div>
-            </motion.article>
-          ))}
+                  <div className="relative aspect-[16/9] overflow-hidden">
+                    <Image
+                      src={card.image}
+                      alt={card.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      sizes="(min-width: 768px) 50vw, 100vw"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a120b] via-[#1a120b]/30 to-transparent" />
+                    <span className="absolute top-4 left-4 inline-flex w-11 h-11 rounded-lg bg-[#1a120b]/80 border border-[#d4af37]/30 items-center justify-center text-[#d4af37]">
+                      <card.icon className="w-5 h-5" />
+                    </span>
+                  </div>
+                  <div className="p-6">
+                    <h3 className="font-serif text-2xl font-semibold text-[#f0d48f] mb-2">
+                      {card.title}
+                    </h3>
+                    <p className="text-[#e8e0d5]/80 leading-relaxed mb-5">{card.desc}</p>
+                    <span className="text-sm font-semibold text-[#d4af37] group-hover:text-[#f0d48f] transition-colors">
+                      Explore {card.title} events →
+                    </span>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
