@@ -29,9 +29,21 @@ async function subscribeEmailToMarketingList(
   apiKey: string,
   email: string,
   signupSource: KlaviyoMarketingSignupSource,
-  extraProperties?: Record<string, string>
+  extraProperties?: Record<string, string>,
+  firstName?: string
 ): Promise<{ ok: boolean; status?: number }> {
   const listId = klaviyoListIdForSignupSource(signupSource);
+  const profileAttributes = {
+    email,
+    ...(firstName ? { first_name: firstName } : {}),
+    subscriptions: {
+      email: {
+        marketing: {
+          consent: "SUBSCRIBED",
+        },
+      },
+    },
+  };
 
   const payload: {
     data: {
@@ -50,16 +62,7 @@ async function subscribeEmailToMarketingList(
           data: [
             {
               type: "profile",
-              attributes: {
-                email,
-                subscriptions: {
-                  email: {
-                    marketing: {
-                      consent: "SUBSCRIBED",
-                    },
-                  },
-                },
-              },
+              attributes: profileAttributes,
             },
           ],
         },
@@ -100,7 +103,7 @@ async function subscribeEmailToMarketingList(
     signup_source: signupSource,
     ...extraProperties,
   };
-  await setKlaviyoProfileProperties(apiKey, email, properties);
+  await setKlaviyoProfileProperties(apiKey, email, properties, firstName);
   return { ok: true };
 }
 
@@ -153,7 +156,8 @@ export async function ensureKlaviyoEmailSubscribed(
 async function setKlaviyoProfileProperties(
   apiKey: string,
   email: string,
-  properties: Record<string, string>
+  properties: Record<string, string>,
+  firstName?: string
 ): Promise<void> {
   const res = await fetch(KLAVIYO_PROFILE_IMPORT_URL, {
     method: "POST",
@@ -168,6 +172,7 @@ async function setKlaviyoProfileProperties(
         type: "profile",
         attributes: {
           email,
+          ...(firstName ? { first_name: firstName } : {}),
           properties,
         },
       },
@@ -187,7 +192,8 @@ async function setKlaviyoProfileProperties(
 export async function subscribeEmailToKlaviyoMarketing(
   email: string,
   signupSource: KlaviyoMarketingSignupSource,
-  extraProperties?: Record<string, string>
+  extraProperties?: Record<string, string>,
+  firstName?: string
 ): Promise<{ ok: boolean; error?: string; status?: number }> {
   const apiKey = process.env.KLAVIYO_PRIVATE_API_KEY;
 
@@ -197,7 +203,13 @@ export async function subscribeEmailToKlaviyoMarketing(
   }
 
   try {
-    const result = await subscribeEmailToMarketingList(apiKey, email, signupSource, extraProperties);
+    const result = await subscribeEmailToMarketingList(
+      apiKey,
+      email,
+      signupSource,
+      extraProperties,
+      firstName
+    );
     if (!result.ok) {
       if (result.status === 429) {
         return { ok: false, error: "Too many requests. Please try again in a moment.", status: 429 };

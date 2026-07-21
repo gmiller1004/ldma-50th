@@ -32,13 +32,15 @@ export function NewsletterSignup({
   successMessage = "Keep an eye on your inbox for gold rush updates.",
   submitLabel = "Join the List",
 }: NewsletterSignupProps = {}) {
+  const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const isBanner = variant === "banner";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim() || status === "loading") return;
+    if ((!isBanner && !firstName.trim()) || !email.trim() || status === "loading") return;
 
     setStatus("loading");
     setErrorMessage("");
@@ -50,6 +52,7 @@ export function NewsletterSignup({
         body: JSON.stringify({
           email: email.trim(),
           signup_source: analyticsSource ?? "home",
+          ...(!isBanner ? { first_name: firstName.trim() } : {}),
         }),
       });
 
@@ -71,11 +74,22 @@ export function NewsletterSignup({
     }
   }
 
-  const isBanner = variant === "banner";
-
   const formInner = (
     <>
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className={isBanner ? "flex flex-col sm:flex-row gap-3" : "flex flex-col gap-3"}>
+        {!isBanner && (
+          <input
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            placeholder="First name"
+            required
+            disabled={status === "loading"}
+            autoComplete="given-name"
+            maxLength={50}
+            className="w-full px-4 py-3 rounded-lg bg-[#1a120b] border border-[#d4af37]/30 text-[#e8e0d5] placeholder-[#e8e0d5]/50 focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50 focus:border-[#d4af37]/50 disabled:opacity-60"
+          />
+        )}
         <input
           type="email"
           value={email}

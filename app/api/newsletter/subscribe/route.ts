@@ -20,12 +20,16 @@ export async function POST(req: Request) {
     const body = await req.json();
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const signupSource = normalizeSignupSource(body.signup_source);
+    const firstName = sanitizeProperty(body.first_name, 50);
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json(
         { error: "Please enter a valid email address" },
         { status: 400 }
       );
+    }
+    if (signupSource === "home" && !firstName) {
+      return NextResponse.json({ error: "Please enter your first name" }, { status: 400 });
     }
 
     if (!process.env.KLAVIYO_PRIVATE_API_KEY) {
@@ -49,7 +53,8 @@ export async function POST(req: Request) {
     const result = await subscribeEmailToKlaviyoMarketing(
       email,
       signupSource,
-      Object.keys(extra).length > 0 ? extra : undefined
+      Object.keys(extra).length > 0 ? extra : undefined,
+      firstName
     );
     if (!result.ok) {
       const status =
