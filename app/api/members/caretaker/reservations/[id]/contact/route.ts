@@ -3,12 +3,15 @@ import { getCaretakerWriteContextFromRequest } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { lookupMemberByContactId, updateContact } from "@/lib/salesforce";
+import { memberQualifiesForCampBooking } from "@/lib/reservation-member";
+import { resyncReservationBillingFromDb } from "@/lib/reservation-billing";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * PATCH /api/members/caretaker/reservations/[id]/contact
- * Link an imported member to Salesforce, or update contact email/phone (member → SF, guest → reservation row).
+ * Link a Salesforce member (also converts guest → member), or update contact email/phone
+ * (member → SF, guest → reservation row).
  */
 export async function PATCH(
   request: NextRequest,
@@ -70,8 +73,8 @@ export async function PATCH(
   }
 
   if (body.linkMember) {
-    if (row.reservation_type !== "member") {
-      return NextResponse.json({ error: "Only member reservations can be linked to Salesforce" }, { status: 400 });
+    if (row.reservation_type !== "member" && row.reservation_type !== "guest") {
+      return NextResponse.json({ error: "Reservation type cannot be linked to Salesforce" }, { status: 400 });
     }
     const contactId = body.linkMember.contactId?.trim() ?? "";
     const memberNumber = body.linkMember.memberNumber?.trim() ?? "";
@@ -91,14 +94,45 @@ export async function PATCH(
       return NextResponse.json({ error: "Contact mismatch" }, { status: 400 });
     }
 
+    const convertingGuest = row.reservation_type === "guest";
+    if (convertingGuest && !memberQualifiesForCampBooking(sf.member)) {
+      return NextResponse.json(
+        { error: "Salesforce contact is not an active LDMA member — cannot convert this guest reservation" },
+        { status: 400 }
+      );
+    }
+
     await sql`
       UPDATE camp_reservations
-      SET member_contact_id = ${contactId},
+      SET reservation_type = 'member',
+          member_contact_id = ${contactId},
           member_number = ${memberNumber},
           member_display_name = ${memberDisplayName},
           updated_at = NOW()
       WHERE id = ${id}
     `;
+
+    let billing: { totalDueCents: number; totalPaidCents: number; balanceDueCents: number } | null =
+      null;
+    if (convertingGuest) {
+      try {
+        billing = await resyncReservationBillingFromDb(id);
+      } catch (e) {
+        console.error("[caretaker] billing resync after guest→member failed:", e);
+        return NextResponse.json(
+          {
+            error:
+              "Linked to Salesforce as member, but billing could not be recalculated. Refresh and edit dates or contact support.",
+            memberContactId: contactId,
+            memberNumber,
+            memberDisplayName,
+            reservationType: "member",
+            convertedFromGuest: true,
+          },
+          { status: 500 }
+        );
+      }
+    }
 
     return NextResponse.json({
       ok: true,
@@ -107,6 +141,9 @@ export async function PATCH(
       memberDisplayName,
       email: sf.member.email?.trim() || null,
       phone: sf.member.phone?.trim() || null,
+      reservationType: "member",
+      convertedFromGuest: convertingGuest,
+      billing,
     });
   }
 

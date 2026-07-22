@@ -1050,7 +1050,11 @@ export function CaretakerPortalContent({
     setDetailsSiteBalance(null);
     setDetailsPayments([]);
     setDetailsPaymentSummary(null);
-    setDetailsContactLookupInput(r.memberNumber ?? "");
+    setDetailsContactLookupInput(
+      r.reservationType === "guest"
+        ? (r.guestEmail?.trim() || r.guestPhone?.trim() || "")
+        : (r.memberNumber ?? "")
+    );
     setDetailsContactLookupMatches([]);
     setDetailsContactLookupResult(null);
     setDetailsContactEmail("");
@@ -1137,23 +1141,38 @@ export function CaretakerPortalContent({
     }
   }
 
-  function handleDetailsContactPick(match: LookupMatch) {
+  async function handleDetailsContactPick(match: LookupMatch) {
     setDetailsContactLookupMatches([]);
-    setDetailsContactLookupResult({
-      contactId: match.contactId,
-      memberNumber: match.memberNumber ?? "",
-      displayName: match.displayName,
-      email: match.email,
-      phone: match.phone,
-      isLdmaMember: true,
-      maintenanceFeesDue: null,
-      membershipDuesOwed: null,
-      membershipBalance: null,
-    });
+    setDetailsContactLookupLoading(true);
+    setDetailsContactError(null);
+    try {
+      const res = await fetch("/api/members/caretaker/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactId: match.contactId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDetailsContactError(data.error ?? "Lookup failed");
+        return;
+      }
+      setDetailsContactLookupResult(data as LookupResult);
+    } catch {
+      setDetailsContactError("Lookup failed");
+    } finally {
+      setDetailsContactLookupLoading(false);
+    }
   }
 
   async function handleDetailsContactLink() {
     if (!detailsReservation || !detailsContactLookupResult) return;
+    if (
+      detailsReservation.reservationType === "guest" &&
+      !detailsContactLookupResult.isLdmaMember
+    ) {
+      setDetailsContactError("Selected contact is not an active LDMA member");
+      return;
+    }
     setDetailsContactLinkSubmitting(true);
     setDetailsContactError(null);
     try {
@@ -1181,6 +1200,7 @@ export function CaretakerPortalContent({
         prev
           ? {
               ...prev,
+              reservationType: data.reservationType ?? "member",
               memberContactId: data.memberContactId,
               memberNumber: data.memberNumber,
               memberDisplayName: data.memberDisplayName,
@@ -1192,7 +1212,12 @@ export function CaretakerPortalContent({
       setDetailsContactPhone(data.phone?.trim() || detailsContactLookupResult.phone?.trim() || "");
       setDetailsContactLookupResult(null);
       setDetailsContactLookupMatches([]);
+      setDetailsContactLookupInput("");
       loadReservations();
+      // Refresh billing after guest→member conversion so rates update in the modal
+      if (data.convertedFromGuest) {
+        refreshDetailsReservation();
+      }
     } catch {
       setDetailsContactError("Could not link contact");
     } finally {
@@ -3033,6 +3058,83 @@ export function CaretakerPortalContent({
                         {detailsGuestContactSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         Save contact
                       </button>
+                    </div>
+
+                    <div className="pt-2 border-t border-[#d4af37]/20 space-y-3">
+                      <p className="text-[#f0d48f] font-medium text-sm">Link Salesforce member</p>
+                      <p className="text-[#e8e0d5]/70 text-xs">
+                        If this guest is actually an LDMA member (e.g. ResNexus import), look them up
+                        to re-label the reservation as member and recalculate rates for date edits.
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={detailsContactLookupInput}
+                          onChange={(e) => setDetailsContactLookupInput(e.target.value)}
+                          placeholder="Member #, email, or phone"
+                          className="flex-1 px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleDetailsContactLookup}
+                          disabled={detailsContactLookupLoading || !detailsContactLookupInput.trim()}
+                          className="px-3 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {detailsContactLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                          Look up
+                        </button>
+                      </div>
+                      {detailsContactLookupMatches.length > 0 && (
+                        <div className="rounded-lg border border-amber-500/40 bg-amber-950/20 p-2 space-y-2">
+                          <p className="text-amber-200/90 text-xs font-medium">Multiple matches — select one:</p>
+                          {detailsContactLookupMatches.map((m) => (
+                            <button
+                              key={m.contactId}
+                              type="button"
+                              onClick={() => handleDetailsContactPick(m)}
+                              className="w-full text-left px-3 py-2 rounded border border-[#d4af37]/20 bg-[#0f0a06]/80 hover:border-[#d4af37]/50"
+                            >
+                              <p className="text-[#e8e0d5] text-sm font-medium">
+                                {m.displayName}{m.memberNumber ? ` (#${m.memberNumber})` : ""}
+                              </p>
+                              <p className="text-[#e8e0d5]/60 text-xs">
+                                {[m.email, m.phone].filter(Boolean).join(" · ") || "No email or phone on file"}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {detailsContactLookupResult && (
+                        <div className="rounded-lg border border-[#d4af37]/25 bg-[#0f0a06]/80 p-3 space-y-2">
+                          <p className="text-[#e8e0d5] text-sm">
+                            ✓ {detailsContactLookupResult.displayName}
+                            {detailsContactLookupResult.memberNumber
+                              ? ` (#${detailsContactLookupResult.memberNumber})`
+                              : ""}
+                          </p>
+                          <p className="text-[#e8e0d5]/60 text-xs">
+                            {[detailsContactLookupResult.email, detailsContactLookupResult.phone]
+                              .filter(Boolean)
+                              .join(" · ") || "No email or phone on file"}
+                          </p>
+                          {!detailsContactLookupResult.isLdmaMember && (
+                            <p className="text-amber-400/90 text-xs">
+                              This contact is not marked as an active LDMA member in Salesforce.
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleDetailsContactLink}
+                            disabled={
+                              detailsContactLinkSubmitting || !detailsContactLookupResult.isLdmaMember
+                            }
+                            className="w-full py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            {detailsContactLinkSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                            Convert to member &amp; link
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
