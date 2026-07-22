@@ -56,6 +56,9 @@ type MovePreview = {
   newTotalCents: number;
   netPaidCents: number;
   additionalDueCents: number;
+  scheduledRemainingCents?: number;
+  nextScheduledPayment?: { dueDate: string; amountCents: number } | null;
+  isLongTermMember?: boolean;
   refundCents: number;
   refundBreakdown: { stripeRefundCents: number; cashRefundCents: number };
   cashAllowed: boolean;
@@ -111,6 +114,9 @@ export function AdminCampReservationsTab({
     };
     netPaidCents: number;
     additionalDueCents: number;
+    scheduledRemainingCents?: number;
+    nextScheduledPayment?: { dueDate: string; amountCents: number } | null;
+    isLongTermMember?: boolean;
     creditCents: number;
     refundBreakdown: { stripeRefundCents: number; cashRefundCents: number };
   } | null>(null);
@@ -816,9 +822,21 @@ export function AdminCampReservationsTab({
                   </div>
                   {editPreview.additionalDueCents > 0 && (
                     <div className="flex justify-between text-amber-200 font-medium">
-                      <span>Amount due</span>
+                      <span>Due now</span>
                       <span>{formatCentsAsCurrency(editPreview.additionalDueCents)}</span>
                     </div>
+                  )}
+                  {(editPreview.scheduledRemainingCents ?? 0) > 0 && (
+                    <div className="flex justify-between text-[#e8e0d5]/80">
+                      <span>Remaining on schedule</span>
+                      <span>{formatCentsAsCurrency(editPreview.scheduledRemainingCents ?? 0)}</span>
+                    </div>
+                  )}
+                  {editPreview.nextScheduledPayment && (
+                    <p className="text-[#e8e0d5]/50 text-xs">
+                      Next payment {formatCentsAsCurrency(editPreview.nextScheduledPayment.amountCents)} due{" "}
+                      {editPreview.nextScheduledPayment.dueDate}
+                    </p>
                   )}
                   {editPreview.creditCents > 0 && (
                     <div className="flex justify-between text-[#6dd472] font-medium">
@@ -864,6 +882,16 @@ export function AdminCampReservationsTab({
                     If unchecked, the credit stays on the reservation (no refund issued).
                   </p>
                 )}
+                {editPreview.additionalDueCents > 0 ? (
+                  <p className="text-[#e8e0d5]/50 text-xs">
+                    Confirming will ask for payment of the amount due now.
+                  </p>
+                ) : (editPreview.scheduledRemainingCents ?? 0) > 0 ? (
+                  <p className="text-[#e8e0d5]/50 text-xs">
+                    First month is satisfied — remaining months stay on the payment schedule. Reminders will
+                    go out before each due date.
+                  </p>
+                ) : null}
                 {editPreviewError && <p className="text-red-400 text-sm">{editPreviewError}</p>}
                 <div className="flex gap-2">
                   <button
@@ -1045,7 +1073,7 @@ export function AdminCampReservationsTab({
                         </div>
                         {movePreview.additionalDueCents > 0 ? (
                           <div className="flex justify-between text-amber-400 font-medium pt-1 border-t border-[#d4af37]/20">
-                            <span>Additional to collect</span>
+                            <span>Due now</span>
                             <span>{formatCentsAsCurrency(movePreview.additionalDueCents)}</span>
                           </div>
                         ) : movePreview.refundCents > 0 ? (
@@ -1055,10 +1083,22 @@ export function AdminCampReservationsTab({
                           </div>
                         ) : (
                           <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20">
-                            <span>No price change</span>
+                            <span>No amount due now</span>
                             <span>$0.00</span>
                           </div>
                         )}
+                        {(movePreview.scheduledRemainingCents ?? 0) > 0 ? (
+                          <div className="flex justify-between text-[#e8e0d5]/80">
+                            <span>Remaining on schedule</span>
+                            <span>{formatCentsAsCurrency(movePreview.scheduledRemainingCents ?? 0)}</span>
+                          </div>
+                        ) : null}
+                        {movePreview.nextScheduledPayment ? (
+                          <p className="text-[#e8e0d5]/50 text-xs">
+                            Next payment {formatCentsAsCurrency(movePreview.nextScheduledPayment.amountCents)} due{" "}
+                            {movePreview.nextScheduledPayment.dueDate}
+                          </p>
+                        ) : null}
                         {movePreview.refundCents > 0 && movePreview.refundBreakdown.stripeRefundCents > 0 && (
                           <p className="text-[#e8e0d5]/50 text-xs">
                             {formatCentsAsCurrency(movePreview.refundBreakdown.stripeRefundCents)} back to card

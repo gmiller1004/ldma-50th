@@ -393,6 +393,9 @@ export function CaretakerPortalContent({
     };
     netPaidCents: number;
     additionalDueCents: number;
+    scheduledRemainingCents?: number;
+    nextScheduledPayment?: { dueDate: string; amountCents: number } | null;
+    isLongTermMember?: boolean;
     creditCents: number;
     refundBreakdown: { stripeRefundCents: number; cashRefundCents: number };
   } | null>(null);
@@ -409,6 +412,9 @@ export function CaretakerPortalContent({
     newTotalCents: number;
     netPaidCents: number;
     additionalDueCents: number;
+    scheduledRemainingCents?: number;
+    nextScheduledPayment?: { dueDate: string; amountCents: number } | null;
+    isLongTermMember?: boolean;
     refundCents: number;
     refundBreakdown: { stripeRefundCents: number; cashRefundCents: number };
     cashAllowed: boolean;
@@ -3224,9 +3230,21 @@ export function CaretakerPortalContent({
                     </div>
                     {resEditPreview.additionalDueCents > 0 && (
                       <div className="flex justify-between text-amber-200 font-medium">
-                        <span>Amount due</span>
+                        <span>Due now</span>
                         <span>{formatCentsAsCurrency(resEditPreview.additionalDueCents)}</span>
                       </div>
+                    )}
+                    {(resEditPreview.scheduledRemainingCents ?? 0) > 0 && (
+                      <div className="flex justify-between text-[#e8e0d5]/80">
+                        <span>Remaining on schedule</span>
+                        <span>{formatCentsAsCurrency(resEditPreview.scheduledRemainingCents ?? 0)}</span>
+                      </div>
+                    )}
+                    {resEditPreview.nextScheduledPayment && (
+                      <p className="text-[#e8e0d5]/50 text-xs">
+                        Next payment {formatCentsAsCurrency(resEditPreview.nextScheduledPayment.amountCents)} due{" "}
+                        {resEditPreview.nextScheduledPayment.dueDate}
+                      </p>
                     )}
                     {resEditPreview.creditCents > 0 && (
                       <div className="flex justify-between text-[#6dd472] font-medium">
@@ -3272,11 +3290,16 @@ export function CaretakerPortalContent({
                       If unchecked, the credit stays on the reservation (no refund issued).
                     </p>
                   )}
-                  {resEditPreview.additionalDueCents > 0 && (
+                  {resEditPreview.additionalDueCents > 0 ? (
                     <p className="text-[#e8e0d5]/50 text-xs">
-                      Confirming will ask for payment of the additional amount.
+                      Confirming will ask for payment of the amount due now.
                     </p>
-                  )}
+                  ) : (resEditPreview.scheduledRemainingCents ?? 0) > 0 ? (
+                    <p className="text-[#e8e0d5]/50 text-xs">
+                      First month is satisfied — remaining months stay on the payment schedule. Reminders will
+                      go out before each due date.
+                    </p>
+                  ) : null}
                   {resEditPreviewError && <p className="text-red-400 text-sm">{resEditPreviewError}</p>}
                   <div className="flex gap-2">
                     <button
@@ -3399,12 +3422,21 @@ export function CaretakerPortalContent({
                           <div className="flex justify-between text-[#e8e0d5]/80"><span>New stay total</span><span>{formatCentsAsCurrency(resMovePreview.newTotalCents)}</span></div>
                           <div className="flex justify-between text-[#e8e0d5]/80"><span>Paid so far</span><span>{formatCentsAsCurrency(resMovePreview.netPaidCents)}</span></div>
                           {resMovePreview.additionalDueCents > 0 ? (
-                            <div className="flex justify-between text-amber-400 font-medium pt-1 border-t border-[#d4af37]/20"><span>Additional to collect</span><span>{formatCentsAsCurrency(resMovePreview.additionalDueCents)}</span></div>
+                            <div className="flex justify-between text-amber-400 font-medium pt-1 border-t border-[#d4af37]/20"><span>Due now</span><span>{formatCentsAsCurrency(resMovePreview.additionalDueCents)}</span></div>
                           ) : resMovePreview.refundCents > 0 ? (
                             <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20"><span>Refund on move</span><span>{formatCentsAsCurrency(resMovePreview.refundCents)}</span></div>
                           ) : (
-                            <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20"><span>No price change</span><span>$0.00</span></div>
+                            <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20"><span>No amount due now</span><span>$0.00</span></div>
                           )}
+                          {(resMovePreview.scheduledRemainingCents ?? 0) > 0 ? (
+                            <div className="flex justify-between text-[#e8e0d5]/80"><span>Remaining on schedule</span><span>{formatCentsAsCurrency(resMovePreview.scheduledRemainingCents ?? 0)}</span></div>
+                          ) : null}
+                          {resMovePreview.nextScheduledPayment ? (
+                            <p className="text-[#e8e0d5]/50 text-xs">
+                              Next payment {formatCentsAsCurrency(resMovePreview.nextScheduledPayment.amountCents)} due{" "}
+                              {resMovePreview.nextScheduledPayment.dueDate}
+                            </p>
+                          ) : null}
                           {resMovePreview.refundCents > 0 && resMovePreview.refundBreakdown.stripeRefundCents > 0 && (
                             <p className="text-[#e8e0d5]/50 text-xs">
                               {formatCentsAsCurrency(resMovePreview.refundBreakdown.stripeRefundCents)} back to card

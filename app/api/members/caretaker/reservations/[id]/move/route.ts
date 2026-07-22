@@ -10,9 +10,11 @@ import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
 import {
   getReservationBalance,
+  listBillingPeriods,
   siteRatesFromRow,
   syncBillingPeriodsForReservation,
 } from "@/lib/reservation-billing";
+import { payableBalanceCents } from "@/lib/reservation-balance-due";
 import {
   getReservationSiteFeeTotals,
   refundReservationSiteFees,
@@ -236,96 +238,106 @@ export async function POST(
       rates,
     });
 
-    // Additional amount owed after moving to a pricier site.
+    // Additional amount owed now after moving (first month / due periods only for long-term members).
     if (balance.balanceDueCents > 0) {
-      const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
-      const cashAllowed = caretakerAllowsCashCheckIn(checkInDate, today);
-      if (!paymentMethod) {
-        await notifySiteMoved();
-        return NextResponse.json({
-          ok: true,
-          moved: true,
-          newSiteId,
-          newSiteName: newSite.name,
-          requirePayment: true,
-          amountDueCents: balance.balanceDueCents,
-          cashAllowed,
-          refund: refundResult,
-        });
-      }
-      if (!cashAllowed) {
-        return NextResponse.json(
-          { error: "Cash not allowed when check-in is more than 7 days in the past. Use card." },
-          { status: 400 }
-        );
-      }
-      const amountCents = typeof body.amountCents === "number" ? body.amountCents : balance.balanceDueCents;
-      const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
-      const recipientDisplayName =
-        typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest";
-      if (
-        amountCents < 1 ||
-        amountCents > balance.balanceDueCents ||
-        !recipientEmail ||
-        !EMAIL_REGEX.test(recipientEmail)
-      ) {
-        return NextResponse.json(
-          {
-            error: `Valid payment required up to $${(balance.balanceDueCents / 100).toFixed(2)}`,
-            amountDueCents: balance.balanceDueCents,
-          },
-          { status: 400 }
-        );
-      }
-
-      await sql`
-        INSERT INTO camp_payments (
-          camp_slug, payment_type, method, amount_cents, reservation_id,
-          member_contact_id, member_number, member_email, recipient_display_name,
-          created_by_contact_id, created_at
-        )
-        VALUES (
-          ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${id},
-          ${reservation.member_contact_id}, ${reservation.member_number}, ${recipientEmail}, ${recipientDisplayName},
-          ${caretaker.contactId}, NOW()
-        )
-      `;
-
-      balance = await syncBillingPeriodsForReservation({
-        reservationId: id,
+      const periods = await listBillingPeriods(id);
+      const payableNowCents = payableBalanceCents({
+        periods,
         checkInDate,
         checkOutDate,
-        isMember,
-        rates,
-      });
-
-      const reservationDetails = {
-        recipientName: recipientDisplayName,
-        checkInDate,
-        checkOutDate,
-        siteName: newSite.name,
-      };
-      const receiptSent = await sendPaymentReceiptEmail(
-        recipientEmail,
-        caretaker.campName,
-        [{ label: `Site change to ${newSite.name}`, amountCents }],
-        amountCents,
-        "cash",
+        reservationType: reservation.reservation_type,
         today,
-        reservationDetails
-      ).catch((e) => {
-        console.error("[caretaker] move receipt email failed:", e);
-        return false;
       });
-      if (receiptSent) {
+      if (payableNowCents > 0) {
+        const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
+        const cashAllowed = caretakerAllowsCashCheckIn(checkInDate, today);
+        if (!paymentMethod) {
+          await notifySiteMoved();
+          return NextResponse.json({
+            ok: true,
+            moved: true,
+            newSiteId,
+            newSiteName: newSite.name,
+            requirePayment: true,
+            amountDueCents: payableNowCents,
+            cashAllowed,
+            refund: refundResult,
+          });
+        }
+        if (!cashAllowed) {
+          return NextResponse.json(
+            { error: "Cash not allowed when check-in is more than 7 days in the past. Use card." },
+            { status: 400 }
+          );
+        }
+        const amountCents = typeof body.amountCents === "number" ? body.amountCents : payableNowCents;
+        const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
+        const recipientDisplayName =
+          typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest";
+        if (
+          amountCents < 1 ||
+          amountCents > payableNowCents ||
+          !recipientEmail ||
+          !EMAIL_REGEX.test(recipientEmail)
+        ) {
+          return NextResponse.json(
+            {
+              error: `Valid payment required up to $${(payableNowCents / 100).toFixed(2)}`,
+              amountDueCents: payableNowCents,
+            },
+            { status: 400 }
+          );
+        }
+
         await sql`
-          UPDATE camp_payments SET receipt_sent_at = NOW()
-          WHERE id = (
-            SELECT id FROM camp_payments
-            WHERE reservation_id = ${id} AND method = 'cash'
-            ORDER BY created_at DESC LIMIT 1
+          INSERT INTO camp_payments (
+            camp_slug, payment_type, method, amount_cents, reservation_id,
+            member_contact_id, member_number, member_email, recipient_display_name,
+            created_by_contact_id, created_at
+          )
+          VALUES (
+            ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${id},
+            ${reservation.member_contact_id}, ${reservation.member_number}, ${recipientEmail}, ${recipientDisplayName},
+            ${caretaker.contactId}, NOW()
           )
         `;
+
+        balance = await syncBillingPeriodsForReservation({
+          reservationId: id,
+          checkInDate,
+          checkOutDate,
+          isMember,
+          rates,
+        });
+
+        const reservationDetails = {
+          recipientName: recipientDisplayName,
+          checkInDate,
+          checkOutDate,
+          siteName: newSite.name,
+        };
+        const receiptSent = await sendPaymentReceiptEmail(
+          recipientEmail,
+          caretaker.campName,
+          [{ label: `Site change to ${newSite.name}`, amountCents }],
+          amountCents,
+          "cash",
+          today,
+          reservationDetails
+        ).catch((e) => {
+          console.error("[caretaker] move receipt email failed:", e);
+          return false;
+        });
+        if (receiptSent) {
+          await sql`
+            UPDATE camp_payments SET receipt_sent_at = NOW()
+            WHERE id = (
+              SELECT id FROM camp_payments
+              WHERE reservation_id = ${id} AND method = 'cash'
+              ORDER BY created_at DESC LIMIT 1
+            )
+          `;
+        }
       }
     }
 

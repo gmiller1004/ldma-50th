@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   balanceDueBeforeArrivalCents,
   payableBalanceCents,
+  previewStayPaymentObligations,
   summarizeReservationPaymentObligations,
   type ReservationPaymentObligations,
 } from "./reservation-balance-due.ts";
@@ -117,5 +118,28 @@ describe("summarizeReservationPaymentObligations", () => {
     assert.equal(summary.nextScheduledPayment?.dueDate, "2026-08-31");
     assert.equal(summary.nextScheduledPayment?.amountCents, 30_000);
     assert.equal(summary.totalUnpaidCents, 30_000);
+  });
+});
+
+describe("previewStayPaymentObligations", () => {
+  it("does not require full stay collection when first month is already paid", () => {
+    const preview = previewStayPaymentObligations({
+      checkInDate: "2026-12-01",
+      checkOutDate: "2027-05-01",
+      reservationType: "member",
+      rates: {
+        memberRateDaily: 15,
+        memberRateMonthly: 450,
+        nonMemberRateDaily: 45,
+      },
+      netPaidCents: 51_000,
+      today: "2026-07-22",
+    });
+
+    assert.equal(preview.isLongTermMember, true);
+    assert.equal(preview.payableNowCents, 0);
+    assert.ok(preview.scheduledRemainingCents > 0);
+    assert.ok(preview.nextScheduledPayment);
+    assert.equal(preview.nextScheduledPayment?.dueDate, "2026-12-31");
   });
 });

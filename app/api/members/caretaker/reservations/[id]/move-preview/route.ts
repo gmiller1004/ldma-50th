@@ -9,6 +9,7 @@ import {
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
 import { getReservationBalance, siteRatesFromRow } from "@/lib/reservation-billing";
+import { previewStayPaymentObligations } from "@/lib/reservation-balance-due";
 import {
   allocateRefundSplit,
   getReservationSiteFeeTotals,
@@ -114,8 +115,15 @@ export async function GET(
     const totals = await getReservationSiteFeeTotals(id);
 
     const balanceAfterMoveCents = newTotalCents - totals.netPaidCents;
-    const additionalDueCents = balanceAfterMoveCents > 0 ? balanceAfterMoveCents : 0;
     const refundCents = balanceAfterMoveCents < 0 ? -balanceAfterMoveCents : 0;
+    const obligations = previewStayPaymentObligations({
+      checkInDate,
+      checkOutDate,
+      reservationType: res.reservation_type,
+      rates,
+      netPaidCents: totals.netPaidCents,
+    });
+    const additionalDueCents = obligations.payableNowCents;
     const { stripeRefundCents, cashRefundCents } = allocateRefundSplit(
       refundCents,
       totals.cardPaidCents,
@@ -138,6 +146,10 @@ export async function GET(
       newTotalCents,
       netPaidCents: totals.netPaidCents,
       additionalDueCents,
+      payableNowCents: additionalDueCents,
+      scheduledRemainingCents: obligations.scheduledRemainingCents,
+      nextScheduledPayment: obligations.nextScheduledPayment,
+      isLongTermMember: obligations.isLongTermMember,
       refundCents,
       refundBreakdown: { stripeRefundCents, cashRefundCents },
       cashAllowed: caretakerAllowsCashCheckIn(checkInDate, today),

@@ -22,6 +22,7 @@ import {
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { refundReservationSiteFees } from "@/lib/reservation-refund";
+import { payableBalanceCents } from "@/lib/reservation-balance-due";
 
 type ReservationRow = {
   id: string;
@@ -322,97 +323,107 @@ export async function PATCH(
       }
 
       if (balanceAfterSync.balanceDueCents > 0) {
-        const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
-        const cashAllowed = caretakerAllowsCashCheckIn(newCheckIn, today);
-        if (!paymentMethod) {
-          return NextResponse.json(
-            {
-              error: cashAllowed
-                ? "Additional site fees are due. Pay with cash here or use card."
-                : "Additional site fees are due. Card only (cash not allowed for check-in more than 7 days ago).",
-              amountDueCents: balanceAfterSync.balanceDueCents,
-              requirePayment: true,
-            },
-            { status: 400 }
-          );
-        }
-        if (paymentMethod === "cash" && !cashAllowed) {
-          return NextResponse.json(
-            { error: "Cash not allowed when check-in is more than 7 days in the past." },
-            { status: 400 }
-          );
-        }
-        const amountCents = typeof body.amountCents === "number" ? body.amountCents : 0;
-        const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
-        const recipientDisplayName =
-          typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest";
-        if (
-          amountCents < 1 ||
-          amountCents > balanceAfterSync.balanceDueCents ||
-          !recipientEmail ||
-          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
-        ) {
-          return NextResponse.json(
-            {
-              error: `Valid payment required up to $${(balanceAfterSync.balanceDueCents / 100).toFixed(2)}`,
-              amountDueCents: balanceAfterSync.balanceDueCents,
-            },
-            { status: 400 }
-          );
-        }
-
-        await sql`
-          INSERT INTO camp_payments (
-            camp_slug, payment_type, method, amount_cents, reservation_id,
-            member_contact_id, member_number, member_email, recipient_display_name,
-            created_by_contact_id, created_at
-          )
-          VALUES (
-            ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${id},
-            ${existingRow.member_contact_id}, ${existingRow.member_number}, ${recipientEmail}, ${recipientDisplayName},
-            ${caretaker.contactId}, NOW()
-          )
-        `;
-
-        await syncBillingPeriodsForReservation({
-          reservationId: id,
+        const periods = await listBillingPeriods(id);
+        const payableNowCents = payableBalanceCents({
+          periods,
           checkInDate: newCheckIn,
           checkOutDate: newCheckOut,
-          isMember,
-          rates,
-        });
-
-        const siteResForReceipt = await sql`SELECT name FROM camp_sites WHERE id = ${existingRow.site_id} LIMIT 1`;
-        const siteNameForReceipt = ((Array.isArray(siteResForReceipt) ? siteResForReceipt : []) as { name: string }[])[0]
-          ?.name;
-        const reservationDetails = {
-          recipientName:
-            recipientDisplayName ||
-            (existingRow.reservation_type === "member"
-              ? existingRow.member_display_name ?? "Member"
-              : [existingRow.guest_first_name, existingRow.guest_last_name].filter(Boolean).join(" ").trim() ||
-                "Guest"),
-          checkInDate: newCheckIn,
-          checkOutDate: newCheckOut,
-          siteName: siteNameForReceipt,
-        };
-        const receiptSent = await sendPaymentReceiptEmail(
-          recipientEmail,
-          caretaker.campName,
-          [{ label: "Additional site fee", amountCents }],
-          amountCents,
-          "cash",
+          reservationType: existingRow.reservation_type,
           today,
-          reservationDetails
-        ).catch((e) => {
-          console.error("[caretaker] payment receipt email failed:", e);
-          return false;
         });
-        if (receiptSent) {
+        if (payableNowCents > 0) {
+          const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
+          const cashAllowed = caretakerAllowsCashCheckIn(newCheckIn, today);
+          if (!paymentMethod) {
+            return NextResponse.json(
+              {
+                error: cashAllowed
+                  ? "Additional site fees are due. Pay with cash here or use card."
+                  : "Additional site fees are due. Card only (cash not allowed for check-in more than 7 days ago).",
+                amountDueCents: payableNowCents,
+                requirePayment: true,
+              },
+              { status: 400 }
+            );
+          }
+          if (paymentMethod === "cash" && !cashAllowed) {
+            return NextResponse.json(
+              { error: "Cash not allowed when check-in is more than 7 days in the past." },
+              { status: 400 }
+            );
+          }
+          const amountCents = typeof body.amountCents === "number" ? body.amountCents : 0;
+          const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
+          const recipientDisplayName =
+            typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest";
+          if (
+            amountCents < 1 ||
+            amountCents > payableNowCents ||
+            !recipientEmail ||
+            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
+          ) {
+            return NextResponse.json(
+              {
+                error: `Valid payment required up to $${(payableNowCents / 100).toFixed(2)}`,
+                amountDueCents: payableNowCents,
+              },
+              { status: 400 }
+            );
+          }
+
           await sql`
-            UPDATE camp_payments SET receipt_sent_at = NOW()
-            WHERE id = (SELECT id FROM camp_payments WHERE reservation_id = ${id} AND method = 'cash' ORDER BY created_at DESC LIMIT 1)
+            INSERT INTO camp_payments (
+              camp_slug, payment_type, method, amount_cents, reservation_id,
+              member_contact_id, member_number, member_email, recipient_display_name,
+              created_by_contact_id, created_at
+            )
+            VALUES (
+              ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${id},
+              ${existingRow.member_contact_id}, ${existingRow.member_number}, ${recipientEmail}, ${recipientDisplayName},
+              ${caretaker.contactId}, NOW()
+            )
           `;
+
+          await syncBillingPeriodsForReservation({
+            reservationId: id,
+            checkInDate: newCheckIn,
+            checkOutDate: newCheckOut,
+            isMember,
+            rates,
+          });
+
+          const siteResForReceipt = await sql`SELECT name FROM camp_sites WHERE id = ${existingRow.site_id} LIMIT 1`;
+          const siteNameForReceipt = ((Array.isArray(siteResForReceipt) ? siteResForReceipt : []) as { name: string }[])[0]
+            ?.name;
+          const reservationDetails = {
+            recipientName:
+              recipientDisplayName ||
+              (existingRow.reservation_type === "member"
+                ? existingRow.member_display_name ?? "Member"
+                : [existingRow.guest_first_name, existingRow.guest_last_name].filter(Boolean).join(" ").trim() ||
+                  "Guest"),
+            checkInDate: newCheckIn,
+            checkOutDate: newCheckOut,
+            siteName: siteNameForReceipt,
+          };
+          const receiptSent = await sendPaymentReceiptEmail(
+            recipientEmail,
+            caretaker.campName,
+            [{ label: "Additional site fee", amountCents }],
+            amountCents,
+            "cash",
+            today,
+            reservationDetails
+          ).catch((e) => {
+            console.error("[caretaker] payment receipt email failed:", e);
+            return false;
+          });
+          if (receiptSent) {
+            await sql`
+              UPDATE camp_payments SET receipt_sent_at = NOW()
+              WHERE id = (SELECT id FROM camp_payments WHERE reservation_id = ${id} AND method = 'cash' ORDER BY created_at DESC LIMIT 1)
+            `;
+          }
         }
       }
 

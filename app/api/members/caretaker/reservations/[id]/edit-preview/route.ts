@@ -8,6 +8,7 @@ import {
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
 import { getReservationBalance, siteRatesFromRow } from "@/lib/reservation-billing";
+import { previewStayPaymentObligations } from "@/lib/reservation-balance-due";
 import {
   allocateRefundSplit,
   getReservationSiteFeeTotals,
@@ -17,7 +18,8 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * GET /api/members/caretaker/reservations/[id]/edit-preview?checkInDate=&checkOutDate=
- * Preview date-change rerate: new nights/total, amount due or leftover credit (no auto-refund).
+ * Preview date-change rerate: new nights/total, amount due now or leftover credit (no auto-refund).
+ * Long-term members are only asked for payable-now (first month / due periods), not full stay.
  */
 export async function GET(
   request: NextRequest,
@@ -108,8 +110,15 @@ export async function GET(
     const totals = await getReservationSiteFeeTotals(id);
     const proposedTotalCents = proposedPricing.totalCents;
     const balanceAfter = proposedTotalCents - totals.netPaidCents;
-    const additionalDueCents = balanceAfter > 0 ? balanceAfter : 0;
     const creditCents = balanceAfter < 0 ? -balanceAfter : 0;
+    const obligations = previewStayPaymentObligations({
+      checkInDate,
+      checkOutDate,
+      reservationType: res.reservation_type,
+      rates,
+      netPaidCents: totals.netPaidCents,
+    });
+    const additionalDueCents = obligations.payableNowCents;
     const { stripeRefundCents, cashRefundCents } = allocateRefundSplit(
       creditCents,
       totals.cardPaidCents,
@@ -140,6 +149,10 @@ export async function GET(
       },
       netPaidCents: totals.netPaidCents,
       additionalDueCents,
+      payableNowCents: additionalDueCents,
+      scheduledRemainingCents: obligations.scheduledRemainingCents,
+      nextScheduledPayment: obligations.nextScheduledPayment,
+      isLongTermMember: obligations.isLongTermMember,
       creditCents,
       refundBreakdown: { stripeRefundCents, cashRefundCents },
       issuesRefund: false,
