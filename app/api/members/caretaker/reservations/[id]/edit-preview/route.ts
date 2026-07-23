@@ -3,7 +3,7 @@ import { getCaretakerWriteContextFromRequest } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import {
   campUsesReservations,
-  caretakerAllowsCashCheckIn,
+  caretakerAllowsCashExistingReservationPayment,
 } from "@/lib/reservation-camps";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
@@ -125,7 +125,6 @@ export async function GET(
       totals.refundedCents
     );
 
-    const today = new Date().toISOString().slice(0, 10);
     const datesUnchanged = checkInDate === currentCheckIn && checkOutDate === currentCheckOut;
 
     return NextResponse.json({
@@ -156,7 +155,7 @@ export async function GET(
       creditCents,
       refundBreakdown: { stripeRefundCents, cashRefundCents },
       issuesRefund: false,
-      cashAllowed: caretakerAllowsCashCheckIn(checkInDate, today),
+      cashAllowed: caretakerAllowsCashExistingReservationPayment(),
     });
   } catch (e) {
     console.error("[caretaker] edit-preview error:", e);

@@ -18,11 +18,23 @@ export function campUsesReservations(campSlug: string): boolean {
   return CAMPS_WITH_RESERVATIONS.has(campSlug);
 }
 
-/** Cash allowed for future, same-day, and backdated check-in within the caretaker backdate window. */
+/**
+ * Cash allowed when creating a reservation (or paying at create time).
+ * Limited to future / same-day / backdated check-in within the caretaker backdate window
+ * so old arrivals cannot be invented as cash-paid.
+ */
 export function caretakerAllowsCashCheckIn(checkInDate: string, today?: string): boolean {
   const t = today ?? new Date().toISOString().slice(0, 10);
   const earliest = addDays(t, -CARETAKER_BACKDATE_MAX_DAYS);
   return checkInDate >= earliest;
+}
+
+/**
+ * Cash for site-fee collection on an existing reservation (balance due, date-edit add-on, site move).
+ * Always allowed — long-term guests commonly pay later months in cash while already on site.
+ */
+export function caretakerAllowsCashExistingReservationPayment(): boolean {
+  return true;
 }
 
 /** Earliest allowed check-in date for caretaker-created reservations. */

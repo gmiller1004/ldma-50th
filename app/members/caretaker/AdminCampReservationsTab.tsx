@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, X } from "lucide-react";
-import { caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
+import { caretakerAllowsCashExistingReservationPayment, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
 import { countNights } from "@/lib/reservation-dates";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
 
@@ -149,7 +149,7 @@ export function AdminCampReservationsTab({
     editCheckIn && editCheckOut && editCheckIn < editCheckOut
       ? countNights(editCheckIn, editCheckOut)
       : 0;
-  const editAllowsCash = editCheckIn ? caretakerAllowsCashCheckIn(editCheckIn, today) : false;
+  const editAllowsCash = Boolean(editing && caretakerAllowsCashExistingReservationPayment());
 
   const apiQs = `?campSlug=${encodeURIComponent(campSlug)}`;
 

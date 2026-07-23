@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCaretakerWriteContextFromRequest } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
-import { campUsesReservations, caretakerAllowsCashCheckIn } from "@/lib/reservation-camps";
+import { campUsesReservations, caretakerAllowsCashExistingReservationPayment } from "@/lib/reservation-camps";
 import { lookupMember } from "@/lib/salesforce";
 import {
   getReservationBalance,
@@ -333,13 +333,11 @@ export async function PATCH(
         });
         if (payableNowCents > 0) {
           const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
-          const cashAllowed = caretakerAllowsCashCheckIn(newCheckIn, today);
+          const cashAllowed = caretakerAllowsCashExistingReservationPayment();
           if (!paymentMethod) {
             return NextResponse.json(
               {
-                error: cashAllowed
-                  ? "Additional site fees are due. Pay with cash here or use card."
-                  : "Additional site fees are due. Card only (cash not allowed for check-in more than 7 days ago).",
+                error: "Additional site fees are due. Pay with cash here or use card.",
                 amountDueCents: payableNowCents,
                 requirePayment: true,
               },
@@ -348,7 +346,7 @@ export async function PATCH(
           }
           if (paymentMethod === "cash" && !cashAllowed) {
             return NextResponse.json(
-              { error: "Cash not allowed when check-in is more than 7 days in the past." },
+              { error: "Cash payment is not available for this reservation." },
               { status: 400 }
             );
           }

@@ -3,7 +3,7 @@ import { getCaretakerWriteContextFromRequest } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import {
   campUsesReservations,
-  caretakerAllowsCashCheckIn,
+  caretakerAllowsCashExistingReservationPayment,
   isNonBookableSite,
 } from "@/lib/reservation-camps";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
@@ -130,8 +130,6 @@ export async function GET(
       totals.refundedCents
     );
 
-    const today = new Date().toISOString().slice(0, 10);
-
     return NextResponse.json({
       reservationId: id,
       currentSiteId: res.site_id,
@@ -152,7 +150,7 @@ export async function GET(
       isLongTermMember: obligations.isLongTermMember,
       refundCents,
       refundBreakdown: { stripeRefundCents, cashRefundCents },
-      cashAllowed: caretakerAllowsCashCheckIn(checkInDate, today),
+      cashAllowed: caretakerAllowsCashExistingReservationPayment(),
     });
   } catch (e) {
     console.error("[caretaker] move-preview error:", e);

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
 import { suggestedReservationPaymentCents } from "@/lib/reservation-billing";
-import { caretakerAllowsCashCheckIn } from "@/lib/reservation-camps";
+import { caretakerAllowsCashExistingReservationPayment } from "@/lib/reservation-camps";
 
 export type BillingPeriodRow = {
   id: string;
@@ -67,8 +67,7 @@ export function ReservationBillingSection({
   campSlug?: string;
   autoFocusAmount?: boolean;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const allowsCash = caretakerAllowsCashCheckIn(checkInDate, today);
+  const allowsCash = caretakerAllowsCashExistingReservationPayment();
 
   const suggestedCents = useMemo(
     () => suggestedReservationPaymentCents(billingPeriods, balance.balanceDueCents),
@@ -286,9 +285,6 @@ export function ReservationBillingSection({
               Pay card
             </button>
           </div>
-          {!allowsCash && (
-            <p className="text-[#e8e0d5]/50 text-xs">Cash available when check-in is today or within the past 7 days.</p>
-          )}
           {!emailValid && (
             <p className="text-amber-400/90 text-xs">A valid receipt email is required before collecting payment.</p>
           )}

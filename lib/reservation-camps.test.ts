@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   campUsesReservations,
   caretakerAllowsCashCheckIn,
+  caretakerAllowsCashExistingReservationPayment,
   caretakerEarliestCheckInDate,
   caretakerEarliestCheckInDateForEdit,
   isHookupSiteType,
@@ -31,6 +32,12 @@ describe("caretakerAllowsCashCheckIn", () => {
   it("allows future check-in", () => {
     assert.equal(caretakerAllowsCashCheckIn("2026-05-20", today), true);
     assert.equal(caretakerAllowsCashCheckIn("2026-12-01", today), true);
+  });
+});
+
+describe("caretakerAllowsCashExistingReservationPayment", () => {
+  it("always allows cash for balance collection on existing stays", () => {
+    assert.equal(caretakerAllowsCashExistingReservationPayment(), true);
   });
 });
 

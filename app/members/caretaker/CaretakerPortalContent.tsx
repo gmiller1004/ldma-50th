@@ -15,7 +15,7 @@ import {
   isSameDay,
   getDay,
 } from "date-fns";
-import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
+import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerAllowsCashExistingReservationPayment, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
 import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
 import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
 import { countNights } from "@/lib/reservation-dates";
@@ -1802,10 +1802,7 @@ export function CaretakerPortalContent({
     resEditCheckInDate && resEditCheckOutDate && resEditCheckInDate < resEditCheckOutDate
       ? countNights(resEditCheckInDate, resEditCheckOutDate)
       : 0;
-  const resEditAllowsCash =
-    editingReservation && resEditCheckInDate
-      ? caretakerAllowsCashCheckIn(resEditCheckInDate, today)
-      : false;
+  const resEditAllowsCash = Boolean(editingReservation && caretakerAllowsCashExistingReservationPayment());
 
   async function handleResEditPayCash() {
     if (!editingReservation || resEditPaymentDueCents == null || resEditPaymentDueCents < 1) return;

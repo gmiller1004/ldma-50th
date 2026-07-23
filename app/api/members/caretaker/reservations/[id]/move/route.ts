@@ -3,7 +3,7 @@ import { getCaretakerWriteContextFromRequest } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import {
   campUsesReservations,
-  caretakerAllowsCashCheckIn,
+  caretakerAllowsCashExistingReservationPayment,
   isNonBookableSite,
 } from "@/lib/reservation-camps";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
@@ -250,7 +250,7 @@ export async function POST(
       });
       if (payableNowCents > 0) {
         const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
-        const cashAllowed = caretakerAllowsCashCheckIn(checkInDate, today);
+        const cashAllowed = caretakerAllowsCashExistingReservationPayment();
         if (!paymentMethod) {
           await notifySiteMoved();
           return NextResponse.json({
@@ -266,7 +266,7 @@ export async function POST(
         }
         if (!cashAllowed) {
           return NextResponse.json(
-            { error: "Cash not allowed when check-in is more than 7 days in the past. Use card." },
+            { error: "Cash payment is not available for this reservation. Use card." },
             { status: 400 }
           );
         }
