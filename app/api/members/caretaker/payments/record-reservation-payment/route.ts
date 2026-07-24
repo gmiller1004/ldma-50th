@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCaretakerWriteContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations } from "@/lib/reservation-camps";
+import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
 import {
   getReservationBalance,
@@ -104,27 +105,52 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await sql`
-    INSERT INTO camp_payments (
-      camp_slug, payment_type, method, amount_cents, reservation_id,
-      member_contact_id, member_number, member_email, recipient_display_name,
-      invoice_number, created_by_contact_id, created_at
-    )
-    VALUES (
-      ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${reservationId},
-      ${res.member_contact_id}, ${res.member_number}, ${recipientEmail}, ${recipientDisplayName},
-      ${res.invoice_number}, ${caretaker.contactId}, NOW()
-    )
-  `;
+  const checkInDate = toDateOnlyStr(res.check_in_date);
+  const checkOutDate = toDateOnlyStr(res.check_out_date);
 
-  const rates = siteRatesFromRow(res);
-  const balance = await syncBillingPeriodsForReservation({
-    reservationId,
-    checkInDate: String(res.check_in_date).slice(0, 10),
-    checkOutDate: String(res.check_out_date).slice(0, 10),
-    isMember: res.reservation_type === "member",
-    rates,
-  });
+  // Insert then sync. If sync fails, delete the payment so retries do not stack ledger rows
+  // while period balances still look unpaid in the UI.
+  let balance;
+  try {
+    const inserted = await sql`
+      INSERT INTO camp_payments (
+        camp_slug, payment_type, method, amount_cents, reservation_id,
+        member_contact_id, member_number, member_email, recipient_display_name,
+        invoice_number, created_by_contact_id, created_at
+      )
+      VALUES (
+        ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${reservationId},
+        ${res.member_contact_id}, ${res.member_number}, ${recipientEmail}, ${recipientDisplayName},
+        ${res.invoice_number}, ${caretaker.contactId}, NOW()
+      )
+      RETURNING id
+    `;
+    const paymentId = (Array.isArray(inserted) ? inserted[0] : undefined) as { id: string } | undefined;
+    if (!paymentId?.id) {
+      return NextResponse.json({ error: "Could not record payment" }, { status: 500 });
+    }
+
+    try {
+      const rates = siteRatesFromRow(res);
+      balance = await syncBillingPeriodsForReservation({
+        reservationId,
+        checkInDate,
+        checkOutDate,
+        isMember: res.reservation_type === "member",
+        rates,
+      });
+    } catch (syncErr) {
+      console.error("[caretaker] reservation payment sync failed, rolling back payment:", syncErr);
+      await sql`DELETE FROM camp_payments WHERE id = ${paymentId.id}`;
+      return NextResponse.json(
+        { error: "Payment could not be applied to billing. Please try again." },
+        { status: 500 }
+      );
+    }
+  } catch (e) {
+    console.error("[caretaker] reservation cash payment failed:", e);
+    return NextResponse.json({ error: "Payment failed" }, { status: 500 });
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const recipientName =
@@ -140,8 +166,8 @@ export async function POST(request: NextRequest) {
     today,
     {
       recipientName,
-      checkInDate: String(res.check_in_date).slice(0, 10),
-      checkOutDate: String(res.check_out_date).slice(0, 10),
+      checkInDate,
+      checkOutDate,
       siteName: res.site_name,
     }
   ).catch((e) => {

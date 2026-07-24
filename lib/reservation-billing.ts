@@ -407,13 +407,18 @@ export async function getReservationBalance(reservationId: string): Promise<{
   totalPaidCents: number;
   balanceDueCents: number;
 }> {
-  const periods = await listBillingPeriods(reservationId);
+  const [periods, netPaidCents] = await Promise.all([
+    listBillingPeriods(reservationId),
+    getReservationNetPaidCents(reservationId),
+  ]);
   if (periods.length === 0) {
-    const paid = await getReservationPaymentsTotalCents(reservationId);
-    return { totalDueCents: 0, totalPaidCents: paid, balanceDueCents: 0 };
+    return { totalDueCents: 0, totalPaidCents: netPaidCents, balanceDueCents: 0 };
   }
   const totalDueCents = periods.reduce((s, p) => s + p.amountDueCents, 0);
-  const totalPaidCents = periods.reduce((s, p) => s + p.amountPaidCents, 0);
+  // Prefer ledger net paid so a failed post-insert sync cannot allow duplicate cash retries
+  // while period rows still show the old unpaid balance.
+  const periodPaidCents = periods.reduce((s, p) => s + p.amountPaidCents, 0);
+  const totalPaidCents = Math.max(periodPaidCents, netPaidCents);
   return {
     totalDueCents,
     totalPaidCents,
