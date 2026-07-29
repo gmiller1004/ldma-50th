@@ -29,6 +29,12 @@ import {
   type BillingPeriodRow,
   type SiteBalance,
 } from "@/app/members/caretaker/ReservationBillingSection";
+import { ReservationListToolbar } from "@/app/members/caretaker/ReservationListToolbar";
+import {
+  filterAndSortReservations,
+  type ReservationListFilterKey,
+  type ReservationListSortKey,
+} from "@/lib/caretaker-reservation-list-query";
 
 import { parseCaretakerLookupInput } from "@/lib/member-contact-search";
 
@@ -503,6 +509,14 @@ export function CaretakerPortalContent({
   const [resViewMode, setResViewMode] = useState<"list" | "calendar">("list");
   const [resCalendarStart, setResCalendarStart] = useState(() => new Date().toISOString().slice(0, 10));
   const [archivedReservationsExpanded, setArchivedReservationsExpanded] = useState(false);
+  const [activeResSearch, setActiveResSearch] = useState("");
+  const [activeResFilter, setActiveResFilter] = useState<ReservationListFilterKey>("all");
+  const [activeResSortKey, setActiveResSortKey] = useState<ReservationListSortKey>("checkIn");
+  const [activeResSortDir, setActiveResSortDir] = useState<"asc" | "desc">("asc");
+  const [archivedResSearch, setArchivedResSearch] = useState("");
+  const [archivedResFilter, setArchivedResFilter] = useState<ReservationListFilterKey>("all");
+  const [archivedResSortKey, setArchivedResSortKey] = useState<ReservationListSortKey>("checkOut");
+  const [archivedResSortDir, setArchivedResSortDir] = useState<"asc" | "desc">("desc");
 
   function loadCheckIns() {
     setListLoading(true);
@@ -768,6 +782,28 @@ export function CaretakerPortalContent({
     resStayTotalCents,
     resTotalCents,
   ]);
+
+  const filteredActiveReservations = useMemo(
+    () =>
+      filterAndSortReservations(activeReservations, {
+        search: activeResSearch,
+        filter: activeResFilter,
+        sortKey: activeResSortKey,
+        sortDir: activeResSortDir,
+      }),
+    [activeReservations, activeResSearch, activeResFilter, activeResSortKey, activeResSortDir]
+  );
+
+  const filteredArchivedReservations = useMemo(
+    () =>
+      filterAndSortReservations(archivedReservations, {
+        search: archivedResSearch,
+        filter: archivedResFilter,
+        sortKey: archivedResSortKey,
+        sortDir: archivedResSortDir,
+      }),
+    [archivedReservations, archivedResSearch, archivedResFilter, archivedResSortKey, archivedResSortDir]
+  );
 
   function applyCreatePricingFields(body: Record<string, unknown>): string | null {
     const resolved = resolveCreateReservationPricing(Math.max(0, resTotalCents), {
@@ -2316,7 +2352,24 @@ export function CaretakerPortalContent({
           </div>
           {reservationsLoading ? (
             <p className="text-[#e8e0d5]/60">Loading…</p>
-          ) : resViewMode === "calendar" ? (
+          ) : (
+            <>
+              {activeReservations.length > 0 ? (
+                <ReservationListToolbar
+                  search={activeResSearch}
+                  onSearchChange={setActiveResSearch}
+                  filter={activeResFilter}
+                  onFilterChange={setActiveResFilter}
+                  sortKey={activeResSortKey}
+                  onSortKeyChange={setActiveResSortKey}
+                  sortDir={activeResSortDir}
+                  onSortDirChange={setActiveResSortDir}
+                  filterMode="active"
+                  resultCount={filteredActiveReservations.length}
+                  totalCount={activeReservations.length}
+                />
+              ) : null}
+              {resViewMode === "calendar" ? (
             <>
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <label className="text-[#e8e0d5]/80 text-sm">Start date:</label>
@@ -2332,7 +2385,7 @@ export function CaretakerPortalContent({
                 <p className="text-[#e8e0d5]/60">No sites loaded.</p>
               ) : (
                 <ReservationCalendarView
-                  reservations={activeReservations}
+                  reservations={filteredActiveReservations}
                   sites={sites.map((s) => ({ id: s.id, name: s.name, siteType: s.siteType }))}
                   onSelectReservation={(r) => openResDetailsModal(r as Reservation)}
                   startDate={resCalendarStart}
@@ -2342,9 +2395,11 @@ export function CaretakerPortalContent({
             </>
           ) : activeReservations.length === 0 ? (
             <p className="text-[#e8e0d5]/60">No active reservations.</p>
+          ) : filteredActiveReservations.length === 0 ? (
+            <p className="text-[#e8e0d5]/60">No reservations match your search or filters.</p>
           ) : (
             <ul className="space-y-2">
-              {activeReservations.map((r) => (
+              {filteredActiveReservations.map((r) => (
                 <li
                   key={r.id}
                   className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg"
@@ -2401,6 +2456,8 @@ export function CaretakerPortalContent({
               ))}
             </ul>
           )}
+            </>
+          )}
         </section>
 
         <section>
@@ -2419,8 +2476,25 @@ export function CaretakerPortalContent({
             reservationsLoading ? null : archivedReservations.length === 0 ? (
               <p className="text-[#e8e0d5]/60">No archived reservations.</p>
             ) : (
+              <>
+                <ReservationListToolbar
+                  search={archivedResSearch}
+                  onSearchChange={setArchivedResSearch}
+                  filter={archivedResFilter}
+                  onFilterChange={setArchivedResFilter}
+                  sortKey={archivedResSortKey}
+                  onSortKeyChange={setArchivedResSortKey}
+                  sortDir={archivedResSortDir}
+                  onSortDirChange={setArchivedResSortDir}
+                  filterMode="archived"
+                  resultCount={filteredArchivedReservations.length}
+                  totalCount={archivedReservations.length}
+                />
+                {filteredArchivedReservations.length === 0 ? (
+                  <p className="text-[#e8e0d5]/60">No reservations match your search or filters.</p>
+                ) : (
               <ul className="space-y-2">
-                {archivedReservations.map((r) => (
+                {filteredArchivedReservations.map((r) => (
                   <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/40 border border-[#d4af37]/10 rounded-lg text-[#e8e0d5]/80">
                     <span>
                       {r.siteName ?? "Site"} — {r.reservationType === "member" ? (r.memberDisplayName || `#${r.memberNumber}`) : `${r.guestFirstName} ${r.guestLastName}`}
@@ -2445,6 +2519,8 @@ export function CaretakerPortalContent({
                   </li>
                 ))}
               </ul>
+                )}
+              </>
             )
           )}
         </section>

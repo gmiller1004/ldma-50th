@@ -30,6 +30,8 @@
     "db:apply:balance-overrides": "node --env-file=.env.local --import tsx scripts/apply-reservation-balance-overrides.ts",
     "db:migrate:pilot-camps": "node --env-file=.env.local --import tsx scripts/migrate-pilot-camps-phase3.ts",
     "db:seed:camp-sites-master": "node --env-file=.env.local scripts/seed-camp-sites-from-master.mjs",
+    "db:merge:stanton-rates-v02": "node scripts/merge-stanton-site-master-v02.mjs",
+    "db:lock:stanton-rates": "node --env-file=.env.local --import tsx scripts/lock-stanton-reservations-pre-rate-update.ts",
     "test": "node --import tsx --test lib/**/*.test.ts",
     "addendum:pdf": "node scripts/addendum-to-pdf.mjs",
     "generate:knowledge-embeddings": "node --env-file=.env.local scripts/generate-knowledge-embeddings.mjs",

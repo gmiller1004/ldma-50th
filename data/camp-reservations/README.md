@@ -56,3 +56,18 @@ Pilot site name mapping: `lib/pilot-site-remap.ts` (e.g. VM `Lower 2` → `LC-02
 - **Member ≥30 nights:** `member_rate_monthly × (nights / 30)`
 - **Guest (any length):** `non_member_daily × nights`
 - **Billing:** rolling 30-day periods from check-in
+
+## Rate-card updates (existing stays)
+
+When updating `camp_sites` rates for a camp, **lock existing non-cancelled reservations first**. Billing sync recomputes from live site rates unless `price_override_flag` is set, so a plain reseed can reprice open stays.
+
+```bash
+# Example: Stanton v02 (July 2026)
+npm run db:merge:stanton-rates-v02 -- --dry-run   # optional
+npm run db:merge:stanton-rates-v02                # merge into camp-site-master.csv
+npm run db:lock:stanton-rates                     # dry-run
+npm run db:lock:stanton-rates -- --execute         # lock at current totals
+npm run db:seed:camp-sites-master -- --only=stanton-arizona
+```
+
+**Intentional exception:** site moves clear overrides and reprice to the destination site’s current rates.

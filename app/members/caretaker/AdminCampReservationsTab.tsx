@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { caretakerAllowsCashExistingReservationPayment, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
 import { countNights } from "@/lib/reservation-dates";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
+import {
+  filterAndSortReservations,
+  type ReservationListFilterKey,
+  type ReservationListSortKey,
+} from "@/lib/caretaker-reservation-list-query";
+import { ReservationListToolbar } from "./ReservationListToolbar";
 
 export type AdminReservationListRow = {
   id: string;
@@ -87,6 +93,22 @@ export function AdminCampReservationsTab({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const earliestCheckIn = caretakerEarliestCheckInDate(today);
+
+  const [listSearch, setListSearch] = useState("");
+  const [listFilter, setListFilter] = useState<ReservationListFilterKey>("all");
+  const [listSortKey, setListSortKey] = useState<ReservationListSortKey>("checkOut");
+  const [listSortDir, setListSortDir] = useState<"asc" | "desc">("desc");
+
+  const filteredReservations = useMemo(
+    () =>
+      filterAndSortReservations(reservations ?? [], {
+        search: listSearch,
+        filter: listFilter,
+        sortKey: listSortKey,
+        sortDir: listSortDir,
+      }),
+    [reservations, listSearch, listFilter, listSortKey, listSortDir]
+  );
 
   const [editing, setEditing] = useState<ReservationDetail | null>(null);
   const [editCheckIn, setEditCheckIn] = useState("");
@@ -653,6 +675,22 @@ export function AdminCampReservationsTab({
 
   return (
     <>
+      <ReservationListToolbar
+        search={listSearch}
+        onSearchChange={setListSearch}
+        filter={listFilter}
+        onFilterChange={setListFilter}
+        sortKey={listSortKey}
+        onSortKeyChange={setListSortKey}
+        sortDir={listSortDir}
+        onSortDirChange={setListSortDir}
+        filterMode="admin"
+        resultCount={filteredReservations.length}
+        totalCount={reservations.length}
+      />
+      {filteredReservations.length === 0 ? (
+        <p className="py-2 text-sm text-[#e8e0d5]/55">No reservations match your search or filters.</p>
+      ) : (
       <div className="overflow-x-auto rounded border border-[#d4af37]/15">
         <table className="w-full text-left text-xs sm:text-sm">
           <thead>
@@ -668,7 +706,7 @@ export function AdminCampReservationsTab({
             </tr>
           </thead>
           <tbody>
-            {reservations.map((r) => (
+            {filteredReservations.map((r) => (
               <tr key={r.id} className="border-t border-[#d4af37]/10 text-[#e8e0d5]/90">
                 <td className="p-2">{r.siteName ?? "—"}</td>
                 <td className="p-2">{partyLabel(r)}</td>
@@ -728,9 +766,10 @@ export function AdminCampReservationsTab({
           </tbody>
         </table>
         <p className="border-t border-[#d4af37]/10 px-2 py-1.5 text-[11px] text-[#e8e0d5]/45">
-          Showing up to 300 reservations, newest checkout first.
+          Showing up to 300 reservations loaded from the server.
         </p>
       </div>
+      )}
 
       {editing && (
         <div
