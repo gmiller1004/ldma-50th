@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import { directoryCamps } from "@/lib/directory-camps";
 import { campUsesReservations, type CapacitySiteFilter } from "@/lib/reservation-camps";
 import { currentMonthValue, isValidDateRange, monthDateRange } from "@/lib/camp-capacity";
@@ -154,6 +154,8 @@ export function CampCapacitySection() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [capacity, setCapacity] = useState<CapacityPayload | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!campSlug || !activeRange) {
@@ -209,6 +211,49 @@ export function CampCapacitySection() {
       ? activeRange.from
       : `${activeRange.from} – ${activeRange.to}`
     : "Select a valid date range";
+
+  async function handleExportOccupancy(format: "xls" | "csv") {
+    if (!campSlug || !activeRange) {
+      setExportError("Choose a camp and valid date range first.");
+      return;
+    }
+    setExportLoading(true);
+    setExportError(null);
+    try {
+      const params = new URLSearchParams({
+        campSlug,
+        from: activeRange.from,
+        to: activeRange.to,
+        siteFilter,
+        format,
+      });
+      const res = await fetch(`/api/members/caretaker/admin/capacity-occupancy-export?${params}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(typeof j.error === "string" ? j.error : "Download failed");
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition");
+      const match = cd?.match(/filename="([^"]+)"/);
+      const filename =
+        match?.[1] ??
+        `${campSlug}-site-nights-${activeRange.from}_to_${activeRange.to}.${format === "csv" ? "csv" : "xls"}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setExportLoading(false);
+    }
+  }
 
   return (
     <section className="rounded-lg border border-[#d4af37]/25 bg-[#0f0a06]/40 p-4 space-y-4">
@@ -357,7 +402,39 @@ export function CampCapacitySection() {
         </div>
       ) : capacity ? (
         <div className="space-y-4 pt-2">
-          <p className="text-sm text-[#f0d48f] font-medium">{capacity.campName}</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="text-sm text-[#f0d48f] font-medium">{capacity.campName}</p>
+            <div className="flex flex-col items-stretch sm:items-end gap-1.5">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleExportOccupancy("xls")}
+                  disabled={exportLoading || !activeRange}
+                  className="inline-flex items-center justify-center gap-2 rounded border border-[#d4af37]/50 bg-[#d4af37]/15 text-[#f0d48f] px-3 py-1.5 text-sm hover:bg-[#d4af37]/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {exportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  Export grid (Excel)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleExportOccupancy("csv")}
+                  disabled={exportLoading || !activeRange}
+                  className="inline-flex items-center justify-center gap-2 rounded border border-[#d4af37]/30 text-[#e8e0d5]/85 px-3 py-1.5 text-sm hover:bg-[#d4af37]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Export CSV
+                </button>
+              </div>
+              <p className="text-[11px] text-[#e8e0d5]/45 max-w-sm sm:text-right">
+                Sites as rows, nights as columns. Booked nights are marked with an x; Excel export
+                also fills those cells yellow.
+              </p>
+              {exportError ? (
+                <p className="text-xs text-red-300 sm:text-right" role="alert">
+                  {exportError}
+                </p>
+              ) : null}
+            </div>
+          </div>
           <div className="flex flex-col lg:flex-row gap-4">
             <CapacityChartCard
               title="Sites with any booking"

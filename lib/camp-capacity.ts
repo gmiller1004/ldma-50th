@@ -143,3 +143,154 @@ export function computeCapacityStats(bookedSites: number, totalSites: number): C
 export function isValidDateRange(from: string, to: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to;
 }
+
+/** Inclusive calendar dates from `from` through `to` (YYYY-MM-DD). */
+export function enumerateInclusiveDates(from: string, to: string): string[] {
+  if (!isValidDateRange(from, to)) return [];
+  const dates: string[] = [];
+  let cur = from;
+  while (cur <= to) {
+    dates.push(cur);
+    cur = addDays(cur, 1);
+  }
+  return dates;
+}
+
+export type SiteNightGridSite = {
+  id: string;
+  name: string;
+};
+
+export type SiteNightGridRow = {
+  siteId: string;
+  siteName: string;
+  /** Parallel to `dates`: true when the site is occupied that night. */
+  booked: boolean[];
+};
+
+/**
+ * Build a site × date occupancy matrix.
+ * A night D is booked when some stay has checkIn <= D < checkOut (checkout exclusive).
+ */
+export function buildSiteNightOccupancyGrid(
+  sites: SiteNightGridSite[],
+  dates: string[],
+  stays: StayOverlapInput[]
+): SiteNightGridRow[] {
+  const staysBySite = new Map<string, StayOverlapInput[]>();
+  for (const stay of stays) {
+    const list = staysBySite.get(stay.siteId);
+    if (list) list.push(stay);
+    else staysBySite.set(stay.siteId, [stay]);
+  }
+
+  return sites.map((site) => {
+    const siteStays = staysBySite.get(site.id) ?? [];
+    const booked = dates.map((date) =>
+      siteStays.some((stay) => stay.checkIn <= date && date < stay.checkOut)
+    );
+    return { siteId: site.id, siteName: site.name, booked };
+  });
+}
+
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * Excel SpreadsheetML workbook: sites as rows, dates as columns,
+ * booked nights as yellow cells with "x". Opens in Excel / compatible apps.
+ * (Plain CSV cannot carry cell fill colors.)
+ */
+export function buildSiteNightOccupancySpreadsheetXml(input: {
+  campName: string;
+  from: string;
+  to: string;
+  dates: string[];
+  rows: SiteNightGridRow[];
+}): string {
+  const { campName, from, to, dates, rows } = input;
+  const headerCells = [
+    `<Cell ss:StyleID="Header"><Data ss:Type="String">Site</Data></Cell>`,
+    ...dates.map(
+      (d) => `<Cell ss:StyleID="Header"><Data ss:Type="String">${escapeXml(d)}</Data></Cell>`
+    ),
+  ].join("");
+
+  const body = rows
+    .map((row) => {
+      const cells = [
+        `<Cell ss:StyleID="Site"><Data ss:Type="String">${escapeXml(row.siteName)}</Data></Cell>`,
+        ...row.booked.map((isBooked) =>
+          isBooked
+            ? `<Cell ss:StyleID="Booked"><Data ss:Type="String">x</Data></Cell>`
+            : `<Cell ss:StyleID="Empty"><Data ss:Type="String"></Data></Cell>`
+        ),
+      ].join("");
+      return `<Row>${cells}</Row>`;
+    })
+    .join("\n");
+
+  return `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+  <Title>${escapeXml(`${campName} site-night occupancy ${from} to ${to}`)}</Title>
+ </DocumentProperties>
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Center"/>
+   <Font ss:FontName="Calibri" ss:Size="11"/>
+  </Style>
+  <Style ss:ID="Header">
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
+   <Interior ss:Color="#F5E6C8" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="Site">
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+  </Style>
+  <Style ss:ID="Booked">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Interior ss:Color="#FFFF00" ss:Pattern="Solid"/>
+   <Font ss:FontName="Calibri" ss:Size="11"/>
+  </Style>
+  <Style ss:ID="Empty">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Occupancy">
+  <Table>
+   <Column ss:Width="180"/>
+${dates.map(() => `   <Column ss:Width="56"/>`).join("\n")}
+   <Row>${headerCells}</Row>
+${body}
+  </Table>
+ </Worksheet>
+</Workbook>
+`;
+}
+
+/** Plain CSV twin (x / blank). Useful when yellow fill is not needed. */
+export function buildSiteNightOccupancyCsv(dates: string[], rows: SiteNightGridRow[]): string {
+  const escape = (s: string) => {
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const lines = [
+    ["Site", ...dates].map(escape).join(","),
+    ...rows.map((row) =>
+      [escape(row.siteName), ...row.booked.map((b) => (b ? "x" : ""))].join(",")
+    ),
+  ];
+  return lines.join("\n") + "\n";
+}
