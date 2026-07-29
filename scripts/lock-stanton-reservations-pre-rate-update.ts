@@ -40,8 +40,8 @@ async function run() {
   const {
     syncBillingPeriodsForReservation,
     siteRatesFromRow,
-  } = await import("../lib/reservation-billing.ts");
-  const { toDateOnlyStr } = await import("../lib/reservation-dates.ts");
+  } = await import("../lib/reservation-billing");
+  const { toDateOnlyStr } = await import("../lib/reservation-dates");
 
   const url =
     process.env.STORAGE_DATABASE_URL ||
