@@ -1099,6 +1099,11 @@ export function AdminCampReservationsTab({
                             {movePreview.nextScheduledPayment.dueDate}
                           </p>
                         ) : null}
+                        {(movePreview.scheduledRemainingCents ?? 0) > 0 && movePreview.additionalDueCents < 1 ? (
+                          <p className="text-[#e8e0d5]/50 text-xs">
+                            Existing deposit/hold is kept — remaining balance stays on the payment schedule.
+                          </p>
+                        ) : null}
                         {movePreview.refundCents > 0 && movePreview.refundBreakdown.stripeRefundCents > 0 && (
                           <p className="text-[#e8e0d5]/50 text-xs">
                             {formatCentsAsCurrency(movePreview.refundBreakdown.stripeRefundCents)} back to card

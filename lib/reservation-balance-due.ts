@@ -227,3 +227,28 @@ export function previewStayPaymentObligations(input: {
     scheduledRemainingCents: Math.max(0, summary.totalUnpaidCents - summary.payableNowCents),
   };
 }
+
+/**
+ * Site moves must honor existing holds (e.g. public $100 deposit).
+ * Do not force collection of the pre-arrival remainder when the caretaker changes sites;
+ * unpaid balance stays on the normal schedule / reminder emails.
+ */
+export function previewSiteMovePaymentObligations(input: {
+  checkInDate: string;
+  checkOutDate: string;
+  reservationType: string;
+  rates: SiteRates;
+  netPaidCents: number;
+  today?: string;
+}): ReservationPaymentObligations & {
+  proposedTotalCents: number;
+  scheduledRemainingCents: number;
+} {
+  const obligations = previewStayPaymentObligations(input);
+  return {
+    ...obligations,
+    payableNowCents: 0,
+    balanceDueBeforeArrivalCents: obligations.balanceDueBeforeArrivalCents,
+    scheduledRemainingCents: obligations.totalUnpaidCents,
+  };
+}

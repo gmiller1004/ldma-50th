@@ -9,7 +9,7 @@ import {
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
 import { getReservationBalance, siteRatesFromRow } from "@/lib/reservation-billing";
-import { previewStayPaymentObligations } from "@/lib/reservation-balance-due";
+import { previewSiteMovePaymentObligations } from "@/lib/reservation-balance-due";
 import {
   allocateRefundSplit,
   getReservationSiteFeeTotals,
@@ -116,7 +116,7 @@ export async function GET(
 
     const balanceAfterMoveCents = newTotalCents - totals.netPaidCents;
     const refundCents = balanceAfterMoveCents < 0 ? -balanceAfterMoveCents : 0;
-    const obligations = previewStayPaymentObligations({
+    const obligations = previewSiteMovePaymentObligations({
       checkInDate,
       checkOutDate,
       reservationType: res.reservation_type,

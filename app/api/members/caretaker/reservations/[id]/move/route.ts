@@ -3,28 +3,23 @@ import { getCaretakerWriteContextFromRequest } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import {
   campUsesReservations,
-  caretakerAllowsCashExistingReservationPayment,
   isNonBookableSite,
 } from "@/lib/reservation-camps";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
 import {
   getReservationBalance,
-  listBillingPeriods,
   siteRatesFromRow,
   syncBillingPeriodsForReservation,
 } from "@/lib/reservation-billing";
-import { payableBalanceCents } from "@/lib/reservation-balance-due";
 import {
   getReservationSiteFeeTotals,
   refundReservationSiteFees,
 } from "@/lib/reservation-refund";
 import { lookupMember } from "@/lib/salesforce";
-import { sendPaymentReceiptEmail, sendReservationSiteMovedEmail } from "@/lib/sendgrid";
+import { sendReservationSiteMovedEmail } from "@/lib/sendgrid";
 import { fetchCaretakerEmailsForCamp } from "@/lib/caretaker-admin-summary";
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type ReservationRow = {
   id: string;
@@ -199,8 +194,6 @@ export async function POST(
     const totalsBefore = await getReservationSiteFeeTotals(id);
     const balanceAfterMoveCents = newTotalCents - totalsBefore.netPaidCents;
 
-    const today = new Date().toISOString().slice(0, 10);
-
     // Refund overpayment before moving so a failed refund does not leave a moved reservation.
     let refundResult: { stripeRefundCents: number; cashRefundCents: number; totalRefundedCents: number } | null =
       null;
@@ -230,116 +223,16 @@ export async function POST(
       WHERE id = ${id}
     `;
 
-    let balance = await syncBillingPeriodsForReservation({
+    // Sync billing to the new site total. Do not require collecting the pre-arrival
+    // remainder here — public $100 deposits (and other holds) stay honored; unpaid
+    // balance remains on the normal schedule / reminders.
+    await syncBillingPeriodsForReservation({
       reservationId: id,
       checkInDate,
       checkOutDate,
       isMember,
       rates,
     });
-
-    // Additional amount owed now after moving (first month / due periods only for long-term members).
-    if (balance.balanceDueCents > 0) {
-      const periods = await listBillingPeriods(id);
-      const payableNowCents = payableBalanceCents({
-        periods,
-        checkInDate,
-        checkOutDate,
-        reservationType: reservation.reservation_type,
-        today,
-      });
-      if (payableNowCents > 0) {
-        const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
-        const cashAllowed = caretakerAllowsCashExistingReservationPayment();
-        if (!paymentMethod) {
-          await notifySiteMoved();
-          return NextResponse.json({
-            ok: true,
-            moved: true,
-            newSiteId,
-            newSiteName: newSite.name,
-            requirePayment: true,
-            amountDueCents: payableNowCents,
-            cashAllowed,
-            refund: refundResult,
-          });
-        }
-        if (!cashAllowed) {
-          return NextResponse.json(
-            { error: "Cash payment is not available for this reservation. Use card." },
-            { status: 400 }
-          );
-        }
-        const amountCents = typeof body.amountCents === "number" ? body.amountCents : payableNowCents;
-        const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
-        const recipientDisplayName =
-          typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest";
-        if (
-          amountCents < 1 ||
-          amountCents > payableNowCents ||
-          !recipientEmail ||
-          !EMAIL_REGEX.test(recipientEmail)
-        ) {
-          return NextResponse.json(
-            {
-              error: `Valid payment required up to $${(payableNowCents / 100).toFixed(2)}`,
-              amountDueCents: payableNowCents,
-            },
-            { status: 400 }
-          );
-        }
-
-        await sql`
-          INSERT INTO camp_payments (
-            camp_slug, payment_type, method, amount_cents, reservation_id,
-            member_contact_id, member_number, member_email, recipient_display_name,
-            created_by_contact_id, created_at
-          )
-          VALUES (
-            ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${id},
-            ${reservation.member_contact_id}, ${reservation.member_number}, ${recipientEmail}, ${recipientDisplayName},
-            ${caretaker.contactId}, NOW()
-          )
-        `;
-
-        balance = await syncBillingPeriodsForReservation({
-          reservationId: id,
-          checkInDate,
-          checkOutDate,
-          isMember,
-          rates,
-        });
-
-        const reservationDetails = {
-          recipientName: recipientDisplayName,
-          checkInDate,
-          checkOutDate,
-          siteName: newSite.name,
-        };
-        const receiptSent = await sendPaymentReceiptEmail(
-          recipientEmail,
-          caretaker.campName,
-          [{ label: `Site change to ${newSite.name}`, amountCents }],
-          amountCents,
-          "cash",
-          today,
-          reservationDetails
-        ).catch((e) => {
-          console.error("[caretaker] move receipt email failed:", e);
-          return false;
-        });
-        if (receiptSent) {
-          await sql`
-            UPDATE camp_payments SET receipt_sent_at = NOW()
-            WHERE id = (
-              SELECT id FROM camp_payments
-              WHERE reservation_id = ${id} AND method = 'cash'
-              ORDER BY created_at DESC LIMIT 1
-            )
-          `;
-        }
-      }
-    }
 
     if (!sameSite) {
       await notifySiteMoved();

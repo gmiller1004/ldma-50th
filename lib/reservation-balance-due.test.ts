@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   balanceDueBeforeArrivalCents,
   payableBalanceCents,
+  previewSiteMovePaymentObligations,
   previewStayPaymentObligations,
   summarizeReservationPaymentObligations,
   type ReservationPaymentObligations,
@@ -141,5 +142,28 @@ describe("previewStayPaymentObligations", () => {
     assert.ok(preview.scheduledRemainingCents > 0);
     assert.ok(preview.nextScheduledPayment);
     assert.equal(preview.nextScheduledPayment?.dueDate, "2026-12-31");
+  });
+});
+
+describe("previewSiteMovePaymentObligations", () => {
+  it("does not require collecting the deposit remainder on a site move", () => {
+    const preview = previewSiteMovePaymentObligations({
+      checkInDate: "2027-01-02",
+      checkOutDate: "2027-02-01",
+      reservationType: "member",
+      rates: {
+        memberRateDaily: 20,
+        memberRateMonthly: 540,
+        nonMemberRateDaily: 55,
+      },
+      netPaidCents: 10_000,
+      today: "2026-07-29",
+    });
+
+    assert.equal(preview.proposedTotalCents, 54_000);
+    assert.equal(preview.payableNowCents, 0);
+    assert.equal(preview.totalUnpaidCents, 44_000);
+    assert.equal(preview.scheduledRemainingCents, 44_000);
+    assert.equal(preview.balanceDueBeforeArrivalCents, 44_000);
   });
 });

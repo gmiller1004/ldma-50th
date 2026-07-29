@@ -3434,6 +3434,11 @@ export function CaretakerPortalContent({
                               {resMovePreview.nextScheduledPayment.dueDate}
                             </p>
                           ) : null}
+                          {(resMovePreview.scheduledRemainingCents ?? 0) > 0 && resMovePreview.additionalDueCents < 1 ? (
+                            <p className="text-[#e8e0d5]/50 text-xs">
+                              Existing deposit/hold is kept — remaining balance stays on the payment schedule.
+                            </p>
+                          ) : null}
                           {resMovePreview.refundCents > 0 && resMovePreview.refundBreakdown.stripeRefundCents > 0 && (
                             <p className="text-[#e8e0d5]/50 text-xs">
                               {formatCentsAsCurrency(resMovePreview.refundBreakdown.stripeRefundCents)} back to card
