@@ -697,6 +697,7 @@ export function CaretakerAdminDashboard() {
               setLoading(true);
               setAppliedRevenueFrom(revFromInput.trim());
               setAppliedRevenueTo(revToInput.trim());
+              setDashboardRefresh((n) => n + 1);
             }}
             className="rounded border border-[#d4af37]/50 bg-[#d4af37]/15 text-[#f0d48f] px-4 py-2 text-sm hover:bg-[#d4af37]/25"
           >
@@ -710,6 +711,7 @@ export function CaretakerAdminDashboard() {
               setRevToInput("");
               setAppliedRevenueFrom("");
               setAppliedRevenueTo("");
+              setDashboardRefresh((n) => n + 1);
             }}
             className="text-sm text-[#e8e0d5]/55 hover:text-[#d4af37] px-2 py-2"
           >
@@ -730,6 +732,7 @@ export function CaretakerAdminDashboard() {
                 setRevToInput(t);
                 setAppliedRevenueFrom(f);
                 setAppliedRevenueTo(t);
+                setDashboardRefresh((n) => n + 1);
               }}
             >
               Last 30 days
@@ -746,6 +749,7 @@ export function CaretakerAdminDashboard() {
                 setRevToInput(t);
                 setAppliedRevenueFrom(f);
                 setAppliedRevenueTo(t);
+                setDashboardRefresh((n) => n + 1);
               }}
             >
               This calendar year

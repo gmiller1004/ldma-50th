@@ -39,6 +39,7 @@ type ReservationRow = {
   checked_in_at: string | null;
   created_at: string;
   updated_at: string;
+  invoice_number?: string | null;
   event_product_handle?: string | null;
   event_site_type?: string | null;
   cancelled_at?: string | null;
@@ -67,6 +68,7 @@ function rowToJson(row: ReservationRow) {
     checkedInAt: row.checked_in_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    invoiceNumber: row.invoice_number ?? null,
     eventProductHandle: row.event_product_handle ?? null,
     eventSiteType: row.event_site_type ?? null,
     cancelledAt: row.cancelled_at ?? null,
@@ -100,7 +102,8 @@ export async function GET(request: NextRequest) {
       SELECT r.id, r.site_id, s.name AS site_name, r.camp_slug, r.check_in_date, r.check_out_date, r.nights,
              r.reservation_type, r.member_contact_id, r.member_number, r.member_display_name,
              r.guest_first_name, r.guest_last_name, r.guest_email, r.guest_phone,
-             r.status, r.checked_in_at, r.created_at, r.updated_at, r.event_product_handle, r.event_site_type
+             r.status, r.checked_in_at, r.created_at, r.updated_at, r.invoice_number,
+             r.event_product_handle, r.event_site_type
       FROM camp_reservations r
       LEFT JOIN camp_sites s ON s.id = r.site_id
       WHERE r.camp_slug = ${caretaker.campSlug} AND r.check_out_date >= ${today} AND r.status != 'cancelled'
@@ -112,7 +115,8 @@ export async function GET(request: NextRequest) {
       SELECT r.id, r.site_id, s.name AS site_name, r.camp_slug, r.check_in_date, r.check_out_date, r.nights,
              r.reservation_type, r.member_contact_id, r.member_number, r.member_display_name,
              r.guest_first_name, r.guest_last_name, r.guest_email, r.guest_phone,
-             r.status, r.checked_in_at, r.created_at, r.updated_at, r.event_product_handle, r.event_site_type,
+             r.status, r.checked_in_at, r.created_at, r.updated_at, r.invoice_number,
+             r.event_product_handle, r.event_site_type,
              r.cancelled_at, r.cancellation_fee_waived, r.cancellation_fee_waived_cents
       FROM camp_reservations r
       LEFT JOIN camp_sites s ON s.id = r.site_id
@@ -125,7 +129,8 @@ export async function GET(request: NextRequest) {
       SELECT r.id, r.site_id, s.name AS site_name, r.camp_slug, r.check_in_date, r.check_out_date, r.nights,
              r.reservation_type, r.member_contact_id, r.member_number, r.member_display_name,
              r.guest_first_name, r.guest_last_name, r.guest_email, r.guest_phone,
-             r.status, r.checked_in_at, r.created_at, r.updated_at, r.event_product_handle, r.event_site_type,
+             r.status, r.checked_in_at, r.created_at, r.updated_at, r.invoice_number,
+             r.event_product_handle, r.event_site_type,
              r.cancelled_at, r.cancellation_fee_waived, r.cancellation_fee_waived_cents
       FROM camp_reservations r
       LEFT JOIN camp_sites s ON s.id = r.site_id
@@ -356,7 +361,7 @@ export async function POST(request: NextRequest) {
       RETURNING id, site_id, camp_slug, check_in_date, check_out_date, nights,
                 reservation_type, member_contact_id, member_number, member_display_name,
                 guest_first_name, guest_last_name, guest_email, guest_phone,
-                status, checked_in_at, created_at, updated_at
+                status, checked_in_at, created_at, updated_at, invoice_number
     `;
     row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
     if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
@@ -403,7 +408,7 @@ export async function POST(request: NextRequest) {
       RETURNING id, site_id, camp_slug, check_in_date, check_out_date, nights,
                 reservation_type, member_contact_id, member_number, member_display_name,
                 guest_first_name, guest_last_name, guest_email, guest_phone,
-                status, checked_in_at, created_at, updated_at
+                status, checked_in_at, created_at, updated_at, invoice_number
     `;
     row = (Array.isArray(inserted) ? inserted : [])[0] as ReservationRow | undefined;
     if (!row) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
@@ -473,5 +478,12 @@ export async function POST(request: NextRequest) {
     console.error("[caretaker] reservation confirmation email failed:", e)
   );
 
-  return NextResponse.json(rowToJson({ ...row, site_name: siteNameStr }), { status: 201 });
+  return NextResponse.json(
+    rowToJson({
+      ...row,
+      site_name: siteNameStr,
+      invoice_number: row.invoice_number ?? pricing.invoiceNumber,
+    }),
+    { status: 201 }
+  );
 }
