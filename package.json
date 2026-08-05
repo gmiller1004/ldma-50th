@@ -24,6 +24,7 @@
     "db:migrate:camp-public-booking": "node --env-file=.env.local scripts/migrate-camp-public-booking.mjs",
     "db:migrate:camp-balance-reminders": "node --env-file=.env.local scripts/migrate-camp-balance-reminders.mjs",
     "db:migrate:camp-billing-period-reminders": "node --env-file=.env.local scripts/migrate-camp-billing-period-reminders.mjs",
+    "db:migrate:director-season-totals": "node --env-file=.env.local scripts/migrate-director-season-totals.mjs",
     "db:import:resnexus": "node --env-file=.env.local --import tsx scripts/import-resnexus-reservations.ts",
     "db:repair:resnexus-import": "node --env-file=.env.local --import tsx scripts/repair-resnexus-import-billing.ts",
     "db:repair:resnexus-site-move": "node --env-file=.env.local --import tsx scripts/repair-resnexus-site-move-billing.ts",

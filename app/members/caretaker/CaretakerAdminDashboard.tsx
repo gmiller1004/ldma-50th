@@ -6,6 +6,7 @@ import { CampCapacitySection } from "./CampCapacitySection";
 import { AdminCampReservationsTab } from "./AdminCampReservationsTab";
 import { ViewAsCaretakerButton } from "./CaretakerAdminViewControls";
 import { ReservationBillingSection } from "./ReservationBillingSection";
+import { DirectorReportingSection } from "./DirectorReportingSection";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
 import type { PaymentDueItem } from "@/lib/caretaker-site-ar";
 import { ChevronDown, ChevronRight, Download, HelpCircle, Loader2, Tent } from "lucide-react";
@@ -419,6 +420,7 @@ function ColumnHelpSheet({
 }
 
 export function CaretakerAdminDashboard() {
+  const [topTab, setTopTab] = useState<"dashboard" | "reporting">("dashboard");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [camps, setCamps] = useState<CampRow[]>([]);
@@ -625,7 +627,7 @@ export function CaretakerAdminDashboard() {
     }
   }
 
-  if (loading) {
+  if (loading && topTab === "dashboard") {
     return (
       <div className="flex items-center gap-3 text-[#e8e0d5]/70 py-12">
         <Loader2 className="w-6 h-6 animate-spin text-[#d4af37]" />
@@ -634,7 +636,7 @@ export function CaretakerAdminDashboard() {
     );
   }
 
-  if (error) {
+  if (error && topTab === "dashboard") {
     return (
       <div className="rounded-lg border border-red-500/40 bg-red-950/30 px-4 py-3 text-red-200">
         {error}
@@ -644,6 +646,43 @@ export function CaretakerAdminDashboard() {
 
   return (
     <div className="space-y-8 caretaker-themed">
+      <div
+        className="inline-flex rounded-lg border border-[#d4af37]/30 bg-[#0f0a06]/60 p-1"
+        role="tablist"
+        aria-label="Director dashboard sections"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={topTab === "dashboard"}
+          onClick={() => setTopTab("dashboard")}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            topTab === "dashboard"
+              ? "bg-[#d4af37]/20 text-[#f0d48f]"
+              : "text-[#e8e0d5]/60 hover:text-[#e8e0d5]"
+          }`}
+        >
+          Dashboard
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={topTab === "reporting"}
+          onClick={() => setTopTab("reporting")}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            topTab === "reporting"
+              ? "bg-[#d4af37]/20 text-[#f0d48f]"
+              : "text-[#e8e0d5]/60 hover:text-[#e8e0d5]"
+          }`}
+        >
+          Reporting
+        </button>
+      </div>
+
+      {topTab === "reporting" ? <DirectorReportingSection /> : null}
+
+      {topTab === "dashboard" ? (
+        <>
       <ColumnHelpSheet helpId={columnHelpId} onClose={() => setColumnHelpId(null)} />
 
       <ManualReservationPanel />
@@ -1107,6 +1146,8 @@ export function CaretakerAdminDashboard() {
           </tbody>
         </table>
       </div>
+        </>
+      ) : null}
     </div>
   );
 }
