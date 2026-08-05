@@ -390,6 +390,37 @@ export async function listSeasonTotalSnapshots(input: {
   return ((Array.isArray(rows) ? rows : []) as SnapshotDbRow[]).map(mapSnapshotRow);
 }
 
+/** Remove one snapshot date, or every snapshot for the camp/season when snapshotDate is null. */
+export async function deleteSeasonTotalSnapshots(input: {
+  campSlug: string;
+  seasonFrom: string;
+  seasonTo: string;
+  snapshotDate: string | null;
+}): Promise<number> {
+  if (!hasDb() || !sql) {
+    throw new Error("Database not available");
+  }
+
+  const rows = input.snapshotDate
+    ? await sql`
+        DELETE FROM director_season_total_snapshots
+        WHERE camp_slug = ${input.campSlug}
+          AND season_from = ${input.seasonFrom}::date
+          AND season_to = ${input.seasonTo}::date
+          AND snapshot_date = ${input.snapshotDate}::date
+        RETURNING id
+      `
+    : await sql`
+        DELETE FROM director_season_total_snapshots
+        WHERE camp_slug = ${input.campSlug}
+          AND season_from = ${input.seasonFrom}::date
+          AND season_to = ${input.seasonTo}::date
+        RETURNING id
+      `;
+
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
 export async function upsertSeasonTotalSnapshot(input: {
   campSlug: string;
   seasonFrom: string;

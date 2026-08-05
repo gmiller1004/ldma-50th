@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCaretakerAccess } from "@/lib/caretaker-auth";
 import { hasDb } from "@/lib/db";
-import { getValidCampSlugs } from "@/lib/directory-camps";
+import { directoryCamps, getValidCampSlugs } from "@/lib/directory-camps";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { isValidDateRange } from "@/lib/camp-capacity";
-import { buildSeasonTotalsCsv } from "@/lib/director-season-totals";
-import { listSeasonTotalSnapshots } from "@/lib/director-season-totals-db";
+import {
+  buildDirectorReportCsv,
+  buildSeasonMonthRanges,
+  enumerateMonthRange,
+  isIsoMonth,
+} from "@/lib/director-season-totals";
+import {
+  listMonthlyBookingTotals,
+  listSeasonMonthTotals,
+  listSeasonTotalSnapshots,
+} from "@/lib/director-season-totals-db";
 
 /**
- * GET /api/members/caretaker/admin/season-totals-export?campSlug=&seasonFrom=&seasonTo=
- * CSV of saved Season Totals snapshots for weekly trend analysis.
+ * GET /api/members/caretaker/admin/season-totals-export
+ * CSV of the full director report: season totals trend, new bookings by month, and season by month.
  */
 export async function GET(request: NextRequest) {
   const access = await getCaretakerAccess();
@@ -20,9 +29,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Database not available" }, { status: 503 });
   }
 
-  const campSlug = request.nextUrl.searchParams.get("campSlug")?.trim() ?? "";
-  const seasonFrom = request.nextUrl.searchParams.get("seasonFrom")?.trim() ?? "";
-  const seasonTo = request.nextUrl.searchParams.get("seasonTo")?.trim() ?? "";
+  const params = request.nextUrl.searchParams;
+  const campSlug = params.get("campSlug")?.trim() ?? "";
+  const seasonFrom = params.get("seasonFrom")?.trim() ?? "";
+  const seasonTo = params.get("seasonTo")?.trim() ?? "";
+  const seasonLabel = params.get("seasonLabel")?.trim() ?? "";
+  const bookingFrom = params.get("bookingFrom")?.trim() ?? "";
+  const bookingTo = params.get("bookingTo")?.trim() ?? "";
 
   if (!campSlug || !getValidCampSlugs().includes(campSlug)) {
     return NextResponse.json({ error: "Valid campSlug required" }, { status: 400 });
@@ -37,10 +50,40 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const bookingMonths = enumerateMonthRange(bookingFrom, bookingTo);
+  const hasBookingRange =
+    isIsoMonth(bookingFrom) &&
+    isIsoMonth(bookingTo) &&
+    bookingMonths.length > 0 &&
+    bookingMonths.length <= 24;
+  const seasonMonthCount = buildSeasonMonthRanges(seasonFrom, seasonTo).length;
+
   try {
-    const snapshots = await listSeasonTotalSnapshots({ campSlug, seasonFrom, seasonTo });
-    const csv = buildSeasonTotalsCsv(snapshots);
-    const filename = `ldma-season-totals-${campSlug}-${seasonFrom}-to-${seasonTo}.csv`;
+    const [snapshots, monthlyBookings, seasonMonths] = await Promise.all([
+      listSeasonTotalSnapshots({ campSlug, seasonFrom, seasonTo }),
+      hasBookingRange
+        ? listMonthlyBookingTotals({ campSlug, seasonFrom, seasonTo, bookingFrom, bookingTo })
+        : Promise.resolve([]),
+      seasonMonthCount > 0 && seasonMonthCount <= 24
+        ? listSeasonMonthTotals({ campSlug, seasonFrom, seasonTo })
+        : Promise.resolve([]),
+    ]);
+
+    const campName =
+      directoryCamps.find((camp) => camp.slug === campSlug)?.name ??
+      snapshots[0]?.campName ??
+      campSlug;
+
+    const csv = buildDirectorReportCsv({
+      campName,
+      seasonFrom,
+      seasonTo,
+      seasonLabel: seasonLabel || `${seasonFrom} – ${seasonTo}`,
+      snapshots,
+      monthlyBookings,
+      seasonMonths,
+    });
+    const filename = `ldma-director-report-${campSlug}-${seasonFrom}-to-${seasonTo}.csv`;
 
     return new NextResponse(csv, {
       status: 200,

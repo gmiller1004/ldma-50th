@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildSeasonMonthRanges,
+  buildDirectorReportCsv,
   buildSeasonTotalsCsv,
   collectedCentsForReservation,
   computeSeasonTotalsMetrics,
@@ -309,5 +310,55 @@ describe("CSV and display helpers", () => {
     assert.ok(lines[1]?.includes("2026-07-29"));
     assert.ok(lines[2]?.includes("2026-08-05"));
     assert.ok(lines[1]?.includes("6791.00"));
+  });
+
+  it("exports all three report sections in one CSV", () => {
+    const csv = buildDirectorReportCsv({
+      campName: "Stanton",
+      seasonFrom: "2026-10-01",
+      seasonTo: "2027-05-31",
+      seasonLabel: "October 1 – May 31",
+      snapshots: [
+        {
+          campSlug: "stanton-arizona",
+          campName: "Stanton",
+          seasonFrom: "2026-10-01",
+          seasonTo: "2027-05-31",
+          snapshotDate: "2026-08-05",
+          siteNightsBooked: 11220,
+          siteNightsAvailable: 37866,
+          totalSiteNights: 49086,
+          bookedPercent: 22.9,
+          availablePercent: 77.1,
+          revenueCollectedCents: 2098700,
+          revenueOwedCents: 14659400,
+          totalReservations: 82,
+          generatedAt: "2026-08-05T20:00:00.000Z",
+        },
+      ],
+      monthlyBookings: [
+        { month: "2026-07", label: "July-26", reservationCount: 17, siteNightsBooked: 1712 },
+        { month: "2026-08", label: "August-26", reservationCount: 9, siteNightsBooked: 674 },
+      ],
+      seasonMonths: [
+        {
+          month: "2026-10",
+          label: "Oct-26",
+          from: "2026-10-01",
+          to: "2026-10-31",
+          reservationCount: 41,
+          siteNightsBooked: 1204,
+          siteNightsAvailable: 4931,
+          totalSiteNights: 6135,
+        },
+      ],
+    });
+
+    assert.ok(csv.includes("1. SEASON TOTALS"));
+    assert.ok(csv.includes("2. CURRENT MONTH BOOKINGS"));
+    assert.ok(csv.includes("3. SEASON BY MONTH"));
+    assert.ok(csv.includes("Stanton,2026-07,17,1712"));
+    assert.ok(csv.includes("Stanton,Oct-26,2026-10-01,2026-10-31,41,1204,4931,6135"));
+    assert.ok(csv.includes("20987.00"));
   });
 });

@@ -25,6 +25,24 @@ export const SEASON_TOTALS_CSV_HEADERS = [
   "GENERATED AT",
 ] as const;
 
+export const MONTHLY_BOOKINGS_CSV_HEADERS = [
+  "CAMP",
+  "BOOKING MONTH",
+  "RESERVATIONS - NEW",
+  "SITE NIGHTS BOOKED",
+] as const;
+
+export const SEASON_MONTHS_CSV_HEADERS = [
+  "CAMP",
+  "MONTH",
+  "MONTH FROM",
+  "MONTH TO",
+  "RESERVATIONS",
+  "SITE NIGHTS BOOKED",
+  "SITE NIGHTS AVAILABLE",
+  "TOTAL SITE NIGHTS",
+] as const;
+
 export type SeasonRange = {
   from: string;
   to: string;
@@ -419,6 +437,84 @@ export function buildSeasonTotalsCsv(
     );
   }
   return lines.join("\n") + (lines.length ? "\n" : "");
+}
+
+export function buildMonthlyBookingsCsvRows(input: {
+  campName: string;
+  totals: MonthlyBookingTotal[];
+}): string[] {
+  return input.totals.map((total) =>
+    [
+      escapeCsvCell(input.campName),
+      total.month,
+      String(total.reservationCount),
+      String(total.siteNightsBooked),
+    ].join(",")
+  );
+}
+
+export function buildSeasonMonthsCsvRows(input: {
+  campName: string;
+  totals: SeasonMonthTotal[];
+}): string[] {
+  return input.totals.map((total) =>
+    [
+      escapeCsvCell(input.campName),
+      escapeCsvCell(total.label),
+      total.from,
+      total.to,
+      String(total.reservationCount),
+      String(total.siteNightsBooked),
+      String(total.siteNightsAvailable),
+      String(total.totalSiteNights),
+    ].join(",")
+  );
+}
+
+/** Full director report: all three reporting sections in one CSV. */
+export function buildDirectorReportCsv(input: {
+  campName: string;
+  seasonFrom: string;
+  seasonTo: string;
+  seasonLabel: string;
+  snapshots: SeasonTotalsSnapshotRow[];
+  monthlyBookings: MonthlyBookingTotal[];
+  seasonMonths: SeasonMonthTotal[];
+}): string {
+  const lines: string[] = [];
+
+  lines.push(`${escapeCsvCell(`${input.campName} Season ${input.seasonLabel}`)}`);
+  lines.push(`Season range,${input.seasonFrom},${input.seasonTo}`);
+  lines.push("");
+
+  lines.push("1. SEASON TOTALS");
+  lines.push(SEASON_TOTALS_CSV_HEADERS.join(","));
+  const seasonTotalsCsv = buildSeasonTotalsCsv(input.snapshots, { includeHeader: false });
+  if (seasonTotalsCsv.trim().length > 0) {
+    lines.push(seasonTotalsCsv.trimEnd());
+  }
+  lines.push("");
+
+  lines.push("2. CURRENT MONTH BOOKINGS");
+  lines.push(MONTHLY_BOOKINGS_CSV_HEADERS.join(","));
+  lines.push(
+    ...buildMonthlyBookingsCsvRows({
+      campName: input.campName,
+      totals: input.monthlyBookings,
+    })
+  );
+  lines.push("");
+
+  lines.push("3. SEASON BY MONTH");
+  lines.push(SEASON_MONTHS_CSV_HEADERS.join(","));
+  lines.push(
+    ...buildSeasonMonthsCsvRows({
+      campName: input.campName,
+      totals: input.seasonMonths,
+    })
+  );
+
+  return lines.join("\n") + "\n";
 }
 
 export function seasonTitle(campName: string, season: Pick<SeasonRange, "from" | "to" | "label">): string {

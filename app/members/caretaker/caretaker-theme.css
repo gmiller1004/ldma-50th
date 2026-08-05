@@ -168,3 +168,35 @@
   color: var(--ct-text);
   border-radius: 0.5rem;
 }
+
+/*
+ * Date/month inputs in the portal. The native indicator is a dark glyph that
+ * disappears on the dark surface, and Safari renders no indicator at all, so we
+ * suppress it and pair the input with our own calendar trigger button.
+ */
+.ct-date-input {
+  color-scheme: dark;
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 2.375rem;
+}
+
+[data-caretaker-theme="light"] .caretaker-themed .ct-date-input {
+  color-scheme: light;
+}
+
+.ct-date-input::-webkit-calendar-picker-indicator {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+/* Safari centers the value and clips it without these. */
+.ct-date-input::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+
+.ct-date-input::-webkit-datetime-edit {
+  padding: 0;
+}

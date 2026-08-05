@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, Download, Loader2, RefreshCw, Trash2, X } from "lucide-react";
 import { directoryCamps } from "@/lib/directory-camps";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { campHasSeasonalClosure } from "@/lib/camp-seasons";
@@ -49,6 +49,62 @@ function previousMonth(isoMonth: string): string {
 
 function formatCount(n: number): string {
   return n.toLocaleString("en-US");
+}
+
+/**
+ * Date/month input with an explicit calendar trigger. The native indicator is
+ * hidden in CSS because it is invisible on the dark portal and absent in Safari.
+ */
+function PortalDateField({
+  type,
+  value,
+  onChange,
+  label,
+  className = "",
+}: {
+  type: "date" | "month";
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  className?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function openPicker() {
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    const withPicker = input as HTMLInputElement & { showPicker?: () => void };
+    if (typeof withPicker.showPicker === "function") {
+      try {
+        withPicker.showPicker();
+      } catch {
+        // Older Safari throws when the picker is not user-activated; focus is enough.
+      }
+    }
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      <input
+        ref={inputRef}
+        type={type}
+        value={value}
+        aria-label={label}
+        onChange={(event) => onChange(event.target.value)}
+        className="ct-date-input w-full rounded-md border border-[#d4af37]/25 bg-[#0f0a06] py-2 pl-3 pr-9 text-sm text-[#e8e0d5]"
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={`Open ${label} calendar`}
+        onClick={openPicker}
+        className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-[#d4af37] hover:text-[#f0d48f]"
+      >
+        <CalendarDays className="h-4 w-4" />
+      </button>
+    </div>
+  );
 }
 
 function formatPct(n: number): string {
@@ -118,6 +174,30 @@ export function DirectorReportingSection() {
   const [seasonMonths, setSeasonMonths] = useState<SeasonMonthTotal[]>([]);
   const [seasonMonthsLoading, setSeasonMonthsLoading] = useState(false);
   const [seasonMonthsError, setSeasonMonthsError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const seasonKey = `${campSlug}|${seasonFrom}|${seasonTo}`;
+  const bookingKey = `${seasonKey}|${bookingFrom}|${bookingTo}`;
+  const activeSeasonKey = useRef(seasonKey);
+  const activeBookingKey = useRef(bookingKey);
+
+  // Clear the grids the moment the selection changes so a slow fetch never
+  // leaves the previous camp/season columns stacked next to the new ones.
+  useEffect(() => {
+    activeSeasonKey.current = seasonKey;
+    setSnapshots([]);
+    setSeasonMonths([]);
+    setLastPulled(null);
+    setError(null);
+    setSeasonMonthsError(null);
+    setExportError(null);
+  }, [seasonKey]);
+
+  useEffect(() => {
+    activeBookingKey.current = bookingKey;
+    setMonthlyBookings([]);
+    setMonthlyError(null);
+  }, [bookingKey]);
 
   const seasonOptions = useMemo(() => {
     if (!campHasSeasonalClosure(campSlug)) return [] as SeasonRange[];
@@ -145,6 +225,7 @@ export function DirectorReportingSection() {
 
   const loadSnapshots = useCallback(async () => {
     if (!campSlug || !seasonFrom || !seasonTo) return;
+    const requestKey = `${campSlug}|${seasonFrom}|${seasonTo}`;
     setLoading(true);
     setError(null);
     try {
@@ -157,8 +238,10 @@ export function DirectorReportingSection() {
         throw new Error(typeof j.error === "string" ? j.error : res.statusText);
       }
       const data = (await res.json()) as { snapshots?: SnapshotRow[] };
+      if (activeSeasonKey.current !== requestKey) return;
       setSnapshots(data.snapshots ?? []);
     } catch (e) {
+      if (activeSeasonKey.current !== requestKey) return;
       setSnapshots([]);
       setError(e instanceof Error ? e.message : "Failed to load snapshots");
     } finally {
@@ -172,6 +255,7 @@ export function DirectorReportingSection() {
 
   const loadMonthlyBookings = useCallback(async () => {
     if (!campSlug || !seasonFrom || !seasonTo || !bookingFrom || !bookingTo) return;
+    const requestKey = `${campSlug}|${seasonFrom}|${seasonTo}|${bookingFrom}|${bookingTo}`;
     setMonthlyLoading(true);
     setMonthlyError(null);
     try {
@@ -190,8 +274,10 @@ export function DirectorReportingSection() {
         throw new Error(typeof body.error === "string" ? body.error : res.statusText);
       }
       const data = (await res.json()) as { totals?: MonthlyBookingTotal[] };
+      if (activeBookingKey.current !== requestKey) return;
       setMonthlyBookings(data.totals ?? []);
     } catch (loadError) {
+      if (activeBookingKey.current !== requestKey) return;
       setMonthlyBookings([]);
       setMonthlyError(
         loadError instanceof Error ? loadError.message : "Failed to load monthly bookings"
@@ -207,6 +293,7 @@ export function DirectorReportingSection() {
 
   const loadSeasonMonths = useCallback(async () => {
     if (!campSlug || !seasonFrom || !seasonTo) return;
+    const requestKey = `${campSlug}|${seasonFrom}|${seasonTo}`;
     setSeasonMonthsLoading(true);
     setSeasonMonthsError(null);
     try {
@@ -219,8 +306,10 @@ export function DirectorReportingSection() {
         throw new Error(typeof body.error === "string" ? body.error : res.statusText);
       }
       const data = (await res.json()) as { totals?: SeasonMonthTotal[] };
+      if (activeSeasonKey.current !== requestKey) return;
       setSeasonMonths(data.totals ?? []);
     } catch (loadError) {
+      if (activeSeasonKey.current !== requestKey) return;
       setSeasonMonths([]);
       setSeasonMonthsError(
         loadError instanceof Error ? loadError.message : "Failed to load season months"
@@ -280,11 +369,52 @@ export function DirectorReportingSection() {
     }
   }
 
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadSnapshots(), loadMonthlyBookings(), loadSeasonMonths()]);
+  }, [loadSnapshots, loadMonthlyBookings, loadSeasonMonths]);
+
+  async function handleClearSnapshots(snapshotDate: string | null) {
+    if (
+      snapshotDate === null &&
+      typeof window !== "undefined" &&
+      !window.confirm("Clear every saved snapshot for this season?")
+    ) {
+      return;
+    }
+    setDeleting(snapshotDate ?? "all");
+    setError(null);
+    try {
+      const params = new URLSearchParams({ campSlug, seasonFrom, seasonTo });
+      if (snapshotDate) params.set("snapshotDate", snapshotDate);
+      const res = await fetch(`/api/members/caretaker/admin/season-totals?${params}`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(typeof body.error === "string" ? body.error : res.statusText);
+      }
+      setLastPulled(null);
+      await loadSnapshots();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to clear snapshots");
+    } finally {
+      setDeleting(null);
+    }
+  }
+
   async function handleExportCsv() {
     setExporting(true);
     setExportError(null);
     try {
-      const params = new URLSearchParams({ campSlug, seasonFrom, seasonTo });
+      const params = new URLSearchParams({
+        campSlug,
+        seasonFrom,
+        seasonTo,
+        seasonLabel,
+        bookingFrom,
+        bookingTo,
+      });
       const res = await fetch(`/api/members/caretaker/admin/season-totals-export?${params}`, {
         cache: "no-store",
       });
@@ -296,7 +426,7 @@ export function DirectorReportingSection() {
       const cd = res.headers.get("Content-Disposition");
       const match = cd?.match(/filename="([^"]+)"/);
       const filename =
-        match?.[1] ?? `ldma-season-totals-${campSlug}-${seasonFrom}-to-${seasonTo}.csv`;
+        match?.[1] ?? `ldma-director-report-${campSlug}-${seasonFrom}-to-${seasonTo}.csv`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -304,7 +434,8 @@ export function DirectorReportingSection() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      // Safari cancels the download if the object URL is revoked synchronously.
+      window.setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (e) {
       setExportError(e instanceof Error ? e.message : "Download failed");
     } finally {
@@ -313,6 +444,7 @@ export function DirectorReportingSection() {
   }
 
   const seasonSelectValue = `${seasonFrom}|${seasonTo}`;
+  const anyLoading = loading || monthlyLoading || seasonMonthsLoading;
 
   return (
     <div className="space-y-8">
@@ -326,15 +458,26 @@ export function DirectorReportingSection() {
               create/cancel and payment dates; stay edits after the as-of date are best-effort.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void handleExportCsv()}
-            disabled={exporting || snapshots.length === 0}
-            className="inline-flex items-center gap-2 rounded-md border border-[#d4af37]/35 bg-[#1a140c] px-3 py-2 text-sm text-[#f0d48f] hover:bg-[#241c12] disabled:opacity-50"
-          >
-            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            Export CSV
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void refreshAll()}
+              disabled={anyLoading}
+              className="inline-flex items-center gap-2 rounded-md border border-[#d4af37]/35 bg-[#1a140c] px-3 py-2 text-sm text-[#f0d48f] hover:bg-[#241c12] disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${anyLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleExportCsv()}
+              disabled={exporting}
+              className="inline-flex items-center gap-2 rounded-md border border-[#d4af37]/35 bg-[#1a140c] px-3 py-2 text-sm text-[#f0d48f] hover:bg-[#241c12] disabled:opacity-50"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Export CSV
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -372,37 +515,39 @@ export function DirectorReportingSection() {
               </select>
             ) : (
               <div className="flex gap-2">
-                <input
+                <PortalDateField
                   type="date"
+                  label="Season start"
                   value={seasonFrom}
-                  onChange={(e) => {
-                    setSeasonFrom(e.target.value);
-                    setSeasonLabel(`${e.target.value} – ${seasonTo}`);
+                  onChange={(next) => {
+                    setSeasonFrom(next);
+                    setSeasonLabel(`${next} – ${seasonTo}`);
                   }}
-                  className="w-full rounded-md border border-[#d4af37]/25 bg-[#0f0a06] px-2 py-2 text-sm text-[#e8e0d5]"
+                  className="w-full"
                 />
-                <input
+                <PortalDateField
                   type="date"
+                  label="Season end"
                   value={seasonTo}
-                  onChange={(e) => {
-                    setSeasonTo(e.target.value);
-                    setSeasonLabel(`${seasonFrom} – ${e.target.value}`);
+                  onChange={(next) => {
+                    setSeasonTo(next);
+                    setSeasonLabel(`${seasonFrom} – ${next}`);
                   }}
-                  className="w-full rounded-md border border-[#d4af37]/25 bg-[#0f0a06] px-2 py-2 text-sm text-[#e8e0d5]"
+                  className="w-full"
                 />
               </div>
             )}
           </label>
 
-          <label className="block text-xs text-[#e8e0d5]/60 space-y-1">
+          <div className="block text-xs text-[#e8e0d5]/60 space-y-1">
             <span>As of (report pull date)</span>
-            <input
+            <PortalDateField
               type="date"
+              label="As of (report pull date)"
               value={asOfDate}
-              onChange={(e) => setAsOfDate(e.target.value)}
-              className="w-full rounded-md border border-[#d4af37]/25 bg-[#0f0a06] px-3 py-2 text-sm text-[#e8e0d5]"
+              onChange={setAsOfDate}
             />
-          </label>
+          </div>
 
           <div className="flex items-end">
             <button
@@ -466,6 +611,23 @@ export function DirectorReportingSection() {
       )}
 
       <section className="rounded-lg border border-[#d4af37]/25 overflow-hidden">
+        {snapshots.length > 0 ? (
+          <div className="flex justify-end border-b border-[#d4af37]/15 bg-[#0f0a06]/40 px-3 py-2">
+            <button
+              type="button"
+              onClick={() => void handleClearSnapshots(null)}
+              disabled={deleting !== null}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[#d4af37]/25 px-2 py-1 text-xs text-[#e8e0d5]/70 hover:border-red-400/50 hover:text-red-300 disabled:opacity-50"
+            >
+              {deleting === "all" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+              Clear all snapshots
+            </button>
+          </div>
+        ) : null}
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
@@ -478,7 +640,22 @@ export function DirectorReportingSection() {
                     key={s.id}
                     className="px-3 py-3 text-right font-semibold text-[#f0d48f] whitespace-nowrap"
                   >
-                    {formatSnapshotColumnDate(s.snapshotDate)}
+                    <span className="inline-flex items-center gap-1.5">
+                      {formatSnapshotColumnDate(s.snapshotDate)}
+                      <button
+                        type="button"
+                        onClick={() => void handleClearSnapshots(s.snapshotDate)}
+                        disabled={deleting !== null}
+                        aria-label={`Remove ${formatSnapshotColumnDate(s.snapshotDate)} snapshot`}
+                        className="rounded text-[#e8e0d5]/40 hover:text-red-300 disabled:opacity-50"
+                      >
+                        {deleting === s.snapshotDate ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </span>
                   </th>
                 ))}
                 {snapshots.length === 0 ? (
@@ -522,24 +699,26 @@ export function DirectorReportingSection() {
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <label className="block text-xs text-[#e8e0d5]/60 space-y-1">
+            <div className="block text-xs text-[#e8e0d5]/60 space-y-1">
               <span>From month</span>
-              <input
+              <PortalDateField
                 type="month"
+                label="From month"
                 value={bookingFrom}
-                onChange={(event) => setBookingFrom(event.target.value)}
-                className="rounded-md border border-[#d4af37]/25 bg-[#0f0a06] px-3 py-2 text-sm text-[#e8e0d5]"
+                onChange={setBookingFrom}
+                className="w-40"
               />
-            </label>
-            <label className="block text-xs text-[#e8e0d5]/60 space-y-1">
+            </div>
+            <div className="block text-xs text-[#e8e0d5]/60 space-y-1">
               <span>To month</span>
-              <input
+              <PortalDateField
                 type="month"
+                label="To month"
                 value={bookingTo}
-                onChange={(event) => setBookingTo(event.target.value)}
-                className="rounded-md border border-[#d4af37]/25 bg-[#0f0a06] px-3 py-2 text-sm text-[#e8e0d5]"
+                onChange={setBookingTo}
+                className="w-40"
               />
-            </label>
+            </div>
           </div>
         </div>
 
