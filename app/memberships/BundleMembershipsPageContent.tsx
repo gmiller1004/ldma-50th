@@ -10,6 +10,7 @@ import { useCart } from "@/context/CartContext";
 import { trackAddToCart } from "@/lib/analytics";
 import { MEMBERSHIP_METRICS, trackMembershipMetricOnsite } from "@/lib/klaviyo-membership-browser";
 import { CustomizeMembershipButton } from "./CustomizeMembershipButton";
+import { BundleOfferCountdown } from "./BundleOfferCountdown";
 
 const BUNDLE_CONTENT: Record<
   string,
@@ -239,6 +240,8 @@ export function BundleMembershipsPageContent() {
 
   return (
     <>
+      <BundleOfferCountdown />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
         <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Membership" }]} />
       </div>
