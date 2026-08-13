@@ -53,7 +53,7 @@ export function BundleOfferCountdown() {
   if (!remaining) {
     return (
       <div
-        className="border-b border-[#d4af37]/25 bg-[#241c12]"
+        className="mt-4 border-y border-[#d4af37]/25 bg-[#241c12]"
         aria-hidden
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 min-h-[4.5rem]" />
@@ -64,7 +64,7 @@ export function BundleOfferCountdown() {
   if (remaining.expired) {
     return (
       <div
-        className="border-b border-[#d4af37]/25 bg-[#241c12]"
+        className="mt-4 border-y border-[#d4af37]/25 bg-[#241c12]"
         role="status"
         aria-live="polite"
       >
@@ -86,7 +86,7 @@ export function BundleOfferCountdown() {
 
   return (
     <div
-      className="border-b border-[#d4af37]/25 bg-[#241c12]"
+      className="mt-4 border-y border-[#d4af37]/25 bg-[#241c12]"
       role="timer"
       aria-live="polite"
       aria-label={`LDMA bundle offers expire in ${remaining.days} days, ${remaining.hours} hours, ${remaining.minutes} minutes`}

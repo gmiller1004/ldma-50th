@@ -240,11 +240,11 @@ export function BundleMembershipsPageContent() {
 
   return (
     <>
-      <BundleOfferCountdown />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
         <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Membership" }]} />
       </div>
+
+      <BundleOfferCountdown />
 
       <section className="py-14 md:py-18">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
