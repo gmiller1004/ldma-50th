@@ -16,6 +16,7 @@ import {
   getDay,
 } from "date-fns";
 import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerAllowsCashExistingReservationPayment, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
+import { isCompleteDateOnly, todayDateOnlyLocal } from "@/lib/reservation-calendar-range";
 import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
 import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
 import { countNights } from "@/lib/reservation-dates";
@@ -507,7 +508,8 @@ export function CaretakerPortalContent({
     isOverdue: boolean;
   }>>([]);
   const [resViewMode, setResViewMode] = useState<"list" | "calendar">("list");
-  const [resCalendarStart, setResCalendarStart] = useState(() => new Date().toISOString().slice(0, 10));
+  const [resCalendarStart, setResCalendarStart] = useState(() => todayDateOnlyLocal());
+  const [resCalendarStartDraft, setResCalendarStartDraft] = useState(resCalendarStart);
   const [archivedReservationsExpanded, setArchivedReservationsExpanded] = useState(false);
   const [activeResSearch, setActiveResSearch] = useState("");
   const [activeResFilter, setActiveResFilter] = useState<ReservationListFilterKey>("all");
@@ -2375,8 +2377,18 @@ export function CaretakerPortalContent({
                 <label className="text-[#e8e0d5]/80 text-sm">Start date:</label>
                 <input
                   type="date"
-                  value={resCalendarStart}
-                  onChange={(e) => setResCalendarStart(e.target.value.slice(0, 10))}
+                  value={resCalendarStartDraft}
+                  onChange={(e) => {
+                    const next = e.target.value.slice(0, 10);
+                    setResCalendarStartDraft(next);
+                    // Safari/Firefox emit "" while typing; only apply a complete day to the grid.
+                    if (isCompleteDateOnly(next)) setResCalendarStart(next);
+                  }}
+                  onBlur={() => {
+                    if (!isCompleteDateOnly(resCalendarStartDraft)) {
+                      setResCalendarStartDraft(resCalendarStart);
+                    }
+                  }}
                   className="px-2 py-1.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm"
                 />
                 <span className="text-[#e8e0d5]/50 text-sm">(45-day view)</span>

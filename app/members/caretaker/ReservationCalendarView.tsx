@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { format, addDays, parseISO, startOfDay } from "date-fns";
+import { format, addDays, parseISO, isValid } from "date-fns";
+import { resolveCalendarRangeStart } from "@/lib/reservation-calendar-range";
 
 export type CalendarReservation = {
   id: string;
@@ -43,9 +44,11 @@ function buildSegments(
     .filter((r) => r.siteId === siteId)
     .filter((r) => {
       const out = parseISO(toDateOnly(r.checkOutDate));
+      const checkIn = parseISO(toDateOnly(r.checkInDate));
+      if (!isValid(out) || !isValid(checkIn)) return false;
       const start = rangeStart;
       const end = addDays(rangeStart, numDays);
-      return out > start && parseISO(toDateOnly(r.checkInDate)) < end;
+      return out > start && checkIn < end;
     })
     .sort((a, b) => toDateOnly(a.checkInDate).localeCompare(toDateOnly(b.checkInDate)));
 
@@ -68,6 +71,11 @@ function buildSegments(
         Math.floor((checkOut.getTime() - rangeStart.getTime()) / (24 * 60 * 60 * 1000)) - 1
       );
       const span = lastDay - day + 1;
+      if (!Number.isFinite(span) || span < 1) {
+        segments.push({ type: "empty", span: 1 });
+        day += 1;
+        continue;
+      }
       segments.push({ type: "reservation", reservation: overlapping, span });
       day = lastDay + 1;
     } else {
@@ -102,7 +110,7 @@ export function ReservationCalendarView({
   const [hoveredReservation, setHoveredReservation] = useState<CalendarReservation | null>(null);
   const [tooltipAnchor, setTooltipAnchor] = useState<{ x: number; y: number } | null>(null);
 
-  const rangeStart = useMemo(() => startOfDay(parseISO(startDate)), [startDate]);
+  const rangeStart = useMemo(() => resolveCalendarRangeStart(startDate), [startDate]);
   const dayColumns = useMemo(() => {
     const cols: { dateStr: string; day: number; month: string; isFirstOfMonth: boolean }[] = [];
     let lastMonth = "";
