@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { lookupMember } from "@/lib/salesforce";
+import { memberHasWebsiteAccess } from "@/lib/member-access";
 
 export async function POST(req: Request) {
   try {
@@ -24,23 +25,13 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!result.active) {
+    if (!memberHasWebsiteAccess(result)) {
       return NextResponse.json(
         {
           error: result.error || "Membership is not active",
           action: "call",
         },
         { status: 403 }
-      );
-    }
-
-    if (!result.email) {
-      return NextResponse.json(
-        {
-          error: result.error || "No email on file. Please call to update your contact information.",
-          action: "call",
-        },
-        { status: 400 }
       );
     }
 

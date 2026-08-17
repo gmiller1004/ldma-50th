@@ -8,6 +8,11 @@
  */
 
 import { normalizePhoneDigits } from "@/lib/member-contact-search";
+import {
+  applyMemberAccess,
+  contactIsActiveLdma,
+  pickSponsoringPrimary,
+} from "@/lib/member-access";
 
 export type MemberLookupResult = {
   valid: boolean;
@@ -54,6 +59,12 @@ export type MemberLookupResult = {
   membershipDuesOwed?: number | null;
   /** For caretaker lookup: membership balance (Membership_Balance__c). */
   membershipBalance?: number | null;
+  /** True for active LDMA members and named companions of an active LDMA member. */
+  hasMemberAccess?: boolean;
+  accessRole?: "primary" | "companion";
+  companionOfName?: string;
+  companionOfMemberNumber?: string;
+  companionOfContactId?: string;
   error?: string;
 };
 
@@ -105,19 +116,21 @@ function contactToMatch(c: Record<string, unknown>): MemberLookupMatch {
 function mapContactRecord(c: Record<string, unknown>): MemberLookupResult {
   const hasEmail = typeof c.Email === "string" && c.Email.length > 0;
   if (!hasEmail) {
-    return {
-      valid: true,
-      active: false,
-      contactId: c.Id as string,
-      error: "No email on file. Please call to update your contact information.",
-    };
+    return applyMemberAccess(
+      {
+        valid: true,
+        active: false,
+        contactId: c.Id as string,
+        error: "No email on file. Please call to update your contact information.",
+      },
+      "primary"
+    );
   }
 
   const membershipType = (c.Active_Membership_Type__c as string) || "";
   const membershipTypeText = (c.Active_Membership_Type_Text_Copy__c as string) || "";
   const isNewMember = c.Is_New_LDMA_Member__c === true;
-  const active =
-    membershipType === "LDMA" || membershipTypeText === "LDMA" || isNewMember;
+  const active = contactIsActiveLdma(c);
 
   const maintenanceExempt =
     String((c.Maintenance_Exempt__c as string) || "").toUpperCase() === "YES";
@@ -230,6 +243,35 @@ function mapContactRecord(c: Record<string, unknown>): MemberLookupResult {
   };
 }
 
+/**
+ * Map a Contact, then grant member-site access if they are active LDMA
+ * or named as Companion__c on an active LDMA primary.
+ */
+async function memberFromContactRecord(
+  record: Record<string, unknown>
+): Promise<MemberLookupResult> {
+  const mapped = mapContactRecord(record);
+  if (mapped.active) {
+    return applyMemberAccess(mapped, "primary");
+  }
+  if (!mapped.contactId) {
+    return applyMemberAccess(mapped, "primary");
+  }
+
+  const escaped = escapeSoqlString(mapped.contactId);
+  const primaries = await queryContactRecords(`Companion__c = '${escaped}'`, 10);
+  const sponsor = pickSponsoringPrimary(primaries);
+  if (!sponsor) {
+    return applyMemberAccess(mapped, "primary");
+  }
+
+  return applyMemberAccess(mapped, "companion", {
+    contactId: String((sponsor as Record<string, unknown>).Id ?? mapped.contactId),
+    memberNumber: memberNumberFromContact(sponsor as Record<string, unknown>),
+    name: displayNameFromContact(sponsor as Record<string, unknown>),
+  });
+}
+
 async function queryContactRecords(whereClause: string, limit: number): Promise<Record<string, unknown>[]> {
   const client = await getSalesforceRestClient();
   if (!client) return [];
@@ -286,7 +328,7 @@ export async function lookupMember(memberNumber: string): Promise<MemberLookupRe
         error: "Member number not found",
       };
     }
-    return mapContactRecord(records[0]);
+    return memberFromContactRecord(records[0]);
   } catch (e) {
     console.error("Salesforce lookup error:", e);
     return {
@@ -313,7 +355,7 @@ export async function lookupMemberByContactId(contactId: string): Promise<Careta
     if (records.length === 0) {
       return { status: "not_found", error: "Member not found" };
     }
-    const member = mapContactRecord(records[0]);
+    const member = await memberFromContactRecord(records[0]);
     if (!member.valid) {
       return { status: "not_found", error: member.error ?? "Member not found" };
     }
@@ -381,7 +423,7 @@ export async function searchMembersForCaretaker(input: {
       };
     }
 
-    const member = mapContactRecord(records[0]);
+    const member = await memberFromContactRecord(records[0]);
     if (!member.valid) {
       return { status: "not_found", error: member.error ?? "Member not found" };
     }
@@ -637,30 +679,33 @@ function mockLookup(memberNumber: string): MemberLookupResult {
       error: "Member number not found",
     };
   }
-  return {
-    valid: true,
-    active: true,
-    contactId: "mock-contact-id",
-    email: `member${memberNumber}@example.com`,
-    phone: "555-123-4567",
-    firstName: "Dev",
-    lastName: "Member",
-    otherStreet: "123 Gold St",
-    otherCity: "Phoenix",
-    otherState: "AZ",
-    otherPostalCode: "85001",
-    duesOwed: 75,
-    maintenancePaidThru: "2025-12-31",
-    showMaintenance: true,
-    hideMaintenance: false,
-    isOnAutoPay: false,
-    companionTransferable: false,
-    companion: undefined,
-    isLdmaAdmin: true,
-    isCaretaker: true,
-    isCaretakerAdmin: false,
-    caretakerAtCamp: "Stanton",
-    membershipDuesOwed: 0,
-    membershipBalance: 0,
-  };
+  return applyMemberAccess(
+    {
+      valid: true,
+      active: true,
+      contactId: "mock-contact-id",
+      email: `member${memberNumber}@example.com`,
+      phone: "555-123-4567",
+      firstName: "Dev",
+      lastName: "Member",
+      otherStreet: "123 Gold St",
+      otherCity: "Phoenix",
+      otherState: "AZ",
+      otherPostalCode: "85001",
+      duesOwed: 75,
+      maintenancePaidThru: "2025-12-31",
+      showMaintenance: true,
+      hideMaintenance: false,
+      isOnAutoPay: false,
+      companionTransferable: false,
+      companion: undefined,
+      isLdmaAdmin: true,
+      isCaretaker: true,
+      isCaretakerAdmin: false,
+      caretakerAtCamp: "Stanton",
+      membershipDuesOwed: 0,
+      membershipBalance: 0,
+    },
+    "primary"
+  );
 }

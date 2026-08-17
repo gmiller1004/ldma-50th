@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifySessionToken } from "@/lib/session";
 import { lookupMember, recordLegacyOfferRequest } from "@/lib/salesforce";
+import { memberCanUseLegacyOffers } from "@/lib/member-access";
 
 export async function POST() {
   try {
@@ -19,6 +20,12 @@ export async function POST() {
     const member = await lookupMember(session.memberNumber);
     if (!member.valid || !member.contactId) {
       return NextResponse.json({ error: "Member not found" }, { status: 401 });
+    }
+    if (!memberCanUseLegacyOffers(member)) {
+      return NextResponse.json(
+        { error: "Legacy offers are available on the primary membership only." },
+        { status: 403 }
+      );
     }
 
     const result = await recordLegacyOfferRequest(member.contactId);

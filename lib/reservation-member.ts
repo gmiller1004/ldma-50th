@@ -1,6 +1,8 @@
 import type { MemberLookupResult } from "@/lib/salesforce";
 
-/** Active LDMA member (including Is_New_LDMA_Member__c) eligible for member rates and stays >10 nights. */
+/** Active LDMA member or named companion of an active LDMA member. */
 export function memberQualifiesForCampBooking(member: MemberLookupResult): boolean {
-  return member.valid === true && member.active === true;
+  if (member.valid !== true) return false;
+  if (member.hasMemberAccess === true) return true;
+  return member.active === true && member.accessRole !== "companion";
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { lookupMember } from "@/lib/salesforce";
+import { memberHasWebsiteAccess } from "@/lib/member-access";
 import { storeAuthCode } from "@/lib/redis";
 import { sendLoginCode } from "@/lib/sendgrid";
 
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
 
     const result = await lookupMember(memberNumber);
 
-    if (!result.valid || !result.active || !result.email) {
+    if (!memberHasWebsiteAccess(result)) {
       return NextResponse.json(
         {
           error:

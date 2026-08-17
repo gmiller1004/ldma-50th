@@ -116,6 +116,9 @@ type Profile = {
   legacyOfferIsTransferable?: boolean;
   legacyOfferIsCompanion?: boolean;
   legacyOfferIsPrePay?: boolean;
+  accessRole?: "primary" | "companion";
+  companionOfName?: string | null;
+  companionOfMemberNumber?: string | null;
 };
 
 export function ProfileContent() {
@@ -179,10 +182,14 @@ export function ProfileContent() {
   }, []);
 
   useEffect(() => {
-    if (profile?.authenticated && profile.companionTransferable === false) {
+    if (
+      profile?.authenticated &&
+      profile.accessRole !== "companion" &&
+      profile.companionTransferable === false
+    ) {
       getCompanionAddOnProduct().then(setCompanionProduct);
     }
-  }, [profile?.authenticated, profile?.companionTransferable]);
+  }, [profile?.authenticated, profile?.accessRole, profile?.companionTransferable]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -346,8 +353,10 @@ export function ProfileContent() {
   }
 
   const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(" ") || "—";
-  const showCompanionBanner = SHOW_COMPANION_ADD_ON_CARD && profile.companionTransferable === false;
-  const showCompanionSection = profile.companionTransferable === true;
+  const isCompanionLogin = profile.accessRole === "companion";
+  const showCompanionBanner =
+    SHOW_COMPANION_ADD_ON_CARD && !isCompanionLogin && profile.companionTransferable === false;
+  const showCompanionSection = !isCompanionLogin && profile.companionTransferable === true;
   const legacyOfferRequested = Boolean(profile.legacyOfferRequestDate);
   const legacyOfferCompleted =
     typeof profile.legacyOfferStatus === "string" &&
@@ -406,7 +415,7 @@ export function ProfileContent() {
         <PurchaseHistoryTab />
       ) : (
       <>
-      {!legacyOfferCompleted && (
+      {!isCompanionLogin && !legacyOfferCompleted && (
       <div className="rounded-xl bg-[#0f3d1e]/40 border border-[#d4af37]/30 overflow-hidden">
         <div className="p-6">
           <h3 className="font-serif text-lg font-semibold text-[#f0d48f] flex items-center gap-2 mb-2">
@@ -548,6 +557,18 @@ export function ProfileContent() {
         </div>
       )}
 
+      {isCompanionLogin ? (
+        <div className="rounded-xl bg-[#0f3d1e]/40 border border-[#d4af37]/30 p-5">
+          <p className="text-[#f0d48f] font-semibold mb-1">Companion access</p>
+          <p className="text-sm text-[#e8e0d5]/80">
+            You can log in, use member pricing on events, book camps at member rates, and access
+            members-only pages. Maintenance dues and family-legacy add-ons stay on the primary
+            membership
+            {profile.companionOfName ? ` (${profile.companionOfName})` : ""}.
+          </p>
+        </div>
+      ) : null}
+
       <div className="flex flex-col sm:flex-row gap-6 items-start">
         <div className="relative group">
           <div className="w-24 h-24 rounded-full overflow-hidden bg-[#0f3d1e]/50 border-2 border-[#d4af37]/30 flex items-center justify-center shrink-0">
@@ -605,6 +626,19 @@ export function ProfileContent() {
             <dt className="text-sm text-[#e8e0d5]/60">Member number</dt>
             <dd className="font-medium text-[#e8e0d5]">{profile.memberNumber ?? "—"}</dd>
           </div>
+          {isCompanionLogin ? (
+            <div>
+              <dt className="text-sm text-[#e8e0d5]/60">Membership</dt>
+              <dd className="font-medium text-[#e8e0d5]">
+                Companion of {profile.companionOfName || "an LDMA member"}
+                {profile.companionOfMemberNumber ? (
+                  <span className="block text-sm font-normal text-[#e8e0d5]/70 mt-0.5">
+                    Primary member #{profile.companionOfMemberNumber}
+                  </span>
+                ) : null}
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-sm text-[#e8e0d5]/60">Email</dt>
             <dd className="font-medium text-[#e8e0d5]">{profile.email ?? "—"}</dd>

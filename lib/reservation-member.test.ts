@@ -18,8 +18,21 @@ describe("memberQualifiesForCampBooking", () => {
       memberQualifiesForCampBooking({
         valid: true,
         active: false,
+        hasMemberAccess: false,
       }),
       false
+    );
+  });
+
+  it("allows a named companion with member access", () => {
+    assert.equal(
+      memberQualifiesForCampBooking({
+        valid: true,
+        active: false,
+        hasMemberAccess: true,
+        accessRole: "companion",
+      }),
+      true
     );
   });
 });

@@ -48,6 +48,9 @@ function minimalMePayload(memberNumber: string) {
     isCaretakerAdmin: false,
     caretakerPortalMode: null,
     caretakerAtCamp: null,
+    accessRole: "primary",
+    companionOfName: null,
+    companionOfMemberNumber: null,
   };
 }
 
@@ -137,6 +140,9 @@ export async function GET() {
       caretakerAdminViewCamp: adminViewCampSlug ?? null,
       caretakerAdminViewCampName: adminViewCampName,
       caretakerAtCamp: member.caretakerAtCamp ?? null,
+      accessRole: member.accessRole ?? "primary",
+      companionOfName: member.companionOfName ?? null,
+      companionOfMemberNumber: member.companionOfMemberNumber ?? null,
     });
   } catch (e) {
     console.error("Me route: post-lookup failed", e);
