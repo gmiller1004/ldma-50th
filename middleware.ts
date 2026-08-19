@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  GPAA_MREF_COOKIE,
+  GPAA_MREF_QUERY_PARAM,
+  gpaaMrefCookieOptions,
+  sanitizeGpaaMref,
+} from "@/lib/gpaa-mref";
 
 // Paths that require member authentication
 const MEMBER_ONLY_PREFIXES = ["/directory"];
@@ -10,6 +16,17 @@ function requiresAuth(pathname: string): boolean {
   );
 }
 
+function withGpaaMrefCookie(request: NextRequest, response: NextResponse) {
+  const mref = sanitizeGpaaMref(request.nextUrl.searchParams.get(GPAA_MREF_QUERY_PARAM));
+  if (!mref) return response;
+  response.cookies.set(
+    GPAA_MREF_COOKIE,
+    mref,
+    gpaaMrefCookieOptions(request.nextUrl.hostname)
+  );
+  return response;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -18,28 +35,15 @@ export function middleware(request: NextRequest) {
     if (!sessionCookie?.value) {
       const loginUrl = new URL("/members/login", request.url);
       loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
+      return withGpaaMrefCookie(request, NextResponse.redirect(loginUrl));
     }
   }
 
-  return NextResponse.next();
+  return withGpaaMrefCookie(request, NextResponse.next());
 }
 
 export const config = {
   matcher: [
-    "/directory",
-    "/directory/:path*",
-    "/",
-    "/memberships",
-    "/memberships/:path*",
-    "/shop",
-    "/shop/:path*",
-    "/members",
-    "/members/:path*",
-    "/about-events",
-    "/events",
-    "/events/:path*",
-    "/customize",
-    "/customize/:path*",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|xml)$).*)",
   ],
 };

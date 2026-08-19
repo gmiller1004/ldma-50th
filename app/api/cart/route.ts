@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getCart } from "@/lib/shopify";
+import { syncGpaaReferralOnCart } from "@/app/actions/cart";
 
 const CART_ID_COOKIE = "shopify_cart_id";
 
@@ -13,6 +14,7 @@ export async function GET() {
   }
 
   try {
+    await syncGpaaReferralOnCart(cartId);
     const cart = await getCart(cartId);
     if (!cart) {
       return NextResponse.json({ count: 0, cart: null });

@@ -7,6 +7,7 @@ import {
   cartLinesUpdate,
   cartLinesRemove,
   cartNoteUpdate,
+  cartAttributesUpdate,
   getCart,
 } from "@/lib/shopify";
 import { cookies } from "next/headers";
@@ -19,6 +20,13 @@ import {
   MEMBERSHIP_QUOTE_EMAIL_COOKIE,
   syncMembershipCartToKlaviyo,
 } from "@/lib/klaviyo-membership-events";
+import {
+  GPAA_MREF_COOKIE,
+  GPAA_REFERRAL_ATTRIBUTE_KEY,
+  cartHasMembershipForReferral,
+  nextReferralCartAttributes,
+  sanitizeGpaaMref,
+} from "@/lib/gpaa-mref";
 
 const CART_ID_COOKIE = "shopify_cart_id";
 
@@ -28,6 +36,37 @@ function getPendingDiscountCartOptions(cookieStore: CookieStore) {
   const code = sanitizeDiscountCode(cookieStore.get(PENDING_DISCOUNT_COOKIE)?.value ?? undefined);
   if (!code) return undefined;
   return { discountCodes: [code] };
+}
+
+function getGpaaReferralCreateAttributes(cookieStore: CookieStore) {
+  const code = sanitizeGpaaMref(cookieStore.get(GPAA_MREF_COOKIE)?.value);
+  if (!code) return undefined;
+  return [{ key: GPAA_REFERRAL_ATTRIBUTE_KEY, value: code }];
+}
+
+/** Stamp or clear referral_code from cart attributes based on membership lines + cookie. */
+export async function syncGpaaReferralOnCart(cartId: string | undefined) {
+  if (!cartId) return { checkoutUrl: undefined as string | undefined };
+  try {
+    const cookieStore = await cookies();
+    const code = sanitizeGpaaMref(cookieStore.get(GPAA_MREF_COOKIE)?.value);
+    const cart = await getCart(cartId);
+    if (!cart) return { checkoutUrl: undefined };
+    const hasMembership = cartHasMembershipForReferral(cart.lines.edges.map((e) => e.node));
+    const { attributes, changed } = nextReferralCartAttributes(cart.attributes, code, hasMembership);
+    if (!changed) return { checkoutUrl: cart.checkoutUrl };
+    return await cartAttributesUpdate(cartId, attributes);
+  } catch (e) {
+    console.warn("[gpaa-mref] cart attribute sync failed:", e);
+    return { checkoutUrl: undefined as string | undefined };
+  }
+}
+
+/** Refresh referral_code immediately before Shopify checkout. */
+export async function syncGpaaReferralForCheckout() {
+  const cookieStore = await cookies();
+  const cartId = cookieStore.get(CART_ID_COOKIE)?.value;
+  return syncGpaaReferralOnCart(cartId);
 }
 
 function clearPendingDiscountCookie(cookieStore: CookieStore) {
@@ -130,6 +169,7 @@ export async function addToCart(
   }
 
   await finalizePendingDiscountAfterCartChange(cookieStore, cartId, discountAppliedOnCartCreate);
+  await syncGpaaReferralOnCart(cartId);
   await maybeSyncMembershipCartToKlaviyo(cartId);
   return { checkoutUrl };
 }
@@ -151,6 +191,7 @@ export async function addMembershipToCart(variantIds: string[]) {
       checkoutUrl = result.checkoutUrl;
       cartId = existingCartId;
       await finalizePendingDiscountAfterCartChange(cookieStore, cartId, false);
+      await syncGpaaReferralOnCart(cartId);
       await maybeSyncMembershipCartToKlaviyo(cartId);
       return { checkoutUrl };
     }
@@ -158,7 +199,11 @@ export async function addMembershipToCart(variantIds: string[]) {
     existingCartId = undefined;
   }
 
-  const result = await createCartAndAddLines(lines, pendingOpts);
+  const referralAttributes = getGpaaReferralCreateAttributes(cookieStore);
+  const result = await createCartAndAddLines(lines, {
+    ...pendingOpts,
+    ...(referralAttributes ? { attributes: referralAttributes } : {}),
+  });
   checkoutUrl = result.checkoutUrl;
   cartId = result.cartId;
   const discountAppliedOnCartCreate = Boolean(pendingOpts?.discountCodes?.length);
@@ -170,6 +215,7 @@ export async function addMembershipToCart(variantIds: string[]) {
     });
   }
   await finalizePendingDiscountAfterCartChange(cookieStore, cartId, discountAppliedOnCartCreate);
+  await syncGpaaReferralOnCart(cartId);
   await maybeSyncMembershipCartToKlaviyo(cartId);
   return { checkoutUrl };
 }
@@ -188,6 +234,7 @@ export async function updateCartLineQuantity(lineId: string, quantity: number) {
   if (!cartId) throw new Error("No cart");
   if (quantity < 1) throw new Error("Quantity must be at least 1");
   await cartLinesUpdate(cartId, [{ id: lineId, quantity }]);
+  await syncGpaaReferralOnCart(cartId);
   await maybeSyncMembershipCartToKlaviyo(cartId);
 }
 
@@ -209,12 +256,14 @@ export async function removeCartLine(lineId: string) {
       .map((e) => e.node.id);
     if (membershipLineIds.length > 0) {
       await cartLinesRemove(cartId, membershipLineIds);
+      await syncGpaaReferralOnCart(cartId);
       await maybeSyncMembershipCartToKlaviyo(cartId);
       return;
     }
   }
 
   await cartLinesRemove(cartId, [lineId]);
+  await syncGpaaReferralOnCart(cartId);
   await maybeSyncMembershipCartToKlaviyo(cartId);
 }
 
@@ -228,6 +277,7 @@ export async function removeCartLineByVariantId(variantId: string) {
   const line = cart.lines.edges.find((e) => e.node.merchandise.id === variantId)?.node;
   if (!line) return;
   await cartLinesRemove(cartId, [line.id]);
+  await syncGpaaReferralOnCart(cartId);
   await maybeSyncMembershipCartToKlaviyo(cartId);
 }
 
@@ -240,4 +290,5 @@ export async function clearCart() {
   if (!cart || !cart.lines.edges.length) return;
   const lineIds = cart.lines.edges.map((e) => e.node.id);
   await cartLinesRemove(cartId, lineIds);
+  await syncGpaaReferralOnCart(cartId);
 }

@@ -975,8 +975,11 @@ export async function createCartAndAddLine(
   return createCartAndAddLines([{ merchandiseId: variantId, sellingPlanId }]);
 }
 
+export type CartAttributeInput = { key: string; value: string };
+
 export type CreateCartOptions = {
   discountCodes?: string[];
+  attributes?: CartAttributeInput[];
 };
 
 export async function createCartAndAddLines(
@@ -991,9 +994,13 @@ export async function createCartAndAddLines(
   const input: {
     lines: typeof normalizedLines;
     discountCodes?: string[];
+    attributes?: CartAttributeInput[];
   } = { lines: normalizedLines };
   if (options?.discountCodes?.length) {
     input.discountCodes = options.discountCodes;
+  }
+  if (options?.attributes?.length) {
+    input.attributes = options.attributes;
   }
   const result = await shopifyFetch<{
     cartCreate: {
@@ -1124,6 +1131,7 @@ export type CartLine = {
       title: string;
       handle: string;
       featuredImage: { url: string } | null;
+      collections?: { edges: Array<{ node: { handle: string } }> };
     };
     title: string;
     price: { amount: string; currencyCode: string };
@@ -1137,6 +1145,7 @@ export type CartData = {
   checkoutUrl: string;
   totalQuantity: number;
   note?: string | null;
+  attributes?: Array<{ key: string; value: string }>;
   cost: { subtotalAmount: { amount: string; currencyCode: string } };
   lines: { edges: Array<{ node: CartLine }> };
 };
@@ -1150,6 +1159,7 @@ export async function getCart(cartId: string): Promise<CartData | null> {
           checkoutUrl
           totalQuantity
           note
+          attributes { key value }
           cost {
             subtotalAmount { amount currencyCode }
           }
@@ -1161,7 +1171,15 @@ export async function getCart(cartId: string): Promise<CartData | null> {
                 merchandise {
                   ... on ProductVariant {
                     id
-                    product { id title handle featuredImage { url } }
+                    product {
+                      id
+                      title
+                      handle
+                      featuredImage { url }
+                      collections(first: 20) {
+                        edges { node { handle } }
+                      }
+                    }
                     title
                     price { amount currencyCode }
                     compareAtPrice { amount currencyCode }
@@ -1177,6 +1195,37 @@ export async function getCart(cartId: string): Promise<CartData | null> {
     variables: { cartId },
   });
   return result?.cart ?? null;
+}
+
+export async function cartAttributesUpdate(cartId: string, attributes: CartAttributeInput[]) {
+  const result = await shopifyFetch<{
+    cartAttributesUpdate: {
+      cart: { checkoutUrl: string; attributes?: Array<{ key: string; value: string }> } | null;
+      userErrors: Array<{ message: string }>;
+    };
+  }>({
+    query: `
+      mutation cartAttributesUpdate($cartId: ID!, $attributes: [AttributeInput!]!) {
+        cartAttributesUpdate(cartId: $cartId, attributes: $attributes) {
+          cart {
+            id
+            checkoutUrl
+            attributes { key value }
+          }
+          userErrors { field message }
+        }
+      }
+    `,
+    variables: { cartId, attributes },
+  });
+  const { cart, userErrors } = result.cartAttributesUpdate;
+  if (userErrors?.length) {
+    throw new Error(userErrors[0].message);
+  }
+  if (!cart?.checkoutUrl) {
+    throw new Error("Failed to update cart attributes");
+  }
+  return { checkoutUrl: cart.checkoutUrl, attributes: cart.attributes ?? [] };
 }
 
 export async function cartNoteUpdate(cartId: string, note: string) {

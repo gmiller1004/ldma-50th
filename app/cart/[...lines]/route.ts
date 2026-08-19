@@ -8,6 +8,7 @@ import {
   pendingDiscountCookieOptions,
   sanitizeDiscountCode,
 } from "@/lib/pending-discount";
+import { syncGpaaReferralOnCart } from "@/app/actions/cart";
 
 type Params = Promise<{ lines: string[] }>;
 
@@ -68,12 +69,13 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
       cookieStore.delete(PENDING_DISCOUNT_COOKIE);
     }
 
+    const referral = await syncGpaaReferralOnCart(cartId);
     const skipCheckout = request.nextUrl.searchParams.get("checkout") === "0";
     if (skipCheckout) {
       return NextResponse.redirect(new URL("/shop", request.nextUrl));
     }
 
-    return NextResponse.redirect(checkoutUrl);
+    return NextResponse.redirect(referral.checkoutUrl || checkoutUrl);
   } catch (e) {
     console.error("[cart-permalink]", e);
     return NextResponse.redirect(new URL("/shop", request.nextUrl));

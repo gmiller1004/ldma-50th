@@ -5,7 +5,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Minus, Plus, Trash2, Loader2 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
-import { updateCartLineQuantity, removeCartLine, updateCartNote } from "@/app/actions/cart";
+import { updateCartLineQuantity, removeCartLine, updateCartNote, syncGpaaReferralForCheckout } from "@/app/actions/cart";
 import { trackBeginCheckout } from "@/lib/analytics";
 
 export function CartDrawer() {
@@ -57,8 +57,9 @@ export function CartDrawer() {
     setCheckoutPending(true);
     try {
       await updateCartNote(note.trim());
+      const referral = await syncGpaaReferralForCheckout();
       trackBeginCheckout();
-      window.location.href = cart.checkoutUrl;
+      window.location.href = referral.checkoutUrl || cart.checkoutUrl;
     } catch {
       setCheckoutPending(false);
     }
