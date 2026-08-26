@@ -3,13 +3,15 @@
  * and stamp Shopify cart attribute referral_code on membership carts only.
  */
 
+import { LDMA_AXIOM_LITE_BUNDLE_PRODUCT_ID } from "./membership-bundle-config";
+
 export const GPAA_MREF_COOKIE = "gpaa_mref";
 export const GPAA_MREF_COOKIE_MAX_AGE = 2592000; // 30 days
 export const GPAA_MREF_QUERY_PARAM = "mref";
 export const GPAA_REFERRAL_ATTRIBUTE_KEY = "referral_code";
 
 /** LDMA Lifetime Bundle — Garrett Axiom Lite (GPAA + LDMA dual Lifetime) */
-export const GPAA_REFERRAL_ALWAYS_MEMBERSHIP_PRODUCT_ID = "7636626899015";
+export const GPAA_REFERRAL_ALWAYS_MEMBERSHIP_PRODUCT_ID = LDMA_AXIOM_LITE_BUNDLE_PRODUCT_ID;
 
 export const GPAA_REFERRAL_MEMBERSHIP_COLLECTION_HANDLES = [
   "membership",

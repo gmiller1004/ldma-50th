@@ -5,9 +5,9 @@ import { MembershipsPageContent as LegacyMembershipsPageContent } from "./Member
 import { BundleMembershipsPageContent } from "./BundleMembershipsPageContent";
 
 export const metadata: Metadata = {
-  title: "Membership | LDMA 50th Anniversary",
+  title: "Lifetime Membership Bundle | LDMA 50th Anniversary",
   description:
-    "Join LDMA — 12 private campgrounds across 8 states, gold prospecting, family-friendly camping from $6/night. Customize your membership to fit your adventure.",
+    "Join LDMA and GPAA for life, bring a companion, keep it in the family, and take home a Garrett Axiom Lite. Through September 30, The Founder Bag is included free with new membership."
 };
 
 export default function MembershipsPage() {
