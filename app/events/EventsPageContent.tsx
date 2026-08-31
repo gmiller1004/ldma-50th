@@ -607,13 +607,14 @@ function EventCard({
       </div>
 
       {/* Full details panel — always expanded on mobile; slides down on hover for sm+ */}
+      {/* Cap height and scroll when options (VIP, shirt size, etc.) make the panel taller than the card. */}
       <div
-        className={`overflow-hidden transition-[max-height] duration-300 ease-out border-t ${
+        className={`transition-[max-height] duration-300 ease-out border-t overscroll-contain ${
           isTapExpandMode
             ? isExpanded
-              ? "max-h-80 border-[#d4af37]/20"
-              : "max-h-0 border-transparent"
-            : "max-h-80 sm:max-h-0 border-[#d4af37]/20 sm:border-transparent sm:group-hover:max-h-80 sm:group-hover:border-[#d4af37]/20"
+              ? "max-h-96 overflow-y-auto border-[#d4af37]/20"
+              : "max-h-0 overflow-hidden border-transparent"
+            : "max-h-96 overflow-y-auto border-[#d4af37]/20 sm:max-h-0 sm:overflow-hidden sm:border-transparent sm:group-hover:max-h-96 sm:group-hover:overflow-y-auto sm:group-hover:border-[#d4af37]/20"
         }`}
       >
         <div className="flex flex-col p-5 bg-[#1a120b]/95">
