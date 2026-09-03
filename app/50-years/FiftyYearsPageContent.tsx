@@ -467,7 +467,7 @@ export function FiftyYearsPageContent() {
               href="/events"
               className="inline-flex items-center justify-center px-8 py-4 border border-[#d4af37]/50 text-[#d4af37] font-semibold rounded-lg hover:bg-[#d4af37]/10 transition-colors"
             >
-              View 2026 Events
+              View Events
             </Link>
           </motion.div>
         </div>

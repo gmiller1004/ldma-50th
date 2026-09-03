@@ -3,7 +3,7 @@ import { Users, Calendar, ShoppingBag, Tent, Sparkles } from "lucide-react";
 
 const LINKS = [
   { href: "/memberships", label: "Memberships", icon: Users },
-  { href: "/events", label: "Events 2026", icon: Calendar },
+  { href: "/events", label: "Events", icon: Calendar },
   { href: "/shop", label: "Shop", icon: ShoppingBag },
   { href: "/campgrounds", label: "Campgrounds", icon: Tent },
   { href: "/50-years", label: "50 Years", icon: Sparkles },

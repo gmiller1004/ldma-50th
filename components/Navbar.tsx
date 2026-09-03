@@ -40,7 +40,7 @@ function NavbarLogo() {
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/campgrounds", label: "Campgrounds" },
-  { href: "/events", label: "Events 2026" },
+  { href: "/events", label: "Events" },
   { href: "/memberships", label: "Memberships" },
   { href: "/shop", label: "Shop" },
   { href: "/50-years", label: "50 Years" },

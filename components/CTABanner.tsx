@@ -31,7 +31,7 @@ export function CTABanner() {
             href="/events"
             className="px-8 py-4 border-2 border-[#d4af37] text-[#f0d48f] font-bold text-lg rounded-lg hover:bg-[#d4af37]/20 transition-colors"
           >
-            2026 DirtFest
+            Mining Events
           </Link>
         </div>
       </motion.div>

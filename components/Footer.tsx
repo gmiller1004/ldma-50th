@@ -5,7 +5,7 @@ import { SocialLinks } from "./SocialLinks";
 const footerLinks = {
   Explore: [
     { href: "/campgrounds", label: "Campgrounds" },
-    { href: "/events", label: "Events 2026" },
+    { href: "/events", label: "Events" },
     { href: "/memberships", label: "Memberships" },
     { href: "/shop", label: "Shop" },
     { href: "/blog", label: "Blog" },

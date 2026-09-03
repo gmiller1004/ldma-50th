@@ -112,7 +112,7 @@ export function Hero() {
             href="/events"
             className="hero-cta-secondary group relative px-8 py-4 border-2 border-[#d4af37] text-[#f0d48f] font-bold text-lg rounded-lg overflow-hidden transition-all hover:bg-[#d4af37]/20 shadow-[0_0_15px_rgba(212,175,55,0.2)] hover:shadow-[0_0_25px_rgba(212,175,55,0.35)]"
           >
-            <span className="relative z-10">Get 2026 DirtFest Tickets</span>
+            <span className="relative z-10">Explore Mining Events</span>
             <span className="hero-cta-shine-gold absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </Link>
         </motion.div>
