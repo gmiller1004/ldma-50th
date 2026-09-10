@@ -65,7 +65,7 @@ const stats = [
   { value: "50", label: "Years of LDMA History" },
   { value: "120", label: "Patented Acres" },
   { value: "197", label: "RV & Dry Sites" },
-  { value: "Sept–May", label: "Open Season" },
+  { value: "Oct–May", label: "Open Season" },
 ];
 
 const MAPS_URL =
@@ -285,7 +285,7 @@ function StantonCampContentInner() {
               lovingly restored into one of America&apos;s best-preserved ghost
               towns. Owned by LDMA (Lost Dutchman&apos;s Mining Association).
               Exclusive access to gold-bearing claims, seasonal camping
-              (September–May), and a true sense of mining history.
+              (October–May), and a true sense of mining history.
             </p>
             <p className="text-[#d4af37]/90 text-base italic border-l-4 border-[#d4af37]/40 pl-4">
               One of LDMA&apos;s original camps — a cornerstone of our 50-year legacy
@@ -403,7 +403,7 @@ function StantonCampContentInner() {
                 with mostly dry terrain.
               </p>
               <p className="text-[#e8e0d5]/70 text-sm italic">
-                Open September through May. Closed in summer due to desert heat.
+                Open October through May. Closed in summer due to desert heat.
               </p>
             </div>
           </motion.div>
