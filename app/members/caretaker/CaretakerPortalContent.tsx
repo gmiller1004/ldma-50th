@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Loader2, Calendar, User, UserPlus, X, MapPin, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, Loader2, Calendar, User, UserPlus, X, MapPin, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer } from "lucide-react";
 import {
   format,
   startOfMonth,
@@ -30,6 +30,7 @@ import {
   type BillingPeriodRow,
   type SiteBalance,
 } from "@/app/members/caretaker/ReservationBillingSection";
+import { printReservationReceipt } from "@/app/members/caretaker/printReservationReceipt";
 import { ReservationListToolbar } from "@/app/members/caretaker/ReservationListToolbar";
 import {
   filterAndSortReservations,
@@ -2940,6 +2941,40 @@ export function CaretakerPortalContent({
                       ))}
                     </ul>
                   </div>
+                )}
+
+                {!detailsLoading && detailsSiteBalance && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const isMember = detailsReservation.reservationType === "member";
+                      const opened = printReservationReceipt({
+                        campName,
+                        partyName: isMember
+                          ? detailsReservation.memberDisplayName || detailsMemberLookup?.displayName || "Member"
+                          : `${detailsReservation.guestFirstName ?? ""} ${detailsReservation.guestLastName ?? ""}`.trim() || "Guest",
+                        memberNumber: isMember
+                          ? detailsReservation.memberNumber || detailsMemberLookup?.memberNumber || null
+                          : null,
+                        siteName: detailsReservation.siteName,
+                        checkInDate: toDateOnly(detailsReservation.checkInDate),
+                        checkOutDate: toDateOnly(detailsReservation.checkOutDate),
+                        nights: detailsReservation.nights,
+                        invoiceNumber: detailsReservation.invoiceNumber,
+                        status: detailsReservation.status,
+                        billingPeriods: detailsBillingPeriods,
+                        payments: detailsPayments,
+                        totalDueCents: detailsSiteBalance.totalDueCents,
+                        totalPaidCents: detailsSiteBalance.totalPaidCents,
+                        balanceDueCents: detailsSiteBalance.balanceDueCents,
+                      });
+                      if (!opened) alert("Allow pop-ups for this site to print receipts.");
+                    }}
+                    className="w-full py-2 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg text-sm flex items-center justify-center gap-2"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Print receipt
+                  </button>
                 )}
 
                 {detailsReservation.reservationType === "member" ? (
