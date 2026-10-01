@@ -9,10 +9,17 @@ import { addMembershipToCart } from "@/app/actions/cart";
 import { useCart } from "@/context/CartContext";
 import { trackAddToCart } from "@/lib/analytics";
 import { MEMBERSHIP_METRICS, trackMembershipMetricOnsite } from "@/lib/klaviyo-membership-browser";
+import { SEPTMEMBER_ENDS_AT_MS } from "@/lib/membership-bundle-config";
 
 const HERO_FALLBACK = {
   src: "/images/memberships/axiom-lite-bundle-hero.jpg",
   alt: "Garrett Axiom Lite, LDMA 50th Anniversary, and The Founder Bag",
+};
+
+/** The Shopify product photo shows the SeptMember Founder Bag, so the hero switches once the promo ends. */
+const POST_SEPTMEMBER_HERO = {
+  src: "/images/email/membership-bundles-822/hero.jpg",
+  alt: "LDMA members running a trommel and sluice at camp",
 };
 
 const AXIOM_CUTOUT = {
@@ -63,23 +70,37 @@ const FAMILY_EXTRAS = [
   },
 ];
 
-const INCLUDED_ITEMS = [
+const BASE_INCLUDED_ITEMS = [
   "LDMA Lifetime — 12 private campgrounds on patented gold-bearing claims",
   "GPAA Lifetime — 93,000+ additional acres of claims and leases nationwide",
   "A companion membership, plus the ability to pass yours on — with the transfer fee already paid",
   `Garrett Axiom Lite detector (${DETECTOR_RETAIL} retail) with 11×7" mono coil, cover, charger, and bag`,
-  "The Founder Bag, free with new membership through September 30",
 ];
 
-const BUNDLE_FAQS = [
+const SEPTMEMBER_INCLUDED_ITEM = "The Founder Bag, free with new membership through September 30";
+
+const INCLUDED_FAQ_BASE =
+  "Lifetime membership in both LDMA and GPAA, a companion membership, the ability to pass your membership to an heir with the transfer fee already paid, and a Garrett Axiom Lite detector.";
+
+const SEPTMEMBER_FAQS = [
   {
     q: "What is included?",
-    a: `Lifetime membership in both LDMA and GPAA, a companion membership, the ability to pass your membership to an heir with the transfer fee already paid, and a Garrett Axiom Lite detector. Through September 30, new members also receive The Founder Bag.`,
+    a: `${INCLUDED_FAQ_BASE} Through September 30, new members also receive The Founder Bag.`,
   },
   {
     q: "What is The Founder Bag?",
     a: "The Founder Bag is a commemorative paydirt bag in memory of GPAA founder George “Buzzard” Massie. It is included free with new LDMA memberships on this site — and with GPAA Lifetime memberships at gpaalifetime.com — during the GPAA SeptMember $250,000 Gold Giveaway, August 26 through September 30. It cannot be purchased on its own. Each day of the giveaway, one Founder Bag includes a bonus mystery gold nugget.",
   },
+];
+
+const STANDARD_FAQS = [
+  {
+    q: "What is included?",
+    a: INCLUDED_FAQ_BASE,
+  },
+];
+
+const SHARED_FAQS = [
   {
     q: "What is the Garrett Axiom Lite?",
     a: `Garrett’s lighter pulse-induction gold detector. It is built for mineralized ground, weighs 4.2 lb with the included 11" coil, folds down to 25" for travel, and includes built-in rechargeable power plus Z-Lynk wireless audio. Manufacturer retail is ${DETECTOR_RETAIL}.`,
@@ -100,12 +121,28 @@ function formatMoney(amount: string): string {
   return `$${value.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-export function BundleMembershipsPageContent() {
+export function BundleMembershipsPageContent({
+  septMemberActiveAtRender,
+}: {
+  septMemberActiveAtRender: boolean;
+}) {
+  const [septMemberActive, setSeptMemberActive] = useState(septMemberActiveAtRender);
   const [product, setProduct] = useState<MembershipBundleProductInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const { refreshCart, openDrawer } = useCart();
+
+  useEffect(() => {
+    if (!septMemberActive) return;
+    const msLeft = SEPTMEMBER_ENDS_AT_MS - Date.now();
+    if (msLeft <= 0) {
+      setSeptMemberActive(false);
+      return;
+    }
+    const id = window.setTimeout(() => setSeptMemberActive(false), msLeft);
+    return () => window.clearTimeout(id);
+  }, [septMemberActive]);
 
   useEffect(() => {
     let active = true;
@@ -140,8 +177,10 @@ export function BundleMembershipsPageContent() {
     return compare - price;
   }, [product]);
 
-  const heroSrc = product?.imageUrl || HERO_FALLBACK.src;
-  const heroAlt = product?.imageAlt || HERO_FALLBACK.alt;
+  const heroSrc = septMemberActive ? product?.imageUrl || HERO_FALLBACK.src : POST_SEPTMEMBER_HERO.src;
+  const heroAlt = septMemberActive ? product?.imageAlt || HERO_FALLBACK.alt : POST_SEPTMEMBER_HERO.alt;
+  const includedItems = septMemberActive ? [...BASE_INCLUDED_ITEMS, SEPTMEMBER_INCLUDED_ITEM] : BASE_INCLUDED_ITEMS;
+  const faqs = [...(septMemberActive ? SEPTMEMBER_FAQS : STANDARD_FAQS), ...SHARED_FAQS];
 
   async function handleAddToCart() {
     if (!product) return;
@@ -214,16 +253,18 @@ export function BundleMembershipsPageContent() {
               <div className="absolute inset-0 bg-gradient-to-t from-[#1a120b] via-[#1a120b]/25 to-transparent" />
             </div>
             <div className="bg-[#1a120b] px-5 py-7 sm:px-8 sm:py-9">
-              <p className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#d4af37]/20 text-[#d4af37] text-sm font-medium">
-                Free Founder Bag through September 30
-              </p>
-              <h1 className="mt-4 font-serif text-3xl sm:text-5xl font-bold text-[#f0d48f] max-w-4xl">
+              {septMemberActive && (
+                <p className="mb-4 inline-flex items-center gap-2 px-3 py-1 rounded bg-[#d4af37]/20 text-[#d4af37] text-sm font-medium">
+                  Free Founder Bag through September 30
+                </p>
+              )}
+              <h1 className="font-serif text-3xl sm:text-5xl font-bold text-[#f0d48f] max-w-4xl">
                 A lifetime on the gold — and a Garrett Axiom Lite to hunt it
               </h1>
               <p className="mt-4 text-[#e8e0d5]/88 max-w-3xl text-base sm:text-lg leading-relaxed">
                 Become an LDMA and GPAA lifetime member. Bring a companion. Keep the membership in the family. Take
-                home Garrett&apos;s lightest pulse-induction gold detector. Join during SeptMember and The Founder Bag
-                comes with you.
+                home Garrett&apos;s lightest pulse-induction gold detector.
+                {septMemberActive && " Join during SeptMember and The Founder Bag comes with you."}
               </p>
 
               {loading ? (
@@ -247,8 +288,8 @@ export function BundleMembershipsPageContent() {
                     </p>
                   )}
                   <p className="mt-2 text-xs text-[#e8e0d5]/55">
-                    Axiom Lite retail is {DETECTOR_RETAIL}. Memberships, family extras, and The Founder Bag are included
-                    in this price.
+                    Axiom Lite retail is {DETECTOR_RETAIL}. Memberships, family extras
+                    {septMemberActive ? ", and The Founder Bag are" : " are"} included in this price.
                   </p>
                   <div className="mt-5">{addToCartButton}</div>
                 </div>
@@ -273,61 +314,63 @@ export function BundleMembershipsPageContent() {
         </div>
       </section>
 
-      <section className="py-14 md:py-18">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid lg:grid-cols-[1.05fr_0.95fr] gap-8 items-center">
-          <div className="relative aspect-[3/4] max-h-[620px] rounded-2xl overflow-hidden border border-[#d4af37]/25 shadow-[0_12px_34px_rgba(0,0,0,0.35)]">
-            <Image
-              src={FOUNDER_BAG_IMAGE.src}
-              alt={FOUNDER_BAG_IMAGE.alt}
-              fill
-              className="object-cover object-center"
-              sizes="(max-width: 1024px) 100vw, 50vw"
-            />
+      {septMemberActive && (
+        <section className="py-14 md:py-18">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 grid lg:grid-cols-[1.05fr_0.95fr] gap-8 items-center">
+            <div className="relative aspect-[3/4] max-h-[620px] rounded-2xl overflow-hidden border border-[#d4af37]/25 shadow-[0_12px_34px_rgba(0,0,0,0.35)]">
+              <Image
+                src={FOUNDER_BAG_IMAGE.src}
+                alt={FOUNDER_BAG_IMAGE.alt}
+                fill
+                className="object-cover object-center"
+                sizes="(max-width: 1024px) 100vw, 50vw"
+              />
+            </div>
+            <div>
+              <p className="inline-flex items-center gap-2 text-[#d4af37] text-xs uppercase tracking-[0.16em] font-semibold">
+                <Gift className="w-4 h-4" />
+                GPAA SeptMember · August 26 – September 30
+              </p>
+              <h2 className="mt-3 font-serif text-3xl md:text-4xl text-[#f0d48f] font-bold">
+                The Founder Bag comes free with new membership
+              </h2>
+              <p className="mt-4 text-[#e8e0d5]/86 text-sm sm:text-base leading-relaxed">
+                During the GPAA SeptMember $250,000 Gold Giveaway, every new LDMA membership on this site includes The
+                Founder Bag — a commemorative paydirt bag in memory of GPAA founder George &quot;Buzzard&quot; Massie.
+              </p>
+              <ul className="mt-5 space-y-3 text-[#e8e0d5]/86 text-sm sm:text-base">
+                <li className="flex gap-2">
+                  <Check className="w-4 h-4 text-[#d4af37] mt-1 shrink-0" />
+                  <span>It is a gift with membership. It cannot be purchased on its own.</span>
+                </li>
+                <li className="flex gap-2">
+                  <Check className="w-4 h-4 text-[#d4af37] mt-1 shrink-0" />
+                  <span>
+                    Available only with new LDMA memberships here, and with GPAA Lifetime memberships at{" "}
+                    <a
+                      href="https://gpaalifetime.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#f0d48f] font-semibold underline underline-offset-2"
+                    >
+                      gpaalifetime.com
+                    </a>
+                    .
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <Check className="w-4 h-4 text-[#d4af37] mt-1 shrink-0" />
+                  <span>Each day of the giveaway, one Founder Bag includes a bonus mystery gold nugget.</span>
+                </li>
+              </ul>
+              <p className="mt-5 text-[#e8e0d5]/65 text-sm">
+                The giveaway runs August 26 through September 30. Join during that window to receive The Founder Bag with
+                this membership.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="inline-flex items-center gap-2 text-[#d4af37] text-xs uppercase tracking-[0.16em] font-semibold">
-              <Gift className="w-4 h-4" />
-              GPAA SeptMember · August 26 – September 30
-            </p>
-            <h2 className="mt-3 font-serif text-3xl md:text-4xl text-[#f0d48f] font-bold">
-              The Founder Bag comes free with new membership
-            </h2>
-            <p className="mt-4 text-[#e8e0d5]/86 text-sm sm:text-base leading-relaxed">
-              During the GPAA SeptMember $250,000 Gold Giveaway, every new LDMA membership on this site includes The
-              Founder Bag — a commemorative paydirt bag in memory of GPAA founder George &quot;Buzzard&quot; Massie.
-            </p>
-            <ul className="mt-5 space-y-3 text-[#e8e0d5]/86 text-sm sm:text-base">
-              <li className="flex gap-2">
-                <Check className="w-4 h-4 text-[#d4af37] mt-1 shrink-0" />
-                <span>It is a gift with membership. It cannot be purchased on its own.</span>
-              </li>
-              <li className="flex gap-2">
-                <Check className="w-4 h-4 text-[#d4af37] mt-1 shrink-0" />
-                <span>
-                  Available only with new LDMA memberships here, and with GPAA Lifetime memberships at{" "}
-                  <a
-                    href="https://gpaalifetime.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#f0d48f] font-semibold underline underline-offset-2"
-                  >
-                    gpaalifetime.com
-                  </a>
-                  .
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <Check className="w-4 h-4 text-[#d4af37] mt-1 shrink-0" />
-                <span>Each day of the giveaway, one Founder Bag includes a bonus mystery gold nugget.</span>
-              </li>
-            </ul>
-            <p className="mt-5 text-[#e8e0d5]/65 text-sm">
-              The giveaway runs August 26 through September 30. Join during that window to receive The Founder Bag with
-              this membership.
-            </p>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="py-14 md:py-18 bg-[#0f3d1e]/30 border-y border-[#d4af37]/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-10">
@@ -338,7 +381,7 @@ export function BundleMembershipsPageContent() {
               a plan for the next generation — plus a detector that is ready for the first trip.
             </p>
             <ul className="mt-5 space-y-2 text-[#e8e0d5]/88 text-sm">
-              {INCLUDED_ITEMS.map((item) => (
+              {includedItems.map((item) => (
                 <li key={item} className="flex gap-2">
                   <Check className="w-4 h-4 text-[#d4af37] mt-0.5 shrink-0" />
                   <span>{item}</span>
@@ -404,7 +447,10 @@ export function BundleMembershipsPageContent() {
               <p className="text-[#e8e0d5]/80 text-xs uppercase tracking-[0.16em]">Also at GPAA</p>
               <p className="mt-2 text-[#f0d48f] font-serif text-2xl font-bold">GPAA Lifetime membership</p>
               <p className="mt-2 text-[#e8e0d5]/78 text-sm">
-                Want GPAA Lifetime on its own? The Founder Bag is included there too during SeptMember.
+                Want GPAA Lifetime on its own?
+                {septMemberActive
+                  ? " The Founder Bag is included there too during SeptMember."
+                  : " You can join directly at gpaalifetime.com."}
               </p>
               <a
                 href="https://gpaalifetime.com"
@@ -526,7 +572,8 @@ export function BundleMembershipsPageContent() {
           <h2 className="font-serif text-3xl md:text-4xl font-bold text-[#f0d48f]">Come join us</h2>
           <p className="text-[#e8e0d5]/80 mt-4 max-w-3xl mx-auto">
             Add this membership to cart and check out. We send the full contract after purchase so you can review the
-            terms before it is activated. The Founder Bag is included with new memberships through September 30.
+            terms before it is activated.
+            {septMemberActive && " The Founder Bag is included with new memberships through September 30."}
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-6 text-sm text-[#e8e0d5]/70">
             <span className="inline-flex items-center gap-2">
@@ -547,13 +594,14 @@ export function BundleMembershipsPageContent() {
             </a>
           </div>
           <p className="mt-5 text-xs text-[#e8e0d5]/50">
-            Offers are available for a limited time while supplies last. The Founder Bag is a SeptMember gift from
-            August 26 through September 30 and is not sold separately.
+            Offers are available for a limited time while supplies last.
+            {septMemberActive &&
+              " The Founder Bag is a SeptMember gift from August 26 through September 30 and is not sold separately."}
           </p>
           <div className="mt-10 text-left">
             <h3 className="font-serif text-2xl font-bold text-[#f0d48f] text-center">Questions we hear a lot</h3>
             <div className="mt-4 space-y-3">
-              {BUNDLE_FAQS.map((item) => (
+              {faqs.map((item) => (
                 <details
                   key={item.q}
                   className="rounded-xl border border-[#d4af37]/20 bg-[#1a120b]/60 overflow-hidden"

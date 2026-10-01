@@ -11,6 +11,13 @@ export const LDMA_AXIOM_LITE_BUNDLE_PRODUCT_ID = "7636626899015";
  */
 export const BUNDLE_OFFER_EXPIRES_AT_MS = Date.parse("2026-08-22T23:59:59-07:00");
 
+/** GPAA SeptMember (Founder Bag + daily mystery nugget) ends at midnight Pacific, start of Oct 1, 2026. */
+export const SEPTMEMBER_ENDS_AT_MS = Date.parse("2026-10-01T00:00:00-07:00");
+
+export function isSeptMemberActive(nowMs: number = Date.now()): boolean {
+  return nowMs < SEPTMEMBER_ENDS_AT_MS;
+}
+
 export const MEMBERSHIP_BUNDLE_KEYS = ["axiom-lite", "gm1000", "gm24k", "gm2000"] as const;
 
 export type MembershipBundleKey = (typeof MEMBERSHIP_BUNDLE_KEYS)[number];
