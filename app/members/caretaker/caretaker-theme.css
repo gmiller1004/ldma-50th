@@ -18,6 +18,8 @@
   --ct-warn-text: #e8c547;
 }
 
+/* The shell carries both the data attribute and .caretaker-themed, so match it directly as well as nested */
+[data-caretaker-theme="light"].caretaker-themed,
 [data-caretaker-theme="light"] .caretaker-themed {
   --ct-page: #f5f0e8;
   --ct-surface: #ffffff;
@@ -38,72 +40,72 @@
 }
 
 /* Map common hardcoded portal colors to theme variables in light mode */
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#1a120b]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-\\[#1a120b\\]"] {
+[data-caretaker-theme="light"] [class*="bg-[#1a120b]"],
+[data-caretaker-theme="light"] [class*="bg-\\[#1a120b\\]"] {
   background-color: var(--ct-surface) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#0f0a06]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-\\[#0f0a06\\]"] {
+[data-caretaker-theme="light"] [class*="bg-[#0f0a06]"],
+[data-caretaker-theme="light"] [class*="bg-\\[#0f0a06\\]"] {
   background-color: var(--ct-surface-alt) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#2a1f14]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-\\[#2a1f14\\]"] {
+[data-caretaker-theme="light"] [class*="bg-[#2a1f14]"],
+[data-caretaker-theme="light"] [class*="bg-\\[#2a1f14\\]"] {
   background-color: #efe8dc !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-[#e8e0d5]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-\\[#e8e0d5\\]"] {
+[data-caretaker-theme="light"] [class*="text-[#e8e0d5]"],
+[data-caretaker-theme="light"] [class*="text-\\[#e8e0d5\\]"] {
   color: var(--ct-text) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-[#f0d48f]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-\\[#f0d48f\\]"] {
+[data-caretaker-theme="light"] [class*="text-[#f0d48f]"],
+[data-caretaker-theme="light"] [class*="text-\\[#f0d48f\\]"] {
   color: var(--ct-gold) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-[#d4af37]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-\\[#d4af37\\]"] {
+[data-caretaker-theme="light"] [class*="text-[#d4af37]"],
+[data-caretaker-theme="light"] [class*="text-\\[#d4af37\\]"] {
   color: var(--ct-gold-accent) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="border-[#d4af37]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="border-\\[#d4af37\\]"] {
+[data-caretaker-theme="light"] [class*="border-[#d4af37]"],
+[data-caretaker-theme="light"] [class*="border-\\[#d4af37\\]"] {
   border-color: var(--ct-border) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-black"] {
+[data-caretaker-theme="light"] [class*="bg-black"] {
   background-color: var(--ct-modal-overlay) !important;
 }
 
 /* Dark panel/table-header surfaces outside the core palette */
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#1a140c]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#1a1208]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#120c08]"] {
+[data-caretaker-theme="light"] [class*="bg-[#1a140c]"],
+[data-caretaker-theme="light"] [class*="bg-[#1a1208]"],
+[data-caretaker-theme="light"] [class*="bg-[#120c08]"] {
   background-color: var(--ct-surface) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#241c12]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#2a241c]"] {
+[data-caretaker-theme="light"] [class*="bg-[#241c12]"],
+[data-caretaker-theme="light"] [class*="bg-[#2a241c]"] {
   background-color: #e5ddd0 !important;
 }
 
 /* Status pills and success text (pale green / yellow on dark) */
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#0f3d1e]"] {
+[data-caretaker-theme="light"] [class*="bg-[#0f3d1e]"] {
   background-color: #dcfce7 !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-[#6dd472]"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-[#b8e8bc]"] {
+[data-caretaker-theme="light"] [class*="text-[#6dd472]"],
+[data-caretaker-theme="light"] [class*="text-[#b8e8bc]"] {
   color: var(--ct-success) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#4a3a0f]"] {
+[data-caretaker-theme="light"] [class*="bg-[#4a3a0f]"] {
   background-color: var(--ct-warn-bg) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-[#e8c547]"] {
+[data-caretaker-theme="light"] [class*="text-[#e8c547]"] {
   color: var(--ct-warn-text) !important;
 }
 
@@ -111,25 +113,25 @@
  * Warning/error callouts (e.g. "Payments to collect", Cancelled badges) use pale amber/red text
  * on dark tints. Solid red buttons (bg-red-700/800 + text-red-100) already read fine and are left alone.
  */
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-amber-950"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-amber-900"] {
+[data-caretaker-theme="light"] [class*="bg-amber-950"],
+[data-caretaker-theme="light"] [class*="bg-amber-900"] {
   background-color: var(--ct-warn-bg) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="bg-red-950"] {
+[data-caretaker-theme="light"] [class*="bg-red-950"] {
   background-color: var(--ct-danger-bg) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-amber-100"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-amber-200"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-amber-300"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-amber-400"] {
+[data-caretaker-theme="light"] [class*="text-amber-100"],
+[data-caretaker-theme="light"] [class*="text-amber-200"],
+[data-caretaker-theme="light"] [class*="text-amber-300"],
+[data-caretaker-theme="light"] [class*="text-amber-400"] {
   color: var(--ct-warn-text) !important;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-red-200"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-red-300"],
-[data-caretaker-theme="light"] .caretaker-themed [class*="text-red-400"] {
+[data-caretaker-theme="light"] [class*="text-red-200"],
+[data-caretaker-theme="light"] [class*="text-red-300"],
+[data-caretaker-theme="light"] [class*="text-red-400"] {
   color: var(--ct-danger-text) !important;
 }
 
@@ -237,7 +239,7 @@
   min-height: 2.375rem;
 }
 
-[data-caretaker-theme="light"] .caretaker-themed .ct-date-input {
+[data-caretaker-theme="light"] .ct-date-input {
   color-scheme: light;
 }
 
