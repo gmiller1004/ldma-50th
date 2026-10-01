@@ -525,7 +525,7 @@ export function ManualReservationPanel() {
                 setMemberLookup(null);
                 setMemberMatches([]);
               }}
-              placeholder="Member #, email, or phone"
+              placeholder="Name, member #, email, or phone"
               className={`${inputClass} flex-1`}
             />
             <button

@@ -958,6 +958,128 @@ Lost Dutchman's Mining Association`;
   }
 }
 
+/**
+ * Notify guest/member that their reservation was cancelled. Refund lines appear only when a refund was issued.
+ */
+export async function sendReservationCancelledEmail(input: {
+  to: string;
+  campName: string;
+  siteLabel: string;
+  checkInDate: string;
+  checkOutDate: string;
+  guestOrMemberName: string;
+  cardRefundCents?: number;
+  cashRefundCents?: number;
+  caretakerCc?: string[];
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        `[DEV] Reservation cancelled email for ${input.to}: ${input.siteLabel}, ${input.checkInDate}–${input.checkOutDate}`
+      );
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping reservation cancelled email");
+    return false;
+  }
+
+  sgMail.setApiKey(apiKey);
+
+  const name = input.guestOrMemberName?.trim() || "there";
+  const refundLines: string[] = [];
+  if (input.cardRefundCents && input.cardRefundCents > 0) {
+    refundLines.push(
+      `${formatUsd(input.cardRefundCents)} has been refunded to your card. Please allow 5–10 business days for it to appear.`
+    );
+  }
+  if (input.cashRefundCents && input.cashRefundCents > 0) {
+    refundLines.push(`${formatUsd(input.cashRefundCents)} will be refunded in cash by the camp caretaker.`);
+  }
+  const policyUrl = campCancellationPolicyUrl();
+
+  const textContent = `Your reservation at ${input.campName} has been cancelled.
+
+Hi ${name},
+
+Your reservation at ${input.siteLabel} has been cancelled.
+
+Check-in:  ${input.checkInDate}
+Check-out: ${input.checkOutDate}
+${refundLines.length > 0 ? `\n${refundLines.join("\n")}\n` : ""}
+Cancellation policy: ${policyUrl}
+
+If you have questions, please call ${LDMA_MEMBER_SERVICES_PHONE}.
+
+Lost Dutchman's Mining Association`;
+
+  const refundHtml = refundLines
+    .map(
+      (line) =>
+        `<p style="margin: 0 0 12px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">${escapeHtml(line)}</p>`
+    )
+    .join("");
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #1a120b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #1a120b; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #2a1f14; border-radius: 8px; border: 1px solid #d4af3740; overflow: hidden;">
+          <tr>
+            <td style="padding: 32px 24px; text-align: center; border-bottom: 1px solid #d4af3720;">
+              <h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #f0d48f; letter-spacing: 0.05em;">LDMA</h1>
+              <p style="margin: 8px 0 0; font-size: 14px; color: #e8e0d5b3;">Reservation cancelled — ${escapeHtml(input.campName)}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 24px;">
+              <p style="margin: 0 0 16px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">Hi ${escapeHtml(name)},</p>
+              <p style="margin: 0 0 16px; font-size: 16px; color: #e8e0d5; line-height: 1.5;">Your reservation at <strong>${escapeHtml(input.siteLabel)}</strong> has been cancelled.</p>
+              <p style="margin: 0 0 8px; font-size: 16px; color: #e8e0d5;">Check-in: <strong>${escapeHtml(input.checkInDate)}</strong></p>
+              <p style="margin: 0 0 24px; font-size: 16px; color: #e8e0d5;">Check-out: <strong>${escapeHtml(input.checkOutDate)}</strong></p>
+              ${refundHtml}
+              <p style="margin: 12px 0 12px; font-size: 14px; color: #e8e0d5b3;">View our <a href="${escapeHtml(policyUrl)}" style="color: #f0d48f;">cancellation policy</a>.</p>
+              <p style="margin: 0; font-size: 14px; color: #e8e0d5b3;">If you have questions, please call <strong>${LDMA_MEMBER_SERVICES_PHONE}</strong>.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 24px; background-color: #1a120b; border-top: 1px solid #d4af3720;">
+              <p style="margin: 0; font-size: 12px; color: #e8e0d560;">Lost Dutchman's Mining Association &bull; 1976–2026</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+
+  try {
+    const cc =
+      input.caretakerCc && input.caretakerCc.length > 0 ? input.caretakerCc : undefined;
+    await sgMail.send({
+      to: input.to,
+      cc,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `Reservation cancelled — ${input.siteLabel} at ${input.campName}`,
+      text: textContent,
+      html: htmlContent,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid reservation cancelled email error:", e);
+    return false;
+  }
+}
+
 export type BalanceReminderDays = 14 | 7 | 3;
 export type BalanceReminderKind = "before_arrival" | "billing_period";
 

@@ -7,6 +7,11 @@ import { sql, hasDb } from "@/lib/db";
 import { computeCancellationRefund, type CancellationRefundResult } from "@/lib/cancellation-refund";
 import { isHookupSiteType } from "@/lib/reservation-camps";
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
+import { lookupMember } from "@/lib/salesforce";
+import { getCampBySlug } from "@/lib/directory-camps";
+import { fetchCaretakerEmailsForCamp } from "@/lib/caretaker-admin-summary";
+import { sendReservationCancelledEmail } from "@/lib/sendgrid";
+import { toDateOnlyStr } from "@/lib/reservation-dates";
 
 export type CancelPreview = CancellationRefundResult & {
   reservationId: string;
@@ -193,8 +198,9 @@ async function executeCancellationInner(input: {
 
   const resRows = await sql`
     SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.nights, r.reservation_type, r.member_number, r.member_display_name,
-           r.guest_email, r.guest_first_name, r.guest_last_name, r.status
+           r.guest_email, r.guest_first_name, r.guest_last_name, r.status, s.name AS site_name
     FROM camp_reservations r
+    LEFT JOIN camp_sites s ON s.id = r.site_id
     WHERE r.id = ${input.reservationId} AND r.camp_slug = ${input.campSlug}
     LIMIT 1
   `;
@@ -211,6 +217,7 @@ async function executeCancellationInner(input: {
     guest_first_name: string | null;
     guest_last_name: string | null;
     status: string;
+    site_name: string | null;
   } | undefined;
   if (!resRow) return { ok: false, error: "Reservation not found" };
 
@@ -344,6 +351,54 @@ async function executeCancellationInner(input: {
   syncReservationToKlaviyo({ ...resRow, status: "cancelled" }).catch((e) =>
     console.error("[Klaviyo] sync after cancel:", e)
   );
+  await notifyReservationCancelled(resRow, preview).catch((e) =>
+    console.error("[cancel] cancellation email failed:", e)
+  );
 
   return { ok: true, preview };
+}
+
+export async function notifyReservationCancelled(
+  row: {
+    camp_slug: string;
+    check_in_date: string;
+    check_out_date: string;
+    reservation_type: string;
+    member_number: string | null;
+    member_display_name: string | null;
+    guest_email: string | null;
+    guest_first_name: string | null;
+    guest_last_name: string | null;
+    site_name: string | null;
+  },
+  refund?: { stripeRefundCents: number; cashRefundCents: number }
+): Promise<boolean> {
+  let email = row.guest_email?.trim() || null;
+  let name =
+    row.reservation_type === "member"
+      ? row.member_display_name?.trim() || ""
+      : [row.guest_first_name, row.guest_last_name].filter(Boolean).join(" ").trim();
+
+  if (!email && row.reservation_type === "member" && row.member_number?.trim()) {
+    const member = await lookupMember(row.member_number.trim());
+    if (member.valid && member.email?.trim()) {
+      email = member.email.trim();
+      name = name || [member.firstName, member.lastName].filter(Boolean).join(" ").trim();
+    }
+  }
+  if (!email) return false;
+
+  const campName = getCampBySlug(row.camp_slug)?.name ?? row.camp_slug;
+  const caretakerCc = await fetchCaretakerEmailsForCamp(row.camp_slug, email).catch(() => []);
+  return sendReservationCancelledEmail({
+    to: email,
+    campName,
+    siteLabel: row.site_name || "your campsite",
+    checkInDate: toDateOnlyStr(row.check_in_date),
+    checkOutDate: toDateOnlyStr(row.check_out_date),
+    guestOrMemberName: name,
+    cardRefundCents: refund?.stripeRefundCents ?? 0,
+    cashRefundCents: refund?.cashRefundCents ?? 0,
+    caretakerCc,
+  });
 }

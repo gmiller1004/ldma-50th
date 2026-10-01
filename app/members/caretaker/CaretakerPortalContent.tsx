@@ -1155,7 +1155,7 @@ export function CaretakerPortalContent({
   async function handleDetailsContactLookup() {
     const fields = parseCaretakerLookupInput(detailsContactLookupInput);
     if (!fields.memberNumber && !fields.email && !fields.phone) {
-      setDetailsContactError("Enter member #, email, or phone");
+      setDetailsContactError("Enter name, member #, email, or phone");
       return;
     }
     setDetailsContactLookupLoading(true);
@@ -2583,7 +2583,7 @@ export function CaretakerPortalContent({
                   {resType === "member" ? (
                     <div className="space-y-2">
                       <div className="flex gap-2">
-                        <input type="text" value={resMemberNumber} onChange={(e) => { setResMemberNumber(e.target.value); setResMemberLookup(null); setResMemberLookupMatches([]); }} placeholder="Member #, email, or phone" className="flex-1 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" />
+                        <input type="text" value={resMemberNumber} onChange={(e) => { setResMemberNumber(e.target.value); setResMemberLookup(null); setResMemberLookupMatches([]); }} placeholder="Name, member #, email, or phone" className="flex-1 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" />
                         <button type="button" onClick={handleReservationMemberLookup} disabled={resMemberLookupLoading || !resMemberNumber.trim()} className="px-4 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center gap-2">
                           {resMemberLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Look up
                         </button>
@@ -2972,7 +2972,7 @@ export function CaretakerPortalContent({
                               type="text"
                               value={detailsContactLookupInput}
                               onChange={(e) => setDetailsContactLookupInput(e.target.value)}
-                              placeholder="Member #, email, or phone"
+                              placeholder="Name, member #, email, or phone"
                               className="flex-1 px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
                             />
                             <button
@@ -3162,7 +3162,7 @@ export function CaretakerPortalContent({
                           type="text"
                           value={detailsContactLookupInput}
                           onChange={(e) => setDetailsContactLookupInput(e.target.value)}
-                          placeholder="Member #, email, or phone"
+                          placeholder="Name, member #, email, or phone"
                           className="flex-1 px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
                         />
                         <button

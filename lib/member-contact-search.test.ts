@@ -41,6 +41,13 @@ describe("parseCaretakerLookupInput", () => {
   it("treats alphanumeric as member number", () => {
     assert.deepEqual(parseCaretakerLookupInput("LDMA-100"), { memberNumber: "LDMA-100" });
   });
+
+  it("detects names (letters, no digits)", () => {
+    assert.deepEqual(parseCaretakerLookupInput("  David   Haley "), { name: "David Haley" });
+    assert.deepEqual(parseCaretakerLookupInput("Haley"), { name: "Haley" });
+    assert.deepEqual(parseCaretakerLookupInput("Haley, David"), { name: "Haley, David" });
+    assert.deepEqual(parseCaretakerLookupInput("O'Brien"), { name: "O'Brien" });
+  });
 });
 
 describe("caretakerLookupFieldsFromBody", () => {
@@ -59,5 +66,11 @@ describe("caretakerLookupFieldsFromBody", () => {
       caretakerLookupFieldsFromBody({ memberNumber: "1", email: "a@b.com" }),
       {}
     );
+  });
+
+  it("accepts name", () => {
+    assert.deepEqual(caretakerLookupFieldsFromBody({ name: " David  Haley " }), {
+      name: "David Haley",
+    });
   });
 });

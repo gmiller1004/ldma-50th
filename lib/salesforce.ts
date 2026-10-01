@@ -299,10 +299,39 @@ async function queryContactRecords(whereClause: string, limit: number): Promise<
 function phoneSoqlWhereClause(phone: string): string | null {
   const digits = normalizePhoneDigits(phone);
   if (digits.length < 7) return null;
-  const last10 = escapeSoqlString(digits.slice(-10));
-  const phoneNorm =
-    "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(Phone, '(', ''), ')', ''), '-', ''), ' ', ''), '+', '')";
-  return `Phone != null AND ${phoneNorm} LIKE '%${last10}%'`;
+  // SOQL has no REPLACE(); wildcards between digit groups tolerate "(618) 383-6464" style formatting.
+  const local = digits.length >= 10 ? digits.slice(-10) : digits.slice(-7);
+  const groups =
+    local.length === 10
+      ? [local.slice(0, 3), local.slice(3, 6), local.slice(6)]
+      : [local.slice(0, 3), local.slice(3)];
+  return `Phone != null AND Phone LIKE '%${groups.join("%")}%'`;
+}
+
+function nameSoqlWhereClause(name: string): string | null {
+  const cleaned = name.replace(/[%_'\\]/g, "").trim();
+  if (!cleaned) return null;
+
+  let first = "";
+  let last = "";
+  if (cleaned.includes(",")) {
+    const [lastPart, firstPart] = cleaned.split(",", 2);
+    last = lastPart.trim();
+    first = (firstPart ?? "").trim().split(/\s+/)[0] ?? "";
+  } else {
+    const tokens = cleaned.split(/\s+/).filter(Boolean);
+    if (tokens.length === 1) {
+      const t = tokens[0];
+      return `Customer_Number__c != null AND (FirstName LIKE '${t}%' OR LastName LIKE '${t}%')`;
+    }
+    first = tokens[0];
+    last = tokens[tokens.length - 1];
+  }
+
+  const parts = ["Customer_Number__c != null"];
+  if (first) parts.push(`FirstName LIKE '${first}%'`);
+  if (last) parts.push(`LastName LIKE '${last}%'`);
+  return parts.length > 1 ? parts.join(" AND ") : null;
 }
 
 export async function lookupMember(memberNumber: string): Promise<MemberLookupResult> {
@@ -374,11 +403,12 @@ export async function searchMembersForCaretaker(input: {
   memberNumber?: string;
   email?: string;
   phone?: string;
+  name?: string;
 }): Promise<CaretakerMemberSearchResult> {
-  const { memberNumber, email, phone } = input;
-  const provided = [memberNumber, email, phone].filter(Boolean).length;
+  const { memberNumber, email, phone, name } = input;
+  const provided = [memberNumber, email, phone, name].filter(Boolean).length;
   if (provided !== 1) {
-    return { status: "not_found", error: "Provide memberNumber, email, or phone" };
+    return { status: "not_found", error: "Provide name, memberNumber, email, or phone" };
   }
 
   if (memberNumber) {
@@ -392,7 +422,7 @@ export async function searchMembersForCaretaker(input: {
   const client = await getSalesforceRestClient();
   if (!client) {
     if (process.env.NODE_ENV === "development") {
-      const member = mockLookup(email || phone || "dev");
+      const member = mockLookup(email || phone || name || "dev");
       return { status: "found", member, memberNumber: "dev" };
     }
     return { status: "not_found", error: "Salesforce not configured" };
@@ -408,13 +438,20 @@ export async function searchMembersForCaretaker(input: {
         return { status: "not_found", error: "Enter at least 7 phone digits" };
       }
       whereClause = phoneWhere;
+    } else if (name) {
+      const nameWhere = nameSoqlWhereClause(name);
+      if (!nameWhere) {
+        return { status: "not_found", error: "Enter a first and/or last name" };
+      }
+      whereClause = `${nameWhere} ORDER BY LastName, FirstName`;
     } else {
-      return { status: "not_found", error: "Provide memberNumber, email, or phone" };
+      return { status: "not_found", error: "Provide name, memberNumber, email, or phone" };
     }
 
-    const records = await queryContactRecords(whereClause, 10);
+    const records = await queryContactRecords(whereClause, name ? 25 : 10);
     if (records.length === 0) {
-      return { status: "not_found", error: "No member found for that email or phone" };
+      const what = name ? "name" : email ? "email" : "phone";
+      return { status: "not_found", error: `No member found for that ${what}` };
     }
     if (records.length > 1) {
       return {

@@ -26,8 +26,8 @@ function memberToCaretakerJson(member: MemberLookupResult, memberNumber: string 
 
 /**
  * POST /api/members/caretaker/lookup
- * Body: { memberNumber } | { email } | { phone } | { contactId } (one at a time)
- * Returns member info, or { multiple: true, matches } when email/phone matches several contacts.
+ * Body: { memberNumber } | { email } | { phone } | { name } | { contactId } (one at a time)
+ * Returns member info, or { multiple: true, matches } when name/email/phone matches several contacts.
  */
 export async function POST(request: NextRequest) {
   const access = await getCaretakerAccess();
@@ -58,15 +58,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(memberToCaretakerJson(result.member, result.memberNumber));
   }
 
-  const { memberNumber, email, phone } = fields;
-  if (!memberNumber && !email && !phone) {
+  const { memberNumber, email, phone, name } = fields;
+  if (!memberNumber && !email && !phone && !name) {
     return NextResponse.json(
-      { error: "Provide memberNumber, email, or phone (one at a time)" },
+      { error: "Provide name, memberNumber, email, or phone (one at a time)" },
       { status: 400 }
     );
   }
 
-  const result = await searchMembersForCaretaker({ memberNumber, email, phone });
+  const result = await searchMembersForCaretaker({ memberNumber, email, phone, name });
   if (result.status === "not_found") {
     return NextResponse.json({ error: result.error }, { status: 404 });
   }
