@@ -77,6 +77,62 @@
   background-color: var(--ct-modal-overlay) !important;
 }
 
+/* Dark panel/table-header surfaces outside the core palette */
+[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#1a140c]"],
+[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#1a1208]"],
+[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#120c08]"] {
+  background-color: var(--ct-surface) !important;
+}
+
+[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#241c12]"],
+[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#2a241c]"] {
+  background-color: #e5ddd0 !important;
+}
+
+/* Status pills and success text (pale green / yellow on dark) */
+[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#0f3d1e]"] {
+  background-color: #dcfce7 !important;
+}
+
+[data-caretaker-theme="light"] .caretaker-themed [class*="text-[#6dd472]"],
+[data-caretaker-theme="light"] .caretaker-themed [class*="text-[#b8e8bc]"] {
+  color: var(--ct-success) !important;
+}
+
+[data-caretaker-theme="light"] .caretaker-themed [class*="bg-[#4a3a0f]"] {
+  background-color: var(--ct-warn-bg) !important;
+}
+
+[data-caretaker-theme="light"] .caretaker-themed [class*="text-[#e8c547]"] {
+  color: var(--ct-warn-text) !important;
+}
+
+/*
+ * Warning/error callouts (e.g. "Payments to collect", Cancelled badges) use pale amber/red text
+ * on dark tints. Solid red buttons (bg-red-700/800 + text-red-100) already read fine and are left alone.
+ */
+[data-caretaker-theme="light"] .caretaker-themed [class*="bg-amber-950"],
+[data-caretaker-theme="light"] .caretaker-themed [class*="bg-amber-900"] {
+  background-color: var(--ct-warn-bg) !important;
+}
+
+[data-caretaker-theme="light"] .caretaker-themed [class*="bg-red-950"] {
+  background-color: var(--ct-danger-bg) !important;
+}
+
+[data-caretaker-theme="light"] .caretaker-themed [class*="text-amber-100"],
+[data-caretaker-theme="light"] .caretaker-themed [class*="text-amber-200"],
+[data-caretaker-theme="light"] .caretaker-themed [class*="text-amber-300"],
+[data-caretaker-theme="light"] .caretaker-themed [class*="text-amber-400"] {
+  color: var(--ct-warn-text) !important;
+}
+
+[data-caretaker-theme="light"] .caretaker-themed [class*="text-red-200"],
+[data-caretaker-theme="light"] .caretaker-themed [class*="text-red-300"],
+[data-caretaker-theme="light"] .caretaker-themed [class*="text-red-400"] {
+  color: var(--ct-danger-text) !important;
+}
+
 .ct-heading {
   color: var(--ct-gold);
 }
