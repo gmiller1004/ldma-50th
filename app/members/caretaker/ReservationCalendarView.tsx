@@ -188,7 +188,7 @@ export function ReservationCalendarView({
                         onMouseEnter={(e) => handleBarMouseEnter(e, r)}
                         onMouseLeave={handleBarMouseLeave}
                         onClick={() => onSelectReservation(r)}
-                        title={`${name} — ${r.checkInDate} to ${r.checkOutDate} (${r.nights} nights). Click for details.`}
+                        title={`${name} — ${toDateOnly(r.checkInDate)} to ${toDateOnly(r.checkOutDate)} (${r.nights} nights). Click for details.`}
                       >
                         <span className="truncate text-xs font-medium text-[#b8e8bc]">{name}</span>
                       </div>
@@ -219,7 +219,7 @@ export function ReservationCalendarView({
           ) : null}
           <p className="text-xs text-[#e8e0d5]/70 mt-1">{hoveredReservation.siteName ?? "Site"}</p>
           <p className="text-xs text-[#e8e0d5]/70">
-            {hoveredReservation.checkInDate} – {hoveredReservation.checkOutDate} ({hoveredReservation.nights} nights)
+            {toDateOnly(hoveredReservation.checkInDate)} – {toDateOnly(hoveredReservation.checkOutDate)} ({hoveredReservation.nights} nights)
           </p>
           {hoveredReservation.checkedInAt ? (
             <p className="text-xs text-[#6dd472] mt-1">Checked in</p>

@@ -2520,7 +2520,7 @@ export function CaretakerPortalContent({
                       {r.eventProductHandle ? <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[#d4af37]/20 text-[#f0d48f]">Event{r.eventSiteType === "upgrade_hookup" ? " (hookup)" : ""}</span> : null}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm">{r.checkInDate} – {r.checkOutDate}</span>
+                      <span className="text-sm">{toDateOnly(r.checkInDate)} → {toDateOnly(r.checkOutDate)}</span>
                       <button
                         type="button"
                         onClick={() => openResDetailsModal(r)}
