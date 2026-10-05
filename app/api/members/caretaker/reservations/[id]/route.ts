@@ -9,6 +9,7 @@ import {
   getReservationPaymentTotals,
   listBillingPeriods,
   listReservationPayments,
+  listReservationPaymentVoids,
   siteRatesFromRow,
   stayNights,
   syncBillingPeriodsForReservation,
@@ -134,10 +135,12 @@ export async function GET(
   const billingPeriods = await listBillingPeriods(id);
   const balance = await getReservationBalance(id);
   const payments = await listReservationPayments(id);
+  const voidedPayments = await listReservationPaymentVoids(id);
   const paymentSummary = await getReservationPaymentTotals(id);
 
   return NextResponse.json({
     ...rowToJson(row),
+    voidedPayments,
     siteName: row.site_name ?? null,
     billingPeriods,
     balance,

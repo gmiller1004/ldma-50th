@@ -124,6 +124,52 @@ export async function listReservationPayments(reservationId: string): Promise<Re
   });
 }
 
+export type ReservationPaymentVoid = {
+  id: string;
+  originalPaymentId: string;
+  method: string;
+  amountCents: number;
+  originalCreatedAt: string;
+  reason: string;
+  voidedAt: string;
+};
+
+export async function listReservationPaymentVoids(reservationId: string): Promise<ReservationPaymentVoid[]> {
+  if (!hasDb() || !sql) return [];
+  let rows: unknown;
+  try {
+    rows = await sql`
+      SELECT id, original_payment_id, method, amount_cents, original_created_at, reason, voided_at
+      FROM camp_payment_voids
+      WHERE reservation_id = ${reservationId}
+      ORDER BY voided_at ASC
+    `;
+  } catch (e) {
+    console.error("[billing] could not list payment voids (run db:migrate:camp-payment-voids):", e);
+    return [];
+  }
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const r = row as {
+      id: string;
+      original_payment_id: string;
+      method: string;
+      amount_cents: number;
+      original_created_at: string | Date;
+      reason: string;
+      voided_at: string | Date;
+    };
+    return {
+      id: r.id,
+      originalPaymentId: r.original_payment_id,
+      method: r.method,
+      amountCents: r.amount_cents,
+      originalCreatedAt: new Date(r.original_created_at).toISOString(),
+      reason: r.reason,
+      voidedAt: new Date(r.voided_at).toISOString(),
+    };
+  });
+}
+
 export async function getReservationPaymentsTotalCents(reservationId: string): Promise<number> {
   const totals = await getReservationPaymentTotals(reservationId);
   return totals.netPaidCents;
@@ -272,7 +318,8 @@ export async function syncBillingPeriodsForReservation(input: {
  * periods exist yet.
  */
 export async function applyPaymentsToExistingPeriods(
-  reservationId: string
+  reservationId: string,
+  opts: { paidCentsOverride?: number } = {}
 ): Promise<{ totalDueCents: number; totalPaidCents: number; balanceDueCents: number }> {
   if (!hasDb() || !sql) {
     return { totalDueCents: 0, totalPaidCents: 0, balanceDueCents: 0 };
@@ -291,8 +338,9 @@ export async function applyPaymentsToExistingPeriods(
     dueDate: p.dueDate,
     pricingBasis: p.pricingBasis as BillingPeriodDraft["pricingBasis"],
   }));
-  const totalPaidCents = await getReservationNetPaidCents(reservationId);
-  const allocated = allocatePaidWaterfall(drafts, totalPaidCents);
+  const totalPaidCents =
+    opts.paidCentsOverride ?? (await getReservationNetPaidCents(reservationId));
+  const allocated = allocatePaidWaterfall(drafts, Math.max(0, totalPaidCents));
 
   for (const p of allocated) {
     await sql`

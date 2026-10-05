@@ -484,6 +484,15 @@ export function CaretakerPortalContent({
     stripePaymentIntentId: string | null;
     createdAt: string;
   }>>([]);
+  const [detailsVoidedPayments, setDetailsVoidedPayments] = useState<Array<{
+    id: string;
+    method: string;
+    amountCents: number;
+    originalCreatedAt: string;
+    reason: string;
+    voidedAt: string;
+  }>>([]);
+  const [detailsVoidingPaymentId, setDetailsVoidingPaymentId] = useState<string | null>(null);
   const [detailsPaymentSummary, setDetailsPaymentSummary] = useState<{
     totalPaidCents: number;
     totalRefundedCents: number;
@@ -1110,6 +1119,7 @@ export function CaretakerPortalContent({
     setDetailsBillingPeriods([]);
     setDetailsSiteBalance(null);
     setDetailsPayments([]);
+    setDetailsVoidedPayments([]);
     setDetailsPaymentSummary(null);
     setDetailsContactLookupInput(
       r.reservationType === "guest"
@@ -1135,6 +1145,7 @@ export function CaretakerPortalContent({
           setDetailsBillingPeriods(detail.billingPeriods ?? []);
           setDetailsSiteBalance(detail.balance ?? null);
           setDetailsPayments(detail.payments ?? []);
+          setDetailsVoidedPayments(detail.voidedPayments ?? []);
           setDetailsPaymentSummary(detail.paymentSummary ?? null);
           setDetailsGuestEmail(detail.guestEmail?.trim() ?? "");
           setDetailsGuestPhone(detail.guestPhone?.trim() ?? "");
@@ -1378,6 +1389,7 @@ export function CaretakerPortalContent({
           setDetailsBillingPeriods(detail.billingPeriods ?? []);
           setDetailsSiteBalance(detail.balance ?? null);
           setDetailsPayments(detail.payments ?? []);
+          setDetailsVoidedPayments(detail.voidedPayments ?? []);
           setDetailsPaymentSummary(detail.paymentSummary ?? null);
           setDetailsGuestEmail(detail.guestEmail?.trim() ?? "");
           setDetailsGuestPhone(detail.guestPhone?.trim() ?? "");
@@ -1386,6 +1398,37 @@ export function CaretakerPortalContent({
       .catch(() => {})
       .finally(() => setDetailsLoading(false));
     loadReservations();
+  }
+
+  async function handleVoidCashEntry(p: { id: string; amountCents: number; createdAt: string }) {
+    const reason = window.prompt(
+      `Void the ${formatCentsAsCurrency(p.amountCents)} cash entry from ${toDateOnly(p.createdAt)}?\n\n` +
+        "Only void cash that was never actually received (entered by mistake). " +
+        "The amount goes back onto the balance due.\n\nReason:"
+    );
+    if (reason === null) return;
+    if (reason.trim().length < 5) {
+      alert("Please give a reason (at least 5 characters).");
+      return;
+    }
+    setDetailsVoidingPaymentId(p.id);
+    try {
+      const res = await fetch("/api/members/caretaker/payments/void-cash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentId: p.id, reason: reason.trim(), campSlug }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error ?? "Could not void this entry");
+        return;
+      }
+      refreshDetailsReservation();
+    } catch {
+      alert("Could not void this entry");
+    } finally {
+      setDetailsVoidingPaymentId(null);
+    }
   }
 
   function openResEditModal(r: Reservation) {
@@ -2830,7 +2873,7 @@ export function CaretakerPortalContent({
                   </div>
                 )}
 
-                {detailsPayments.length > 0 && (
+                {(detailsPayments.length > 0 || detailsVoidedPayments.length > 0) && (
                   <div className="pt-2 border-t border-[#d4af37]/20">
                     <p className="text-[#f0d48f] font-medium text-sm mb-2">Payment history</p>
                     <ul className="space-y-2 text-xs">
@@ -2847,8 +2890,29 @@ export function CaretakerPortalContent({
                             <p className="text-[#e8e0d5]/50 font-mono truncate" title={p.stripePaymentIntentId}>PI: {p.stripePaymentIntentId}</p>
                           )}
                           {p.method === "cash" && p.paymentType !== "refund" && (
-                            <p className="text-[#e8e0d5]/50 font-mono truncate" title={p.id}>ID: {p.id}</p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[#e8e0d5]/50 font-mono truncate" title={p.id}>ID: {p.id}</p>
+                              {detailsReservation.status !== "cancelled" && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleVoidCashEntry(p)}
+                                  disabled={detailsVoidingPaymentId !== null}
+                                  className="shrink-0 text-red-300 hover:text-red-200 hover:underline disabled:opacity-50"
+                                  title="Remove a cash entry that was recorded by mistake (cash never received)"
+                                >
+                                  {detailsVoidingPaymentId === p.id ? "Voiding…" : "Void entry"}
+                                </button>
+                              )}
+                            </div>
                           )}
+                        </li>
+                      ))}
+                      {detailsVoidedPayments.map((v) => (
+                        <li key={v.id} className="text-[#e8e0d5]/50">
+                          <span className="line-through">{formatCentsAsCurrency(v.amountCents)}</span>
+                          {" · "}Cash · {toDateOnly(v.originalCreatedAt)}
+                          {" · "}<span className="text-amber-300/80">Voided {toDateOnly(v.voidedAt)}</span>
+                          <p className="italic">Reason: {v.reason}</p>
                         </li>
                       ))}
                     </ul>
