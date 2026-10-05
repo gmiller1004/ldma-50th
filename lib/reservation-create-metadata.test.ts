@@ -30,4 +30,21 @@ describe("resolveCreateReservationPricing", () => {
     assert.equal(r.fields.amountOverrideCents, 250000);
     assert.equal(r.fields.overrideReason, "Negotiated rate");
   });
+
+  it("blank payment collects the full stay total by default (card checkout)", () => {
+    const r = resolveCreateReservationPricing(300000, { paymentAmountDollars: "" });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.collectCents, 300000);
+    assert.equal(r.balanceAfterCents, 0);
+  });
+
+  it("blank payment collects nothing when blankPaymentMeans is zero (cash / pay on arrival)", () => {
+    const r = resolveCreateReservationPricing(300000, { paymentAmountDollars: "  ", blankPaymentMeans: "zero" });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.collectCents, 0);
+    assert.equal(r.balanceAfterCents, 300000);
+    assert.equal(r.fields.amountCents, 0);
+  });
 });

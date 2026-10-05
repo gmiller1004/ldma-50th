@@ -37,6 +37,28 @@ describe("validatePriceOverride", () => {
       assert.equal(r.result.effectiveTotalCents, 7500);
     }
   });
+
+  it("rejects $0 payment unless allowZeroPayment (cash pay on arrival)", () => {
+    assert.equal(validatePriceOverride({ calculatedTotalCents: 10000, paymentAmountCents: 0 }).ok, false);
+    assert.equal(
+      validatePriceOverride({ calculatedTotalCents: 10000, paymentAmountCents: 0, allowZeroPayment: true }).ok,
+      true
+    );
+    assert.equal(
+      validatePriceOverride({
+        calculatedTotalCents: 10000,
+        amountOverrideCents: 7500,
+        overrideReason: "Long stay rate",
+        paymentAmountCents: 0,
+        allowZeroPayment: true,
+      }).ok,
+      true
+    );
+    assert.equal(
+      validatePriceOverride({ calculatedTotalCents: 10000, paymentAmountCents: -100, allowZeroPayment: true }).ok,
+      false
+    );
+  });
 });
 
 describe("scalePeriodDraftsToTotal", () => {

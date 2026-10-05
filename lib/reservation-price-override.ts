@@ -9,6 +9,8 @@ export type PriceOverrideInput = {
   amountOverrideCents?: number | null;
   overrideReason?: string | null;
   paymentAmountCents: number;
+  /** Cash create can record nothing now (pay on arrival); card checkout cannot charge $0. */
+  allowZeroPayment?: boolean;
 };
 
 export type PriceOverrideResult = {
@@ -26,6 +28,10 @@ export function validatePriceOverride(input: PriceOverrideInput):
   if (calculatedTotalCents < 0) {
     return { ok: false, error: "Invalid calculated total" };
   }
+  if (paymentAmountCents < 0) {
+    return { ok: false, error: "Payment cannot be negative" };
+  }
+  const minPaymentCents = input.allowZeroPayment ? 0 : 1;
 
   const rawOverride =
     typeof input.amountOverrideCents === "number" && !Number.isNaN(input.amountOverrideCents)
@@ -46,7 +52,7 @@ export function validatePriceOverride(input: PriceOverrideInput):
         error: `Payment cannot exceed override total ($${(rawOverride / 100).toFixed(2)})`,
       };
     }
-    if (rawOverride > 0 && paymentAmountCents < 1) {
+    if (rawOverride > 0 && paymentAmountCents < minPaymentCents) {
       return { ok: false, error: "Payment must be at least $0.01 unless override total is $0" };
     }
     return {
@@ -67,7 +73,7 @@ export function validatePriceOverride(input: PriceOverrideInput):
       error: `Collect amount ($${(paymentAmountCents / 100).toFixed(2)}) cannot exceed calculated stay total ($${(calculatedTotalCents / 100).toFixed(2)})`,
     };
   }
-  if (paymentAmountCents < 1 && calculatedTotalCents > 0) {
+  if (paymentAmountCents < minPaymentCents && calculatedTotalCents > 0) {
     return { ok: false, error: "Payment must be at least $0.01" };
   }
 

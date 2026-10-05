@@ -283,7 +283,9 @@ export async function POST(request: NextRequest) {
   const isMember = type === "member";
   const totalDueCents = computeStayTotalCents({ checkInDate, checkOutDate, isMember, rates });
 
-  const pricingParsed = parseReservationPricingBody(body, totalDueCents < 1 ? 0 : totalDueCents);
+  const pricingParsed = parseReservationPricingBody(body, totalDueCents < 1 ? 0 : totalDueCents, {
+    allowZeroPayment: body.paymentMethod === "cash",
+  });
   if (!pricingParsed.ok) {
     return NextResponse.json({ error: pricingParsed.error }, { status: 400 });
   }

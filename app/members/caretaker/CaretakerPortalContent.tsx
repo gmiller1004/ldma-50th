@@ -745,6 +745,7 @@ export function CaretakerPortalContent({
       stayTotalOverrideDollars: resStayTotalOverride,
       overrideReason: resOverrideReason,
       paymentAmountDollars: resPaymentAmount,
+      blankPaymentMeans: "zero",
     });
     return r.ok ? r : null;
   }, [resTotalCents, resStayTotalOverride, resOverrideReason, resPaymentAmount]);
@@ -808,11 +809,15 @@ export function CaretakerPortalContent({
     [archivedReservations, archivedResSearch, archivedResFilter, archivedResSortKey, archivedResSortDir]
   );
 
-  function applyCreatePricingFields(body: Record<string, unknown>): string | null {
+  function applyCreatePricingFields(
+    body: Record<string, unknown>,
+    blankPaymentMeans: "full" | "zero"
+  ): string | null {
     const resolved = resolveCreateReservationPricing(Math.max(0, resTotalCents), {
       stayTotalOverrideDollars: resStayTotalOverride,
       overrideReason: resOverrideReason,
       paymentAmountDollars: resPaymentAmount,
+      blankPaymentMeans,
     });
     if (!resolved.ok) return resolved.error;
     Object.assign(body, resolved.fields);
@@ -957,7 +962,7 @@ export function CaretakerPortalContent({
             ? resMemberLookup!.displayName || `#${resMemberLookup!.memberNumber}`
             : `${resGuestFirstName.trim()} ${resGuestLastName.trim()}`.trim() || "Guest",
       };
-      const pricingErr = applyCreatePricingFields(body);
+      const pricingErr = applyCreatePricingFields(body, "zero");
       if (pricingErr) {
         setResError(pricingErr);
         return;
@@ -1043,7 +1048,7 @@ export function CaretakerPortalContent({
         nights: resNights,
         reservationType: resType,
       };
-      const pricingErr = applyCreatePricingFields(checkoutBody);
+      const pricingErr = applyCreatePricingFields(checkoutBody, "full");
       if (pricingErr) {
         setResError(pricingErr);
         return;
@@ -2682,9 +2687,16 @@ export function CaretakerPortalContent({
                           step={0.01}
                           value={resPaymentAmount}
                           onChange={(e) => setResPaymentAmount(e.target.value)}
-                          placeholder={(resCollectCents / 100).toFixed(2)}
+                          placeholder="0.00"
                           className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
                         />
+                        <button
+                          type="button"
+                          onClick={() => setResPaymentAmount((resStayTotalCents / 100).toFixed(2))}
+                          className="mt-1 mr-3 text-xs text-[#d4af37] hover:underline"
+                        >
+                          Full stay ({formatCentsAsCurrency(resStayTotalCents)})
+                        </button>
                         {resSuggestedFirstPeriodCents != null &&
                           resSuggestedFirstPeriodCents > 0 &&
                           resSuggestedFirstPeriodCents < resStayTotalCents && (
@@ -2719,14 +2731,20 @@ export function CaretakerPortalContent({
                       placeholder="Reason if stay total differs from calculated"
                       className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
                     />
-                    {resBalanceAfterCents > 0 && (
+                    {resCollectCents === 0 ? (
+                      <p className="text-amber-300/90 text-xs">
+                        Nothing collected now — full balance of {formatCentsAsCurrency(resStayTotalCents)} due later
+                        (collect in reservation details).
+                      </p>
+                    ) : resBalanceAfterCents > 0 ? (
                       <p className="text-amber-300/90 text-xs">
                         Balance after this payment: {formatCentsAsCurrency(resBalanceAfterCents)} (collect later in
                         reservation details)
                       </p>
-                    )}
+                    ) : null}
                     <p className="text-[#e8e0d5]/60 text-xs">
-                      Pay with cash at the camp or send a card checkout link.
+                      Cash: only enter what you&apos;re holding now — leave blank for pay on arrival. Card checkout
+                      charges the amount above, or the full stay if blank.
                     </p>
                   </div>
                 )}
@@ -2740,7 +2758,10 @@ export function CaretakerPortalContent({
                       <>
                         {resAllowsCash && (
                           <button type="button" onClick={handleCreateReservationCash} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
-                            {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with cash
+                            {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                            {resCollectCents > 0
+                              ? `Record ${formatCentsAsCurrency(resCollectCents)} cash received`
+                              : "Create — pay on arrival"}
                           </button>
                         )}
                         <button type="button" onClick={handleCreateReservationCard} disabled={resSubmitting} className={resAllowsCash ? "flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2" : "flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2"}>

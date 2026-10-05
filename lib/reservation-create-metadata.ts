@@ -20,7 +20,8 @@ export function parseReservationPricingBody(
     amountOverrideCents?: number;
     overrideReason?: string;
   },
-  calculatedTotalCents: number
+  calculatedTotalCents: number,
+  opts: { allowZeroPayment?: boolean } = {}
 ): { ok: true; pricing: ReservationPricingFields; paymentAmountCents: number } | { ok: false; error: string } {
   const paymentAmountCents =
     typeof body.amountCents === "number" && !Number.isNaN(body.amountCents)
@@ -36,6 +37,7 @@ export function parseReservationPricingBody(
     amountOverrideCents,
     overrideReason: body.overrideReason,
     paymentAmountCents,
+    allowZeroPayment: opts.allowZeroPayment,
   });
   if (!validated.ok) return validated;
 
@@ -78,6 +80,8 @@ export function resolveCreateReservationPricing(
     stayTotalOverrideDollars?: string;
     overrideReason?: string;
     paymentAmountDollars?: string;
+    /** What an empty payment field means: collect the full stay total (card checkout) or nothing (cash / pay on arrival). */
+    blankPaymentMeans?: "full" | "zero";
   }
 ):
   | { ok: false; error: string }
@@ -100,12 +104,13 @@ export function resolveCreateReservationPricing(
     {
       amountCents: parseOptionalDollarsToCents(
         opts.paymentAmountDollars,
-        stayTotalOverrideCents ?? calculatedTotalCents
+        opts.blankPaymentMeans === "zero" ? 0 : stayTotalOverrideCents ?? calculatedTotalCents
       ),
       amountOverrideCents: stayTotalOverrideCents,
       overrideReason: opts.overrideReason,
     },
-    calculatedTotalCents
+    calculatedTotalCents,
+    { allowZeroPayment: opts.blankPaymentMeans === "zero" }
   );
   if (!parsedPricing.ok) return parsedPricing;
 
