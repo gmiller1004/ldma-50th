@@ -25,6 +25,7 @@ import {
 } from "@/lib/sendgrid";
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
+import { campTodayStr } from "@/lib/camp-time";
 import { refundReservationSiteFees } from "@/lib/reservation-refund";
 import { payableBalanceCents } from "@/lib/reservation-balance-due";
 
@@ -183,6 +184,7 @@ export async function PATCH(
       recipientEmail?: string;
       recipientDisplayName?: string;
       issueRefund?: boolean;
+      cashRefundHandedBack?: boolean;
       stayTotalOverrideCents?: number;
       overrideReason?: string;
     };
@@ -230,7 +232,7 @@ export async function PATCH(
 
     const setCheckInRequested = body.checkIn === true;
     if (setCheckInRequested) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = campTodayStr(caretaker.campSlug);
       const effectiveCheckIn =
         typeof body.checkInDate === "string" && DATE_REGEX.test(body.checkInDate.trim())
           ? body.checkInDate.trim().slice(0, 10)
@@ -262,7 +264,7 @@ export async function PATCH(
     }
 
     const datesChanged = checkInCandidate !== null || checkOutCandidate !== null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = campTodayStr(caretaker.campSlug);
 
     let cashPayment: { amountCents: number; recipientEmail: string; recipientDisplayName: string } | null = null;
     if (datesChanged && body.paymentMethod === "cash") {
@@ -365,6 +367,7 @@ export async function PATCH(
           campSlug: caretaker.campSlug,
           createdByContactId: caretaker.contactId,
           refundCents: creditCents,
+          cashRefundHandedBack: body.cashRefundHandedBack === true,
         });
         if (!refund.ok) {
           return NextResponse.json(

@@ -16,6 +16,7 @@ import {
   getReservationSiteFeeTotals,
   refundReservationSiteFees,
 } from "@/lib/reservation-refund";
+import { validatePriceOverride } from "@/lib/reservation-price-override";
 import { lookupMember } from "@/lib/salesforce";
 import { sendReservationSiteMovedEmail } from "@/lib/sendgrid";
 import { fetchCaretakerEmailsForCamp } from "@/lib/caretaker-admin-summary";
@@ -40,8 +41,8 @@ type ReservationRow = {
 
 /**
  * POST /api/members/caretaker/reservations/[id]/move
- * Move a reservation to a different (available) site and settle the price difference:
- * charge the additional amount (cash here / card via checkout) or refund the overpayment.
+ * Move a reservation to a different (available) site. Added balance stays due on the schedule;
+ * an overpayment is refunded only when issueRefund is set (cash portion only if handed back).
  */
 export async function POST(
   request: NextRequest,
@@ -64,10 +65,10 @@ export async function POST(
 
     let body: {
       newSiteId?: string;
-      paymentMethod?: string;
-      amountCents?: number;
-      recipientEmail?: string;
-      recipientDisplayName?: string;
+      issueRefund?: boolean;
+      cashRefundHandedBack?: boolean;
+      stayTotalOverrideCents?: number;
+      overrideReason?: string;
     };
     try {
       body = await request.json();
@@ -183,26 +184,38 @@ export async function POST(
 
     const rates = siteRatesFromRow(newSite);
     const pricing = computeStayPricing({ checkInDate, checkOutDate, isMember, rates });
-    const newTotalCents = pricing.totalCents;
-    if (newTotalCents < 1) {
+    if (pricing.totalCents < 1) {
       return NextResponse.json(
         { error: "Destination site rates are not configured" },
         { status: 400 }
       );
     }
+    // The new site gets its standard total unless the caretaker enters a special total for it.
+    const priced = validatePriceOverride({
+      calculatedTotalCents: pricing.totalCents,
+      amountOverrideCents:
+        typeof body.stayTotalOverrideCents === "number" ? Math.round(body.stayTotalOverrideCents) : undefined,
+      overrideReason: body.overrideReason,
+      paymentAmountCents: 0,
+      allowZeroPayment: true,
+    });
+    if (!priced.ok) {
+      return NextResponse.json({ error: priced.error }, { status: 400 });
+    }
+    const newTotalCents = priced.result.effectiveTotalCents;
 
     const totalsBefore = await getReservationSiteFeeTotals(id);
-    const balanceAfterMoveCents = newTotalCents - totalsBefore.netPaidCents;
+    const creditCents = Math.max(0, totalsBefore.netPaidCents - newTotalCents);
 
     // Refund overpayment before moving so a failed refund does not leave a moved reservation.
-    let refundResult: { stripeRefundCents: number; cashRefundCents: number; totalRefundedCents: number } | null =
-      null;
-    if (balanceAfterMoveCents < 0) {
+    let refundResult: Awaited<ReturnType<typeof refundReservationSiteFees>> | null = null;
+    if (body.issueRefund === true && creditCents > 0) {
       const refund = await refundReservationSiteFees({
         reservationId: id,
         campSlug: caretaker.campSlug,
         createdByContactId: caretaker.contactId,
-        refundCents: -balanceAfterMoveCents,
+        refundCents: creditCents,
+        cashRefundHandedBack: body.cashRefundHandedBack === true,
       });
       if (!refund.ok) {
         return NextResponse.json({ error: refund.error }, { status: 400 });
@@ -210,28 +223,27 @@ export async function POST(
       refundResult = refund;
     }
 
-    // Move the reservation and reset pricing to the new site's calculated total.
     await sql`
       UPDATE camp_reservations
       SET site_id = ${newSiteId},
           nights = ${pricing.totalNights},
-          calculated_total_cents = ${newTotalCents},
-          amount_override_cents = NULL,
-          override_reason = NULL,
-          price_override_flag = FALSE,
+          calculated_total_cents = ${priced.result.calculatedTotalCents},
+          amount_override_cents = ${priced.result.amountOverrideCents},
+          override_reason = ${priced.result.overrideReason},
+          price_override_flag = ${priced.result.priceOverrideFlag},
           updated_at = NOW()
       WHERE id = ${id}
     `;
 
-    // Sync billing to the new site total. Do not require collecting the pre-arrival
-    // remainder here — public $100 deposits (and other holds) stay honored; unpaid
-    // balance remains on the normal schedule / reminders.
+    // Do not require collecting the pre-arrival remainder here — public $100 deposits
+    // (and other holds) stay honored; unpaid balance remains on the normal schedule / reminders.
     await syncBillingPeriodsForReservation({
       reservationId: id,
       checkInDate,
       checkOutDate,
       isMember,
       rates,
+      effectiveTotalCents: newTotalCents,
     });
 
     if (!sameSite) {

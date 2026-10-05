@@ -42,7 +42,8 @@ export async function GET(
     }
 
     const resRows = await sql`
-      SELECT id, site_id, check_in_date, check_out_date, nights, reservation_type, status
+      SELECT id, site_id, check_in_date, check_out_date, nights, reservation_type, status,
+             amount_override_cents, override_reason, price_override_flag
       FROM camp_reservations
       WHERE id = ${id} AND camp_slug = ${caretaker.campSlug}
       LIMIT 1
@@ -56,6 +57,9 @@ export async function GET(
           nights: number;
           reservation_type: string;
           status: string;
+          amount_override_cents: number | null;
+          override_reason: string | null;
+          price_override_flag: boolean | null;
         }
       | undefined;
     if (!res) return NextResponse.json({ error: "Reservation not found" }, { status: 404 });
@@ -127,7 +131,7 @@ export async function GET(
     const { stripeRefundCents, cashRefundCents } = allocateRefundSplit(
       refundCents,
       totals.cardPaidCents,
-      totals.refundedCents
+      totals.cardRefundedCents
     );
 
     return NextResponse.json({
@@ -151,6 +155,10 @@ export async function GET(
       refundCents,
       refundBreakdown: { stripeRefundCents, cashRefundCents },
       cashAllowed: caretakerAllowsCashExistingReservationPayment(),
+      specialRate:
+        res.price_override_flag && res.amount_override_cents != null
+          ? { totalCents: res.amount_override_cents, reason: res.override_reason ?? "" }
+          : null,
     });
   } catch (e) {
     console.error("[caretaker] move-preview error:", e);

@@ -4,6 +4,8 @@
 
 import { sql, hasDb } from "@/lib/db";
 import { directoryCamps } from "@/lib/directory-camps";
+import { campTodayStr } from "@/lib/camp-time";
+import { addDays } from "@/lib/reservation-dates";
 
 export type PaymentDueItem = {
   reservationId: string;
@@ -53,10 +55,8 @@ export async function fetchPaymentsDueForCamp(
   daysAhead = 7
 ): Promise<PaymentDueItem[]> {
   if (!hasDb() || !sql) return [];
-  const today = new Date().toISOString().slice(0, 10);
-  const horizon = new Date();
-  horizon.setDate(horizon.getDate() + daysAhead);
-  const horizonStr = horizon.toISOString().slice(0, 10);
+  const today = campTodayStr(campSlug);
+  const horizonStr = addDays(today, daysAhead);
 
   const rows = await sql`
     SELECT r.id AS reservation_id, s.name AS site_name, r.reservation_type,
@@ -113,7 +113,7 @@ export async function fetchSiteArByCamp(): Promise<CampSiteArSummary[]> {
     }));
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = campTodayStr();
   const rows = await sql`
     SELECT r.camp_slug,
            COALESCE(SUM(bp.amount_due_cents - bp.amount_paid_cents), 0)::int AS balance_due,

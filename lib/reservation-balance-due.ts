@@ -3,6 +3,7 @@
  */
 
 import { countNights } from "@/lib/reservation-dates";
+import { campTodayStr } from "@/lib/camp-time";
 import {
   MEMBER_DAILY_MAX_NIGHTS,
   generateBillingPeriods,
@@ -77,7 +78,7 @@ export function nextScheduledPayment(
   periods: BillingPeriodSummary[],
   today?: string
 ): { dueDate: string; amountCents: number } | null {
-  const todayStr = (today ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
+  const todayStr = (today ?? campTodayStr()).slice(0, 10);
   const upcoming = periods
     .filter((p) => {
       const dueDate = p.dueDate.slice(0, 10);
@@ -113,7 +114,7 @@ export function payableBalanceCents(input: {
   reservationType: string;
   today?: string;
 }): number {
-  const todayStr = input.today ?? new Date().toISOString().slice(0, 10);
+  const todayStr = input.today ?? campTodayStr();
   const checkIn = input.checkInDate.slice(0, 10);
   const periods = activeBillingPeriods(input.periods);
   const totalUnpaid = totalUnpaidBalanceCents(periods);

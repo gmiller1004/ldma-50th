@@ -12,6 +12,8 @@ import { getCampBySlug } from "@/lib/directory-camps";
 import { fetchCaretakerEmailsForCamp } from "@/lib/caretaker-admin-summary";
 import { sendReservationCancelledEmail } from "@/lib/sendgrid";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
+import { allocateRefundSplit } from "@/lib/reservation-refund";
+import { campTodayStr } from "@/lib/camp-time";
 
 export type CancelPreview = CancellationRefundResult & {
   reservationId: string;
@@ -50,24 +52,26 @@ async function resolvePaymentIntentId(
 }
 
 async function paymentTotals(reservationId: string) {
-  if (!sql) return { paid: 0, refunded: 0, cardPaid: 0, cashPaid: 0 };
+  if (!sql) return { paid: 0, refunded: 0, cardPaid: 0, cashPaid: 0, cardRefunded: 0 };
   const paidRes = await sql`
     SELECT
       COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation'), 0)::int AS paid,
       COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'refund'), 0)::int AS refunded,
       COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation' AND method = 'card'), 0)::int AS card_paid,
-      COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation' AND method = 'cash'), 0)::int AS cash_paid
+      COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation' AND method = 'cash'), 0)::int AS cash_paid,
+      COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'refund' AND method = 'card'), 0)::int AS card_refunded
     FROM camp_payments
     WHERE reservation_id = ${reservationId}
   `;
   const row = (Array.isArray(paidRes) ? paidRes[0] : undefined) as
-    | { paid: number; refunded: number; card_paid: number; cash_paid: number }
+    | { paid: number; refunded: number; card_paid: number; cash_paid: number; card_refunded: number }
     | undefined;
   return {
     paid: row?.paid ?? 0,
     refunded: row?.refunded ?? 0,
     cardPaid: row?.card_paid ?? 0,
     cashPaid: row?.cash_paid ?? 0,
+    cardRefunded: row?.card_refunded ?? 0,
   };
 }
 
@@ -81,14 +85,6 @@ async function refundedForPayment(paymentId: string): Promise<number> {
   return ((Array.isArray(rows) ? rows[0] : undefined) as { n: number } | undefined)?.n ?? 0;
 }
 
-function allocateRefund(refundCents: number, cardPaid: number, cashPaid: number, alreadyRefunded: number) {
-  const cardRemaining = Math.max(0, cardPaid - alreadyRefunded);
-  const stripeRefundCents = Math.min(refundCents, cardRemaining);
-  const cashRefundCents = Math.max(0, refundCents - stripeRefundCents);
-  void cashPaid;
-  return { stripeRefundCents, cashRefundCents };
-}
-
 export async function buildCancelPreview(
   reservationId: string,
   campSlug: string,
@@ -97,7 +93,7 @@ export async function buildCancelPreview(
 ): Promise<CancelPreview | null> {
   if (!hasDb() || !sql) return null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = campTodayStr(campSlug);
   const effectiveCancel = cancelDate?.slice(0, 10) || today;
 
   const rows = await sql`
@@ -136,11 +132,10 @@ export async function buildCancelPreview(
     waiveCancellationFee,
   });
 
-  const { stripeRefundCents, cashRefundCents } = allocateRefund(
+  const { stripeRefundCents, cashRefundCents } = allocateRefundSplit(
     calc.refundCents,
     totals.cardPaid,
-    totals.cashPaid,
-    totals.refunded
+    totals.cardRefunded
   );
 
   return {
@@ -159,6 +154,8 @@ export async function executeCancellation(input: {
   createdByContactId: string;
   cancelDate?: string;
   waiveCancellationFee?: boolean;
+  /** Caretaker confirmed the cash portion of the refund was handed back; otherwise no cash refund is recorded. */
+  cashRefundHandedBack?: boolean;
 }): Promise<{ ok: true; preview: CancelPreview } | { ok: false; error: string }> {
   if (!hasDb() || !sql) return { ok: false, error: "Database not available" };
 
@@ -184,17 +181,24 @@ async function executeCancellationInner(input: {
   createdByContactId: string;
   cancelDate?: string;
   waiveCancellationFee?: boolean;
+  cashRefundHandedBack?: boolean;
 }): Promise<{ ok: true; preview: CancelPreview } | { ok: false; error: string }> {
   if (!sql) return { ok: false, error: "Database not available" };
 
   const waive = Boolean(input.waiveCancellationFee);
-  const preview = await buildCancelPreview(
+  const policyPreview = await buildCancelPreview(
     input.reservationId,
     input.campSlug,
     input.cancelDate,
     waive
   );
-  if (!preview) return { ok: false, error: "Reservation not found or already cancelled" };
+  if (!policyPreview) return { ok: false, error: "Reservation not found or already cancelled" };
+  const cashRecordedCents = input.cashRefundHandedBack ? policyPreview.cashRefundCents : 0;
+  const preview: CancelPreview = {
+    ...policyPreview,
+    cashRefundCents: cashRecordedCents,
+    refundCents: policyPreview.stripeRefundCents + cashRecordedCents,
+  };
 
   const resRows = await sql`
     SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.nights, r.reservation_type, r.member_number, r.member_display_name,

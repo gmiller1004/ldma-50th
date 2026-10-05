@@ -11,6 +11,7 @@ import {
   type BillingPeriodDraft,
 } from "@/lib/reservation-pricing";
 import { countNights, toDateOnlyStr } from "@/lib/reservation-dates";
+import { campTodayStr } from "@/lib/camp-time";
 import { scalePeriodDraftsToTotal } from "@/lib/reservation-price-override";
 
 export type BillingPeriodSummary = {
@@ -529,20 +530,25 @@ export type ReservationBalanceSummary = {
   totalPaidCents: number;
   hasOverduePeriod: boolean;
   nextDueDate: string | null;
+  /** Unpaid amount on periods due today or earlier (excludes scheduled future months). */
+  dueNowCents: number;
 };
 
 /** Batch balance summary for reservation list views. */
 export async function summarizeReservationBalances(
-  reservationIds: string[]
+  reservationIds: string[],
+  today: string = campTodayStr()
 ): Promise<Map<string, ReservationBalanceSummary>> {
   const out = new Map<string, ReservationBalanceSummary>();
   if (!hasDb() || !sql || reservationIds.length === 0) return out;
 
-  const today = new Date().toISOString().slice(0, 10);
   const rows = await sql`
     SELECT reservation_id,
            COALESCE(SUM(amount_due_cents), 0)::int AS total_due,
            COALESCE(SUM(amount_paid_cents), 0)::int AS total_paid,
+           COALESCE(SUM(GREATEST(0, amount_due_cents - amount_paid_cents)) FILTER (
+             WHERE status IN ('unpaid', 'partial') AND due_date <= ${today}::date
+           ), 0)::int AS due_now,
            BOOL_OR(status IN ('unpaid', 'partial') AND due_date < ${today}::date) AS has_overdue,
            MIN(due_date) FILTER (WHERE status IN ('unpaid', 'partial'))::text AS next_due
     FROM camp_billing_periods
@@ -556,6 +562,7 @@ export async function summarizeReservationBalances(
       reservation_id: string;
       total_due: number;
       total_paid: number;
+      due_now: number;
       has_overdue: boolean;
       next_due: string | null;
     };
@@ -566,6 +573,7 @@ export async function summarizeReservationBalances(
       totalPaidCents: r.total_paid,
       hasOverduePeriod: Boolean(r.has_overdue),
       nextDueDate: r.next_due ? String(r.next_due).slice(0, 10) : null,
+      dueNowCents: Math.min(balanceDueCents, r.due_now),
     });
   }
 

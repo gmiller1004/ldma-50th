@@ -39,6 +39,7 @@ import {
 } from "@/lib/caretaker-reservation-list-query";
 
 import { parseCaretakerLookupInput } from "@/lib/member-contact-search";
+import { campTodayStr } from "@/lib/camp-time";
 
 type LookupResult = {
   contactId: string;
@@ -120,6 +121,7 @@ type Reservation = {
   overrideReason?: string | null;
   priceOverrideFlag?: boolean;
   balanceDueCents?: number;
+  dueNowCents?: number;
   siteFeesPaidCents?: number;
   siteFeesDueCents?: number;
   hasOverdueSiteFee?: boolean;
@@ -139,19 +141,20 @@ function toDateOnly(dateStr: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : dateStr;
 }
 
-function reservationIsArchived(r: { checkOutDate: string; status: string }): boolean {
+function reservationIsArchived(r: { checkOutDate: string; status: string }, today: string): boolean {
   if (r.status === "cancelled") return true;
-  const today = new Date().toISOString().slice(0, 10);
   return toDateOnly(r.checkOutDate) < today;
 }
 
-function reservationStatusLabel(r: {
-  status: string;
-  checkOutDate: string;
-  checkedInAt?: string | null;
-}): string {
+function reservationStatusLabel(
+  r: {
+    status: string;
+    checkOutDate: string;
+    checkedInAt?: string | null;
+  },
+  today: string
+): string {
   if (r.status === "cancelled") return "Cancelled";
-  const today = new Date().toISOString().slice(0, 10);
   if (toDateOnly(r.checkOutDate) < today) {
     return r.checkedInAt ? "Completed (checked in)" : "Completed";
   }
@@ -182,6 +185,38 @@ function DateTile({ dateStr }: { dateStr: string }) {
       <span className="text-[10px] font-medium text-[#d4af37]/90">{month}</span>
       <span className="text-base font-semibold text-[#e8e0d5]">{day}</span>
     </span>
+  );
+}
+
+function CashRefundHandedBackField({
+  cashCents,
+  checked,
+  onChange,
+  disabled,
+}: {
+  cashCents: number;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-amber-700/40 bg-amber-950/20 p-3 space-y-1">
+      <label className="flex items-start gap-2 text-sm text-[#e8e0d5]/90 cursor-pointer">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span>I handed {formatCentsAsCurrency(cashCents)} cash back to the guest.</span>
+      </label>
+      <p className="text-[#e8e0d5]/50 text-xs">
+        {checked
+          ? "A cash refund will be recorded under your name."
+          : "No cash refund will be recorded. If the cash was never collected, void that cash entry in Reservation details instead."}
+      </p>
+    </div>
   );
 }
 
@@ -408,6 +443,7 @@ export function CaretakerPortalContent({
   const [resEditPreviewLoading, setResEditPreviewLoading] = useState(false);
   const [resEditPreviewError, setResEditPreviewError] = useState<string | null>(null);
   const [resEditIssueRefund, setResEditIssueRefund] = useState(false);
+  const [resEditCashHandedBack, setResEditCashHandedBack] = useState(false);
   const [resEditSpecialTotal, setResEditSpecialTotal] = useState("");
   const [resEditSpecialReason, setResEditSpecialReason] = useState("");
   const [resEditShowSpecial, setResEditShowSpecial] = useState(false);
@@ -427,7 +463,13 @@ export function CaretakerPortalContent({
     refundCents: number;
     refundBreakdown: { stripeRefundCents: number; cashRefundCents: number };
     cashAllowed: boolean;
+    specialRate?: { totalCents: number; reason: string } | null;
   } | null>(null);
+  const [resMoveIssueRefund, setResMoveIssueRefund] = useState(false);
+  const [resMoveCashHandedBack, setResMoveCashHandedBack] = useState(false);
+  const [resMoveShowSpecial, setResMoveShowSpecial] = useState(false);
+  const [resMoveSpecialTotal, setResMoveSpecialTotal] = useState("");
+  const [resMoveSpecialReason, setResMoveSpecialReason] = useState("");
   const [resMovePreviewLoading, setResMovePreviewLoading] = useState(false);
   const [resMoveSubmitting, setResMoveSubmitting] = useState(false);
   const [resMovePaymentDueCents, setResMovePaymentDueCents] = useState<number | null>(null);
@@ -452,6 +494,7 @@ export function CaretakerPortalContent({
   const [resCancelPreviewLoading, setResCancelPreviewLoading] = useState(false);
   const [resCancelError, setResCancelError] = useState<string | null>(null);
   const [resCancelWaiveFee, setResCancelWaiveFee] = useState(false);
+  const [resCancelCashHandedBack, setResCancelCashHandedBack] = useState(false);
   const [checkingInReservation, setCheckingInReservation] = useState<Reservation | null>(null);
   const [resCheckInSubmitting, setResCheckInSubmitting] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
@@ -673,8 +716,8 @@ export function CaretakerPortalContent({
     setResMemberLookup(result);
     setResMemberLookupMatches([]);
     setResMemberNumber(result.memberNumber);
-    setResPastDueMaintenanceCents(Math.round((result.maintenanceFeesDue ?? 0) * 100));
-    setResPastDueMembershipCents(Math.round((result.membershipDuesOwed ?? 0) * 100));
+    setResPastDueMaintenanceCents(0);
+    setResPastDueMembershipCents(0);
   }
 
   async function handleReservationMemberLookup(e: React.FormEvent) {
@@ -723,8 +766,12 @@ export function CaretakerPortalContent({
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = campTodayStr(campSlug);
   const earliestCheckIn = caretakerEarliestCheckInDate(today);
+  const detailsImportedPaidCents =
+    detailsSiteBalance && detailsPaymentSummary
+      ? Math.max(0, detailsSiteBalance.totalPaidCents - detailsPaymentSummary.netPaidCents)
+      : 0;
   const resEditCheckInMin = editingReservation
     ? caretakerEarliestCheckInDateForEdit(toDateOnly(editingReservation.checkInDate), today)
     : earliestCheckIn;
@@ -858,8 +905,8 @@ export function CaretakerPortalContent({
         setResError("Look up member first");
         return;
       }
-    } else if (!resGuestFirstName.trim() || !resGuestLastName.trim() || !resGuestEmail.trim()) {
-      setResError("Enter guest name and email");
+    } else if (!resGuestFirstName.trim() || !resGuestLastName.trim()) {
+      setResError("Enter guest first and last name");
       return;
     }
     if (resTotalCents > 0 && resOverrideReason.trim().length < 3) {
@@ -950,8 +997,17 @@ export function CaretakerPortalContent({
         return;
       }
     } else {
-      if (!resGuestFirstName.trim() || !resGuestLastName.trim() || !resGuestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resGuestEmail.trim())) {
-        setResError("Enter guest first name, last name, and valid email");
+      const guestEmail = resGuestEmail.trim();
+      if (!resGuestFirstName.trim() || !resGuestLastName.trim()) {
+        setResError("Enter guest first and last name");
+        return;
+      }
+      if ((guestEmail || resCollectCents > 0) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
+        setResError(
+          resCollectCents > 0
+            ? "Enter a valid guest email for the cash receipt, or leave Collect now blank (pay on arrival)"
+            : "Guest email looks invalid — fix it or leave it blank"
+        );
         return;
       }
     }
@@ -964,6 +1020,12 @@ export function CaretakerPortalContent({
     }
     if (resQuoteLoading) {
       setResError("Stay total is still loading — please wait a moment");
+      return;
+    }
+    if (resCollectCents > 0 && !resAllowsCash) {
+      setResError(
+        "Check-in is more than 7 days ago. Leave Collect now blank to create the reservation, then record the payment in reservation details."
+      );
       return;
     }
     setResError(null);
@@ -1171,8 +1233,8 @@ export function CaretakerPortalContent({
           if (lookup) {
             setDetailsContactEmail(lookup.email?.trim() || "");
             setDetailsContactPhone(lookup.phone?.trim() || "");
-            setDetailsPastDueMaintenanceCents(Math.round((lookup.maintenanceFeesDue ?? 0) * 100));
-            setDetailsPastDueMembershipCents(Math.round((lookup.membershipDuesOwed ?? 0) * 100));
+            setDetailsPastDueMaintenanceCents(0);
+            setDetailsPastDueMembershipCents(0);
           }
         })
         .catch(() => setDetailsMemberLookup(null))
@@ -1438,6 +1500,7 @@ export function CaretakerPortalContent({
     setResEditPreview(null);
     setResEditPreviewError(null);
     setResEditIssueRefund(false);
+    setResEditCashHandedBack(false);
     setResEditModalOpen(true);
   }
 
@@ -1447,6 +1510,7 @@ export function CaretakerPortalContent({
     setResEditPreview(null);
     setResEditPreviewError(null);
     setResEditIssueRefund(false);
+    setResEditCashHandedBack(false);
   }
 
   function pricingBasisLabel(basis: string): string {
@@ -1463,6 +1527,7 @@ export function CaretakerPortalContent({
     setResEditPreviewError(null);
     setResEditPreview(null);
     setResEditIssueRefund(false);
+    setResEditCashHandedBack(false);
     try {
       const params = new URLSearchParams({
         checkInDate: resEditCheckInDate,
@@ -1478,6 +1543,7 @@ export function CaretakerPortalContent({
       }
       setResEditPreview(data);
       setResEditIssueRefund(false);
+      setResEditCashHandedBack(false);
       setResEditSpecialTotal("");
       setResEditSpecialReason("");
       setResEditShowSpecial(Boolean(data.specialRate));
@@ -1515,6 +1581,7 @@ export function CaretakerPortalContent({
           checkInDate: resEditCheckInDate,
           checkOutDate: resEditCheckOutDate,
           issueRefund: resEditIssueRefund && (resEditPreview.creditCents ?? 0) > 0,
+          cashRefundHandedBack: resEditCashHandedBack,
           ...(specialTotalCents != null
             ? { stayTotalOverrideCents: specialTotalCents, overrideReason: resEditSpecialReason.trim() }
             : {}),
@@ -1568,6 +1635,11 @@ export function CaretakerPortalContent({
     setResMovePreview(null);
     setResMovePaymentDueCents(null);
     setResMoveError(null);
+    setResMoveIssueRefund(false);
+    setResMoveCashHandedBack(false);
+    setResMoveShowSpecial(false);
+    setResMoveSpecialTotal("");
+    setResMoveSpecialReason("");
     try {
       const res = await fetch(
         `/api/members/caretaker/reservations/${movingReservation.id}/move-preview?newSiteId=${encodeURIComponent(newSiteId)}`
@@ -1601,13 +1673,31 @@ export function CaretakerPortalContent({
 
   async function confirmResMove() {
     if (!movingReservation || !resMovePreview || !resMovePreview.available) return;
+    const specialTotalCents = resMoveSpecialTotal.trim()
+      ? Math.round(parseFloat(resMoveSpecialTotal) * 100)
+      : null;
+    if (specialTotalCents != null && (Number.isNaN(specialTotalCents) || specialTotalCents < 0)) {
+      setResMoveError("Enter a valid special stay total, or leave it blank for standard pricing.");
+      return;
+    }
+    if (specialTotalCents != null && resMoveSpecialReason.trim().length < 3) {
+      setResMoveError("Add a short reason for the special stay total.");
+      return;
+    }
     setResMoveSubmitting(true);
     setResMoveError(null);
     try {
       const res = await fetch(`/api/members/caretaker/reservations/${movingReservation.id}/move`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newSiteId: resMovePreview.newSiteId }),
+        body: JSON.stringify({
+          newSiteId: resMovePreview.newSiteId,
+          issueRefund: resMoveIssueRefund && specialTotalCents == null && resMovePreview.refundCents > 0,
+          cashRefundHandedBack: resMoveCashHandedBack,
+          ...(specialTotalCents != null
+            ? { stayTotalOverrideCents: specialTotalCents, overrideReason: resMoveSpecialReason.trim() }
+            : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1725,6 +1815,9 @@ export function CaretakerPortalContent({
       alert("Member email required for receipt; not on file.");
       return;
     }
+    if (!window.confirm(`Record ${formatCentsAsCurrency(totalCents)} cash received for past-due dues?\n\nOnly confirm if you are holding this cash now.`)) {
+      return;
+    }
     setDetailsPastDueSubmitting(true);
     try {
       const res = await fetch("/api/members/caretaker/payments/record-cash", {
@@ -1767,6 +1860,9 @@ export function CaretakerPortalContent({
     const recipientEmail = resMemberLookup.email?.trim();
     if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
       setResError("Member email required for receipt; not on file.");
+      return;
+    }
+    if (!window.confirm(`Record ${formatCentsAsCurrency(totalCents)} cash received for past-due dues?\n\nOnly confirm if you are holding this cash now.`)) {
       return;
     }
     setResPastDueSubmitting(true);
@@ -1897,6 +1993,7 @@ export function CaretakerPortalContent({
     setResCancelPreview(null);
     setResCancelError(null);
     setResCancelWaiveFee(false);
+    setResCancelCashHandedBack(false);
     setResCancelModalOpen(true);
     void loadResCancelPreview(r.id, false);
   }
@@ -1934,7 +2031,10 @@ export function CaretakerPortalContent({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ waiveCancellationFee: resCancelWaiveFee }),
+          body: JSON.stringify({
+            waiveCancellationFee: resCancelWaiveFee,
+            cashRefundHandedBack: resCancelCashHandedBack,
+          }),
         }
       );
       const text = await res.text();
@@ -2367,6 +2467,7 @@ export function CaretakerPortalContent({
                     ) : null}
                     <PaymentDueBadge
                       balanceDueCents={r.balanceDueCents ?? 0}
+                      dueNowCents={r.dueNowCents}
                       hasOverdue={r.hasOverdueSiteFee}
                     />
                   </div>
@@ -2375,7 +2476,11 @@ export function CaretakerPortalContent({
                       <button
                         type="button"
                         onClick={() => openResDetailsModal(r, { focusPayment: true })}
-                        className="px-3 py-1.5 text-sm bg-amber-950/50 text-amber-200 border border-amber-500/40 rounded hover:bg-amber-900/40"
+                        className={
+                          (r.dueNowCents ?? r.balanceDueCents ?? 0) > 0
+                            ? "px-3 py-1.5 text-sm bg-amber-950/50 text-amber-200 border border-amber-500/40 rounded hover:bg-amber-900/40"
+                            : "px-3 py-1.5 text-sm text-[#e8e0d5]/70 border border-[#d4af37]/25 rounded hover:bg-[#d4af37]/10"
+                        }
                       >
                         Collect payment
                       </button>
@@ -2388,7 +2493,8 @@ export function CaretakerPortalContent({
                         title={today < toDateOnly(r.checkInDate) ? `Check-in available from ${toDateOnly(r.checkInDate)}` : undefined}
                         className="px-3 py-1.5 text-sm bg-[#0f3d1e] text-[#6dd472] rounded hover:bg-[#0f3d1e]/80 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {resCheckInSubmitting && checkingInReservation?.id === r.id ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Check in
+                        {resCheckInSubmitting && checkingInReservation?.id === r.id ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null}{" "}
+                        {today < toDateOnly(r.checkInDate) ? `Check in from ${toDateOnly(r.checkInDate)}` : "Check in"}
                       </button>
                     )}
                     <button type="button" onClick={() => openResDetailsModal(r)} className="px-3 py-1.5 text-sm bg-[#1a120b] text-[#e8e0d5] border border-[#d4af37]/40 rounded hover:bg-[#d4af37]/10">
@@ -2489,7 +2595,13 @@ export function CaretakerPortalContent({
               <form onSubmit={handleCreateReservation} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Check-in date *</label>
-                  <DatePickerWithCalendar value={resCheckInDate} onChange={setResCheckInDate} min={earliestCheckIn} placeholder="Select check-in" id="res-check-in" />
+                  <DatePickerWithCalendar value={resCheckInDate} onChange={setResCheckInDate} placeholder="Select check-in" id="res-check-in" />
+                  {resCheckInDate && !resAllowsCash && (
+                    <p className="text-amber-300/90 text-xs mt-1">
+                      Check-in is more than 7 days ago. Create it with nothing collected now, then record the payment
+                      in reservation details.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#e8e0d5] mb-1">Check-out date *</label>
@@ -2562,9 +2674,9 @@ export function CaretakerPortalContent({
                                 <p className="text-[#e8e0d5]/80 text-xs">Pay past due now (optional)</p>
                                 <div className="flex gap-2 items-center">
                                   <label className="text-[#e8e0d5]/80 text-xs shrink-0">Maintenance $</label>
-                                  <input type="number" min={0} step={0.01} value={resPastDueMaintenanceCents / 100} onChange={(e) => setResPastDueMaintenanceCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-20 px-2 py-1 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
+                                  <input type="number" min={0} step={0.01} value={resPastDueMaintenanceCents ? resPastDueMaintenanceCents / 100 : ""} placeholder="0.00" onChange={(e) => setResPastDueMaintenanceCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-20 px-2 py-1 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
                                   <label className="text-[#e8e0d5]/80 text-xs shrink-0">Membership $</label>
-                                  <input type="number" min={0} step={0.01} value={resPastDueMembershipCents / 100} onChange={(e) => setResPastDueMembershipCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-20 px-2 py-1 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
+                                  <input type="number" min={0} step={0.01} value={resPastDueMembershipCents ? resPastDueMembershipCents / 100 : ""} placeholder="0.00" onChange={(e) => setResPastDueMembershipCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-20 px-2 py-1 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
                                 </div>
                                 {resPastDueMaintenanceCents + resPastDueMembershipCents > 0 && (
                                   <div className="flex gap-2">
@@ -2586,7 +2698,7 @@ export function CaretakerPortalContent({
                     <div className="grid grid-cols-2 gap-2">
                       <input type="text" value={resGuestFirstName} onChange={(e) => setResGuestFirstName(e.target.value)} placeholder="First name" className="px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required={resType === "guest"} />
                       <input type="text" value={resGuestLastName} onChange={(e) => setResGuestLastName(e.target.value)} placeholder="Last name" className="px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required={resType === "guest"} />
-                      <input type="email" value={resGuestEmail} onChange={(e) => setResGuestEmail(e.target.value)} placeholder="Email" className="col-span-2 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" required={resType === "guest"} />
+                      <input type="email" value={resGuestEmail} onChange={(e) => setResGuestEmail(e.target.value)} placeholder="Email (needed for receipts / card)" className="col-span-2 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" />
                       <input type="tel" value={resGuestPhone} onChange={(e) => setResGuestPhone(e.target.value)} placeholder="Phone (optional)" className="col-span-2 px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]" />
                     </div>
                   )}
@@ -2690,7 +2802,7 @@ export function CaretakerPortalContent({
                       </button>
                     ) : (
                       <>
-                        {resAllowsCash && (
+                        {(resAllowsCash || resCollectCents === 0) && (
                           <button type="button" onClick={handleCreateReservationCash} disabled={resSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2">
                             {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                             {resCollectCents > 0
@@ -2698,7 +2810,7 @@ export function CaretakerPortalContent({
                               : "Create — pay on arrival"}
                           </button>
                         )}
-                        <button type="button" onClick={handleCreateReservationCard} disabled={resSubmitting} className={resAllowsCash ? "flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2" : "flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2"}>
+                        <button type="button" onClick={handleCreateReservationCard} disabled={resSubmitting} className={resAllowsCash || resCollectCents === 0 ? "flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2" : "flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] disabled:opacity-50 flex items-center justify-center gap-2"}>
                           {resSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay with card
                         </button>
                       </>
@@ -2731,7 +2843,7 @@ export function CaretakerPortalContent({
                 <div className="flex flex-wrap gap-4">
                   <div>
                     <p className="text-[#e8e0d5]/60 mb-0.5">Status</p>
-                    <p className="text-[#e8e0d5]">{reservationStatusLabel(detailsReservation)}</p>
+                    <p className="text-[#e8e0d5]">{reservationStatusLabel(detailsReservation, today)}</p>
                   </div>
                   {detailsReservation.status === "cancelled" && detailsReservation.cancelledAt && (
                     <div>
@@ -2811,19 +2923,22 @@ export function CaretakerPortalContent({
 
                 {detailsLoading ? (
                   <p className="text-[#e8e0d5]/60 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading billing…</p>
-                ) : reservationIsArchived(detailsReservation) && detailsReservation.status !== "cancelled" && detailsSiteBalance ? (
+                ) : reservationIsArchived(detailsReservation, today) &&
+                  detailsReservation.status !== "cancelled" &&
+                  detailsSiteBalance &&
+                  detailsSiteBalance.balanceDueCents < 1 ? (
                   <div className="rounded-lg border border-[#d4af37]/15 bg-[#0f0a06]/80 p-3 space-y-2">
                     <p className="text-[#f0d48f] font-medium text-sm">Stay summary</p>
                     <div className="flex justify-between text-xs">
-                      <span className="text-[#e8e0d5]/70">Total site fees</span>
+                      <span className="text-[#e8e0d5]/70">Stay total</span>
                       <span>{formatCentsAsCurrency(detailsSiteBalance.totalDueCents)}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-[#e8e0d5]/70">Total paid</span>
+                      <span className="text-[#e8e0d5]/70">Collected</span>
                       <span>{formatCentsAsCurrency(detailsSiteBalance.totalPaidCents)}</span>
                     </div>
                     <div className="flex justify-between text-sm font-semibold pt-1 border-t border-[#d4af37]/20">
-                      <span className="text-[#e8e0d5]/70">Balance due</span>
+                      <span className="text-[#e8e0d5]/70">Remaining</span>
                       <span className={detailsSiteBalance.balanceDueCents > 0 ? "text-amber-400" : "text-[#6dd472]"}>
                         {detailsSiteBalance.balanceDueCents > 0
                           ? formatCentsAsCurrency(detailsSiteBalance.balanceDueCents)
@@ -2831,11 +2946,12 @@ export function CaretakerPortalContent({
                       </span>
                     </div>
                   </div>
-                ) : !reservationIsArchived(detailsReservation) && detailsSiteBalance ? (
+                ) : detailsReservation.status !== "cancelled" && detailsSiteBalance ? (
                   <ReservationBillingSection
                     key={`${detailsReservation.id}-${detailsSiteBalance.balanceDueCents}`}
                     reservationId={detailsReservation.id}
                     checkInDate={toDateOnly(detailsReservation.checkInDate)}
+                    today={today}
                     balance={detailsSiteBalance}
                     billingPeriods={detailsBillingPeriods}
                     recipientEmail={
@@ -2853,7 +2969,9 @@ export function CaretakerPortalContent({
                   />
                 ) : null}
 
-                {reservationIsArchived(detailsReservation) && detailsBillingPeriods.length > 0 && (
+                {reservationIsArchived(detailsReservation, today) &&
+                  detailsBillingPeriods.length > 0 &&
+                  (detailsReservation.status === "cancelled" || (detailsSiteBalance?.balanceDueCents ?? 0) < 1) && (
                   <div className="pt-2 border-t border-[#d4af37]/20">
                     <p className="text-[#f0d48f] font-medium text-sm mb-2">Billing periods</p>
                     <ul className="space-y-1.5 text-xs">
@@ -2873,10 +2991,16 @@ export function CaretakerPortalContent({
                   </div>
                 )}
 
-                {(detailsPayments.length > 0 || detailsVoidedPayments.length > 0) && (
+                {(detailsPayments.length > 0 || detailsVoidedPayments.length > 0 || detailsImportedPaidCents > 0) && (
                   <div className="pt-2 border-t border-[#d4af37]/20">
                     <p className="text-[#f0d48f] font-medium text-sm mb-2">Payment history</p>
                     <ul className="space-y-2 text-xs">
+                      {detailsImportedPaidCents > 0 && (
+                        <li className="text-[#e8e0d5]/80">
+                          <span className="text-[#e8e0d5]">{formatCentsAsCurrency(detailsImportedPaidCents)}</span>
+                          {" · "}Paid before the portal (imported credit)
+                        </li>
+                      )}
                       {detailsPayments.map((p) => (
                         <li key={p.id} className="text-[#e8e0d5]/80">
                           {p.paymentType === "refund" ? (
@@ -3077,7 +3201,7 @@ export function CaretakerPortalContent({
                       )}
                     </div>
 
-                    {!reservationIsArchived(detailsReservation) && detailsMemberLookup && (
+                    {!reservationIsArchived(detailsReservation, today) && detailsMemberLookup && (
                       <div className="pt-2 border-t border-[#d4af37]/20 space-y-2">
                         <p className="text-[#f0d48f] font-medium text-sm">Membership & maintenance (Salesforce)</p>
                         <p className="text-[#e8e0d5]/60 text-xs">Separate from site fees above.</p>
@@ -3093,11 +3217,11 @@ export function CaretakerPortalContent({
                               <p className="text-[#e8e0d5]/80 text-sm">Pay past due (optional)</p>
                               <div className="flex gap-2 items-center">
                                 <label className="text-[#e8e0d5]/80 text-sm shrink-0">Maintenance $</label>
-                                <input type="number" min={0} step={0.01} value={detailsPastDueMaintenanceCents / 100} onChange={(e) => setDetailsPastDueMaintenanceCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-24 px-2 py-1.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
+                                <input type="number" min={0} step={0.01} value={detailsPastDueMaintenanceCents ? detailsPastDueMaintenanceCents / 100 : ""} placeholder="0.00" onChange={(e) => setDetailsPastDueMaintenanceCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-24 px-2 py-1.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
                               </div>
                               <div className="flex gap-2 items-center">
                                 <label className="text-[#e8e0d5]/80 text-sm shrink-0">Membership $</label>
-                                <input type="number" min={0} step={0.01} value={detailsPastDueMembershipCents / 100} onChange={(e) => setDetailsPastDueMembershipCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-24 px-2 py-1.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
+                                <input type="number" min={0} step={0.01} value={detailsPastDueMembershipCents ? detailsPastDueMembershipCents / 100 : ""} placeholder="0.00" onChange={(e) => setDetailsPastDueMembershipCents(Math.round((parseFloat(e.target.value) || 0) * 100))} className="w-24 px-2 py-1.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm" />
                               </div>
                               {detailsPastDueMaintenanceCents + detailsPastDueMembershipCents > 0 && (
                                 <>
@@ -3394,6 +3518,16 @@ export function CaretakerPortalContent({
                       </span>
                     </label>
                   )}
+                  {resEditPreview.creditCents > 0 &&
+                    resEditIssueRefund &&
+                    resEditPreview.refundBreakdown.cashRefundCents > 0 && (
+                      <CashRefundHandedBackField
+                        cashCents={resEditPreview.refundBreakdown.cashRefundCents}
+                        checked={resEditCashHandedBack}
+                        onChange={setResEditCashHandedBack}
+                        disabled={resEditSubmitting}
+                      />
+                    )}
                   {resEditPreview.creditCents > 0 && !resEditIssueRefund && (
                     <p className="text-[#e8e0d5]/50 text-xs">
                       If unchecked, the credit stays on the reservation (no refund issued).
@@ -3415,7 +3549,7 @@ export function CaretakerPortalContent({
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => { setResEditPreview(null); setResEditPreviewError(null); setResEditIssueRefund(false); }}
+                      onClick={() => { setResEditPreview(null); setResEditPreviewError(null); setResEditIssueRefund(false); setResEditCashHandedBack(false); }}
                       disabled={resEditSubmitting}
                       className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]"
                     >
@@ -3477,7 +3611,7 @@ export function CaretakerPortalContent({
         {/* Move reservation to a different site */}
         {resMoveModalOpen && movingReservation && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => !resMoveSubmitting && closeResMoveModal()}>
-            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-sm w-full p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-[#f0d48f]">{resMovePaymentDueCents != null ? "Charge site difference" : "Move to a different site"}</h3>
                 <button type="button" onClick={() => !resMoveSubmitting && closeResMoveModal()} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
@@ -3535,7 +3669,7 @@ export function CaretakerPortalContent({
                           {resMovePreview.additionalDueCents > 0 ? (
                             <div className="flex justify-between text-amber-400 font-medium pt-1 border-t border-[#d4af37]/20"><span>Due now</span><span>{formatCentsAsCurrency(resMovePreview.additionalDueCents)}</span></div>
                           ) : resMovePreview.refundCents > 0 ? (
-                            <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20"><span>Refund on move</span><span>{formatCentsAsCurrency(resMovePreview.refundCents)}</span></div>
+                            <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20"><span>Credit after move</span><span>{formatCentsAsCurrency(resMovePreview.refundCents)}</span></div>
                           ) : (
                             <div className="flex justify-between text-[#6dd472] font-medium pt-1 border-t border-[#d4af37]/20"><span>No amount due now</span><span>$0.00</span></div>
                           )}
@@ -3553,16 +3687,104 @@ export function CaretakerPortalContent({
                               Existing deposit/hold is kept — remaining balance stays on the payment schedule.
                             </p>
                           ) : null}
-                          {resMovePreview.refundCents > 0 && resMovePreview.refundBreakdown.stripeRefundCents > 0 && (
-                            <p className="text-[#e8e0d5]/50 text-xs">
-                              {formatCentsAsCurrency(resMovePreview.refundBreakdown.stripeRefundCents)} back to card
-                              {resMovePreview.refundBreakdown.cashRefundCents > 0 ? ` · ${formatCentsAsCurrency(resMovePreview.refundBreakdown.cashRefundCents)} cash` : ""}
-                            </p>
-                          )}
                         </>
                       )}
                     </div>
                   ) : null}
+
+                  {resMovePreview && resMovePreview.available && (
+                    <>
+                      {resMovePreview.specialRate && (
+                        <p className="text-amber-300/90 text-xs">
+                          This reservation has a special rate of{" "}
+                          {formatCentsAsCurrency(resMovePreview.specialRate.totalCents)}
+                          {resMovePreview.specialRate.reason ? ` (${resMovePreview.specialRate.reason})` : ""}. The new
+                          site uses standard pricing ({formatCentsAsCurrency(resMovePreview.newTotalCents)}) unless you
+                          enter a special total for it below.
+                        </p>
+                      )}
+                      {resMoveShowSpecial ? (
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-[#e8e0d5]">
+                            Special stay total at the new site $ <span className="text-[#e8e0d5]/50">(optional)</span>
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={resMoveSpecialTotal}
+                            onChange={(e) => setResMoveSpecialTotal(e.target.value)}
+                            placeholder={(resMovePreview.newTotalCents / 100).toFixed(2)}
+                            className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                          />
+                          {resMoveSpecialTotal.trim() && (
+                            <input
+                              type="text"
+                              value={resMoveSpecialReason}
+                              onChange={(e) => setResMoveSpecialReason(e.target.value)}
+                              placeholder="Reason (e.g. Flat $510 × 6 months)"
+                              className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                            />
+                          )}
+                          {resMoveSpecialTotal.trim() && !Number.isNaN(parseFloat(resMoveSpecialTotal)) && (
+                            <p className="text-[#e8e0d5]/70 text-xs">
+                              New total {formatCentsAsCurrency(Math.round(parseFloat(resMoveSpecialTotal) * 100))} ·
+                              balance after move{" "}
+                              {formatCentsAsCurrency(
+                                Math.max(0, Math.round(parseFloat(resMoveSpecialTotal) * 100) - resMovePreview.netPaidCents)
+                              )}
+                              . Any credit stays on the reservation.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setResMoveShowSpecial(true)}
+                          className="text-xs text-[#d4af37] hover:underline"
+                        >
+                          Use a special stay total instead of standard pricing
+                        </button>
+                      )}
+                      {resMovePreview.refundCents > 0 && !resMoveSpecialTotal.trim() && (
+                        <>
+                          <label className="flex items-start gap-2 text-sm text-[#e8e0d5]/90 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="mt-1"
+                              checked={resMoveIssueRefund}
+                              disabled={resMoveSubmitting}
+                              onChange={(e) => setResMoveIssueRefund(e.target.checked)}
+                            />
+                            <span>
+                              Issue refund of {formatCentsAsCurrency(resMovePreview.refundCents)} on move
+                              {resMovePreview.refundBreakdown.stripeRefundCents > 0
+                                ? ` (${formatCentsAsCurrency(resMovePreview.refundBreakdown.stripeRefundCents)} back to card${
+                                    resMovePreview.refundBreakdown.cashRefundCents > 0
+                                      ? `, ${formatCentsAsCurrency(resMovePreview.refundBreakdown.cashRefundCents)} cash`
+                                      : ""
+                                  })`
+                                : " (cash)"}
+                              .
+                            </span>
+                          </label>
+                          {resMoveIssueRefund && resMovePreview.refundBreakdown.cashRefundCents > 0 && (
+                            <CashRefundHandedBackField
+                              cashCents={resMovePreview.refundBreakdown.cashRefundCents}
+                              checked={resMoveCashHandedBack}
+                              onChange={setResMoveCashHandedBack}
+                              disabled={resMoveSubmitting}
+                            />
+                          )}
+                          {!resMoveIssueRefund && (
+                            <p className="text-[#e8e0d5]/50 text-xs">
+                              If unchecked, the credit stays on the reservation (no refund issued).
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
 
                   {resMoveError && <p className="text-red-300 text-sm">{resMoveError}</p>}
 
@@ -3570,7 +3792,9 @@ export function CaretakerPortalContent({
                     <button type="button" onClick={closeResMoveModal} className="flex-1 py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Cancel</button>
                     <button type="button" onClick={confirmResMove} disabled={resMoveSubmitting || resMovePreviewLoading || !resMovePreview || !resMovePreview.available} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
                       {resMoveSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                      {resMovePreview && resMovePreview.refundCents > 0 ? "Move & refund" : "Move site"}
+                      {resMovePreview && resMoveIssueRefund && resMovePreview.refundCents > 0 && !resMoveSpecialTotal.trim()
+                        ? "Move & refund"
+                        : "Move site"}
                     </button>
                   </div>
                 </div>
@@ -3651,6 +3875,16 @@ export function CaretakerPortalContent({
                     This will be flagged on the reservation.
                   </span>
                 </label>
+              )}
+              {!resCancelPreviewLoading && (resCancelPreview?.cashRefundCents ?? 0) > 0 && (
+                <div className="mb-4">
+                  <CashRefundHandedBackField
+                    cashCents={resCancelPreview?.cashRefundCents ?? 0}
+                    checked={resCancelCashHandedBack}
+                    onChange={setResCancelCashHandedBack}
+                    disabled={resCancelSubmitting}
+                  />
+                </div>
               )}
               {resCancelError && <p className="mb-4 text-red-400 text-sm">{resCancelError}</p>}
               <div className="flex gap-2">

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { caretakerAllowsCashExistingReservationPayment, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
 import { countNights } from "@/lib/reservation-dates";
+import { campTodayStr } from "@/lib/camp-time";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
 import {
   filterAndSortReservations,
@@ -91,7 +92,7 @@ export function AdminCampReservationsTab({
   reservations: AdminReservationListRow[] | undefined;
   onUpdated: () => void;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = campTodayStr(campSlug);
   const earliestCheckIn = caretakerEarliestCheckInDate(today);
 
   const [listSearch, setListSearch] = useState("");

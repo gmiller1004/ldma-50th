@@ -3,6 +3,7 @@ import { getCaretakerWriteContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
+import { campTodayStr } from "@/lib/camp-time";
 import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
 import { getReservationBalance, applyPaymentsToExistingPeriods } from "@/lib/reservation-billing";
 
@@ -48,8 +49,8 @@ export async function POST(request: NextRequest) {
   if (amountCents < 1) {
     return NextResponse.json({ error: "amountCents must be positive" }, { status: 400 });
   }
-  if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
-    return NextResponse.json({ error: "Valid recipientEmail required" }, { status: 400 });
+  if (recipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+    return NextResponse.json({ error: "Receipt email is not valid" }, { status: 400 });
   }
 
   const resRows = await sql`
@@ -107,6 +108,7 @@ export async function POST(request: NextRequest) {
   // Insert then sync. If sync fails, delete the payment so retries do not stack ledger rows
   // while period balances still look unpaid in the UI.
   let balance;
+  let paymentId: string;
   try {
     const inserted = await sql`
       INSERT INTO camp_payments (
@@ -121,16 +123,17 @@ export async function POST(request: NextRequest) {
       )
       RETURNING id
     `;
-    const paymentId = (Array.isArray(inserted) ? inserted[0] : undefined) as { id: string } | undefined;
-    if (!paymentId?.id) {
+    const insertedRow = (Array.isArray(inserted) ? inserted[0] : undefined) as { id: string } | undefined;
+    if (!insertedRow?.id) {
       return NextResponse.json({ error: "Could not record payment" }, { status: 500 });
     }
+    paymentId = insertedRow.id;
 
     try {
       balance = await applyPaymentsToExistingPeriods(reservationId);
     } catch (syncErr) {
       console.error("[caretaker] reservation payment sync failed, rolling back payment:", syncErr);
-      await sql`DELETE FROM camp_payments WHERE id = ${paymentId.id}`;
+      await sql`DELETE FROM camp_payments WHERE id = ${paymentId}`;
       return NextResponse.json(
         { error: "Payment could not be applied to billing. Please try again." },
         { status: 500 }
@@ -141,42 +144,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Payment failed" }, { status: 500 });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = campTodayStr(caretaker.campSlug);
   const recipientName =
     res.reservation_type === "member"
       ? res.member_display_name?.trim() || "Member"
       : [res.guest_first_name, res.guest_last_name].filter(Boolean).join(" ").trim() || "Guest";
-  const receiptSent = await sendPaymentReceiptEmail(
-    recipientEmail,
-    caretaker.campName,
-    [{ label: "Camp site fee", amountCents }],
-    amountCents,
-    "cash",
-    today,
-    {
-      recipientName,
-      checkInDate,
-      checkOutDate,
-      siteName: res.site_name,
-    }
-  ).catch((e) => {
-    console.error("[caretaker] reservation payment receipt failed:", e);
-    return false;
-  });
+  const receiptSent = recipientEmail
+    ? await sendPaymentReceiptEmail(
+        recipientEmail,
+        caretaker.campName,
+        [{ label: "Camp site fee", amountCents }],
+        amountCents,
+        "cash",
+        today,
+        {
+          recipientName,
+          checkInDate,
+          checkOutDate,
+          siteName: res.site_name,
+        }
+      ).catch((e) => {
+        console.error("[caretaker] reservation payment receipt failed:", e);
+        return false;
+      })
+    : false;
 
   if (receiptSent) {
-    await sql`
-      UPDATE camp_payments SET receipt_sent_at = NOW()
-      WHERE id = (
-        SELECT id FROM camp_payments
-        WHERE reservation_id = ${reservationId} AND method = 'cash'
-        ORDER BY created_at DESC LIMIT 1
-      )
-    `;
+    await sql`UPDATE camp_payments SET receipt_sent_at = NOW() WHERE id = ${paymentId}`;
   }
 
   return NextResponse.json({
     ok: true,
+    receiptSent,
     balanceDueCents: balance.balanceDueCents,
     totalPaidCents: balance.totalPaidCents,
     totalDueCents: balance.totalDueCents,

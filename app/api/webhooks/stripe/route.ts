@@ -11,6 +11,7 @@ import {
   syncBillingPeriodsForReservation,
 } from "@/lib/reservation-billing";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
+import { campTodayStr } from "@/lib/camp-time";
 import { withReservationInvoice } from "@/lib/reservation-create-metadata";
 import {
   filterBookableSites,
@@ -503,7 +504,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const paymentDate = new Date().toISOString().slice(0, 10);
+  const paymentDate = campTodayStr(campSlug);
   if (!receiptAlreadySent) {
     const receiptSent = await sendPaymentReceiptEmail(
     recipientEmail,

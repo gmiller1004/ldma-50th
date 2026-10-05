@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { directoryCamps } from "@/lib/directory-camps";
-import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate } from "@/lib/reservation-camps";
+import { campUsesReservations, caretakerAllowsCashCheckIn } from "@/lib/reservation-camps";
 import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
 import { countNights } from "@/lib/reservation-dates";
 import { suggestedReservationPaymentCents } from "@/lib/reservation-billing";
 import { scalePeriodDraftsToTotal } from "@/lib/reservation-price-override";
 import { resolveCreateReservationPricing } from "@/lib/reservation-create-metadata";
 import { parseCaretakerLookupInput } from "@/lib/member-contact-search";
+import { campTodayStr } from "@/lib/camp-time";
 
 type Site = {
   id: string;
@@ -63,8 +64,7 @@ export function ManualReservationPanel() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const earliestCheckIn = caretakerEarliestCheckInDate(today);
+  const today = campTodayStr(campSlug);
   const nights =
     quotedNights ??
     (checkInDate && checkOutDate && checkInDate < checkOutDate
@@ -490,7 +490,6 @@ export function ManualReservationPanel() {
           Check-in
           <input
             type="date"
-            min={earliestCheckIn}
             value={checkInDate}
             onChange={(e) => setCheckInDate(e.target.value)}
             className={`${inputClass} mt-1`}
@@ -680,7 +679,7 @@ export function ManualReservationPanel() {
           </button>
         ) : (
           <>
-            {allowsCash && (
+            {(allowsCash || collectCents === 0) && (
               <button
                 type="button"
                 onClick={payCash}

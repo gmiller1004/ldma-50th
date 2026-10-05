@@ -5,6 +5,7 @@
 
 import { MASTER_CAMP_TO_SLUG } from "@/lib/camp-master";
 import { addDays } from "@/lib/reservation-dates";
+import { campTodayStr } from "@/lib/camp-time";
 
 export const RESERVATION_PILOT_CAMP_SLUG = "burnt-river-oregon";
 
@@ -24,7 +25,7 @@ export function campUsesReservations(campSlug: string): boolean {
  * so old arrivals cannot be invented as cash-paid.
  */
 export function caretakerAllowsCashCheckIn(checkInDate: string, today?: string): boolean {
-  const t = today ?? new Date().toISOString().slice(0, 10);
+  const t = today ?? campTodayStr();
   const earliest = addDays(t, -CARETAKER_BACKDATE_MAX_DAYS);
   return checkInDate >= earliest;
 }
@@ -39,7 +40,7 @@ export function caretakerAllowsCashExistingReservationPayment(): boolean {
 
 /** Earliest allowed check-in date for caretaker-created reservations. */
 export function caretakerEarliestCheckInDate(today?: string): string {
-  const t = today ?? new Date().toISOString().slice(0, 10);
+  const t = today ?? campTodayStr();
   return addDays(t, -CARETAKER_BACKDATE_MAX_DAYS);
 }
 

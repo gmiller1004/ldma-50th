@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
 import { suggestedReservationPaymentCents } from "@/lib/reservation-billing";
 import { caretakerAllowsCashExistingReservationPayment } from "@/lib/reservation-camps";
+import { campTodayStr } from "@/lib/camp-time";
 
 export type BillingPeriodRow = {
   id: string;
@@ -55,6 +56,7 @@ export function ReservationBillingSection({
   onPaymentComplete,
   campSlug,
   autoFocusAmount,
+  today,
 }: {
   reservationId: string;
   checkInDate: string;
@@ -66,6 +68,8 @@ export function ReservationBillingSection({
   /** Required for director dashboard (admin paying on any camp). */
   campSlug?: string;
   autoFocusAmount?: boolean;
+  /** Camp-local YYYY-MM-DD; defaults from campSlug. */
+  today?: string;
 }) {
   const allowsCash = caretakerAllowsCashExistingReservationPayment();
 
@@ -92,16 +96,27 @@ export function ReservationBillingSection({
   const emailValid = EMAIL_REGEX.test(effectiveEmail);
   const amountCents = Math.round((parseFloat(amountInput) || 0) * 100);
   const payAmount = Math.min(Math.max(0, amountCents), balance.balanceDueCents);
+  const canSubmitCash = canPay && payAmount >= 1 && (!effectiveEmail || emailValid);
   const canSubmit = canPay && emailValid && payAmount >= 1;
+
+  const todayStr = today ?? campTodayStr(campSlug);
+  const dueNowCents = Math.min(
+    balance.balanceDueCents,
+    billingPeriods
+      .filter((p) => (p.status === "unpaid" || p.status === "partial") && p.dueDate.slice(0, 10) <= todayStr)
+      .reduce((sum, p) => sum + periodRemainingCents(p), 0)
+  );
 
   function fillAmount(cents: number) {
     setAmountInput((cents / 100).toFixed(2));
   }
 
   async function payCash() {
-    if (!canSubmit) return;
+    if (!canSubmitCash) return;
     const confirmed = window.confirm(
-      `Record ${formatCentsAsCurrency(payAmount)} cash received from ${recipientDisplayName}?\n\nOnly confirm if you are holding this cash now. A receipt will be emailed.`
+      `Record ${formatCentsAsCurrency(payAmount)} cash received from ${recipientDisplayName}?\n\nOnly confirm if you are holding this cash now. ${
+        effectiveEmail ? `A receipt will be emailed to ${effectiveEmail}.` : "No receipt email will be sent."
+      }`
     );
     if (!confirmed) return;
     setSubmitting(true);
@@ -170,13 +185,20 @@ export function ReservationBillingSection({
       <div>
         <p className="text-[#f0d48f] font-medium text-sm mb-1">Site fees (this reservation)</p>
         <p className="text-[#e8e0d5] text-sm">
-          Paid: <span className="font-medium">{formatCentsAsCurrency(balance.totalPaidCents)}</span>
+          Stay total: <span className="font-medium">{formatCentsAsCurrency(balance.totalDueCents)}</span>
           {" · "}
-          Total due: <span className="font-medium">{formatCentsAsCurrency(balance.totalDueCents)}</span>
+          Collected: <span className="font-medium">{formatCentsAsCurrency(balance.totalPaidCents)}</span>
         </p>
         {balance.balanceDueCents > 0 ? (
           <p className="text-amber-400 text-sm mt-1">
-            Balance due: <strong>{formatCentsAsCurrency(balance.balanceDueCents)}</strong>
+            Remaining: <strong>{formatCentsAsCurrency(balance.balanceDueCents)}</strong>
+            {dueNowCents < balance.balanceDueCents && (
+              <span className="text-[#e8e0d5]/70">
+                {" · "}
+                Due now: <strong className="text-amber-300">{formatCentsAsCurrency(dueNowCents)}</strong>
+                {dueNowCents === 0 && " (rest is scheduled for later)"}
+              </span>
+            )}
           </p>
         ) : (
           <p className="text-[#6dd472] text-sm mt-1">Site fees paid in full</p>
@@ -226,7 +248,9 @@ export function ReservationBillingSection({
           </p>
           {!recipientEmail.trim() && (
             <div>
-              <label className="text-[#e8e0d5]/80 text-xs block mb-1">Receipt email *</label>
+              <label className="text-[#e8e0d5]/80 text-xs block mb-1">
+                Receipt email (required for card; optional for cash)
+              </label>
               <input
                 type="email"
                 value={emailInput}
@@ -280,7 +304,7 @@ export function ReservationBillingSection({
               <button
                 type="button"
                 onClick={payCash}
-                disabled={submitting || !canSubmit}
+                disabled={submitting || !canSubmitCash}
                 className="flex-1 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-1"
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
@@ -298,7 +322,11 @@ export function ReservationBillingSection({
             </button>
           </div>
           {!emailValid && (
-            <p className="text-amber-400/90 text-xs">A valid receipt email is required before collecting payment.</p>
+            <p className="text-amber-400/90 text-xs">
+              {effectiveEmail
+                ? "Receipt email looks invalid."
+                : "No email on file: cash can be recorded without a receipt; card needs an email."}
+            </p>
           )}
         </div>
       )}
@@ -310,20 +338,36 @@ export function ReservationBillingSection({
 
 export function PaymentDueBadge({
   balanceDueCents,
+  dueNowCents,
   hasOverdue,
 }: {
   balanceDueCents: number;
+  /** When provided, only this amount is shown as due; the rest is labeled as scheduled. */
+  dueNowCents?: number;
   hasOverdue?: boolean;
 }) {
   if (balanceDueCents < 1) return null;
+  const dueNow = dueNowCents ?? balanceDueCents;
+  if (dueNow < 1) {
+    return (
+      <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-[#2a1f14] text-[#e8e0d5]/70 border border-[#d4af37]/20">
+        Remaining {formatCentsAsCurrency(balanceDueCents)}
+      </span>
+    );
+  }
   return (
     <span
       className={`text-xs px-1.5 py-0.5 rounded font-medium ${
         hasOverdue ? "bg-red-950/70 text-red-300 border border-red-800/50" : "bg-[#4a3a0f] text-[#e8c547]"
       }`}
+      title={
+        dueNow < balanceDueCents
+          ? `${formatCentsAsCurrency(balanceDueCents)} remaining on the stay`
+          : undefined
+      }
     >
-      {hasOverdue ? "Overdue " : "Due "}
-      {formatCentsAsCurrency(balanceDueCents)}
+      {hasOverdue ? "Overdue " : "Due now "}
+      {formatCentsAsCurrency(dueNow)}
     </span>
   );
 }

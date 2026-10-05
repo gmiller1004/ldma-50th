@@ -4,6 +4,7 @@ import { sql, hasDb } from "@/lib/db";
 import { getValidCampSlugs } from "@/lib/caretaker-camps";
 import { sendCaretakerGuestCheckInWelcomeEmail } from "@/lib/sendgrid";
 import { upsertCampStayProfile } from "@/lib/klaviyo-camp-stay";
+import { campTodayStr } from "@/lib/camp-time";
 
 type GuestCheckInRow = {
   id: string;
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status") || "active";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = campTodayStr(caretaker.campSlug);
 
   let rows: GuestCheckInRow[];
   if (status === "active") {
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest) {
     baseUrl
   ).catch((e) => console.error("[caretaker] guest welcome email failed:", e));
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = campTodayStr(caretaker.campSlug);
   const stayStatus = checkOutDateStr >= todayStr ? "in_progress" : "completed";
   upsertCampStayProfile({
     email,

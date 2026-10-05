@@ -4,7 +4,6 @@ import { sql, hasDb } from "@/lib/db";
 import {
   campUsesReservations,
   caretakerAllowsCashCheckIn,
-  caretakerEarliestCheckInDate,
   isNonBookableSite,
 } from "@/lib/reservation-camps";
 import {
@@ -19,6 +18,7 @@ import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 import { summarizeReservationBalances } from "@/lib/reservation-billing";
 import { parseReservationPricingBody, withReservationInvoice } from "@/lib/reservation-create-metadata";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
+import { campTodayStr } from "@/lib/camp-time";
 
 type ReservationRow = {
   id: string;
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status") || "active";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = campTodayStr(caretaker.campSlug);
 
   let rows: ReservationRow[];
   if (status === "active") {
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
   }
 
   const ids = rows.map((r) => r.id);
-  const balanceMap = await summarizeReservationBalances(ids);
+  const balanceMap = await summarizeReservationBalances(ids, today);
 
   return NextResponse.json({
     reservations: rows.map((row) => {
@@ -151,6 +151,7 @@ export async function GET(request: NextRequest) {
       return {
         ...base,
         balanceDueCents: balance?.balanceDueCents ?? 0,
+        dueNowCents: balance?.dueNowCents ?? 0,
         siteFeesPaidCents: balance?.totalPaidCents ?? 0,
         siteFeesDueCents: balance?.totalDueCents ?? 0,
         hasOverdueSiteFee: balance?.hasOverduePeriod ?? false,
@@ -248,15 +249,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "type required: 'member' or 'guest'" }, { status: 400 });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const earliestCheckIn = caretakerEarliestCheckInDate(today);
-  if (checkInDate < earliestCheckIn) {
-    return NextResponse.json(
-      { error: `Check-in cannot be more than ${earliestCheckIn === today ? "0" : "7"} days in the past` },
-      { status: 400 }
-    );
-  }
-
+  const today = campTodayStr(caretaker.campSlug);
   const nights = stayNights(checkInDate, checkOutDate);
 
   const siteRows = await sql`
@@ -309,9 +302,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!caretakerAllowsCashCheckIn(checkInDate, today)) {
+    if (payCents > 0 && !caretakerAllowsCashCheckIn(checkInDate, today)) {
       return NextResponse.json(
-        { error: "Cash payment is not allowed when check-in is more than 7 days in the past. Use card." },
+        {
+          error:
+            "Check-in is more than 7 days in the past. Create the reservation with nothing collected, then record the payment in reservation details.",
+        },
         { status: 400 }
       );
     }
@@ -390,9 +386,15 @@ export async function POST(request: NextRequest) {
     const guestLastName = typeof body.guestLastName === "string" ? body.guestLastName.trim() : "";
     const guestEmail = typeof body.guestEmail === "string" ? body.guestEmail.trim() : "";
     const guestPhone = typeof body.guestPhone === "string" ? body.guestPhone.trim() || null : null;
-    if (!guestFirstName || !guestLastName || !guestEmail || !EMAIL_REGEX.test(guestEmail)) {
+    if (!guestFirstName || !guestLastName) {
       return NextResponse.json(
-        { error: "guestFirstName, guestLastName, and valid guestEmail required for guest reservation" },
+        { error: "guestFirstName and guestLastName required for guest reservation" },
+        { status: 400 }
+      );
+    }
+    if ((guestEmail || payCents > 0) && !EMAIL_REGEX.test(guestEmail)) {
+      return NextResponse.json(
+        { error: "Valid guest email required when collecting payment (receipt)" },
         { status: 400 }
       );
     }
@@ -405,7 +407,7 @@ export async function POST(request: NextRequest) {
       )
       VALUES (
         ${siteId}, ${caretaker.campSlug}, ${checkInDate}, ${checkOutDate}, ${nights},
-        'guest', ${guestFirstName}, ${guestLastName}, ${guestEmail}, ${guestPhone},
+        'guest', ${guestFirstName}, ${guestLastName}, ${guestEmail || null}, ${guestPhone},
         'reserved', ${caretaker.contactId},
         ${pricing.invoiceNumber}, ${pricing.calculatedTotalCents}, ${pricing.amountOverrideCents},
         ${pricing.overrideReason}, ${pricing.priceOverrideFlag}

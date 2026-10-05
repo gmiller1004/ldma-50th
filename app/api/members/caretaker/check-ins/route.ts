@@ -6,6 +6,7 @@ import { getValidCampSlugs } from "@/lib/caretaker-camps";
 import { lookupMember } from "@/lib/salesforce";
 import { sendCaretakerCheckInWelcomeEmail } from "@/lib/sendgrid";
 import { upsertCampStayProfile } from "@/lib/klaviyo-camp-stay";
+import { campTodayStr } from "@/lib/camp-time";
 
 type CheckInRow = {
   id: string;
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status") || "active";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = campTodayStr(caretaker.campSlug);
 
   let rows: CheckInRow[];
   if (status === "active") {
@@ -158,7 +159,7 @@ export async function POST(request: NextRequest) {
   );
 
   // Send welcome email and sync to Klaviyo (fire-and-forget)
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = campTodayStr(caretaker.campSlug);
   const stayStatus = checkOutDateStr >= todayStr ? "in_progress" : "completed";
   lookupMember(memberNumber)
     .then(async (member) => {

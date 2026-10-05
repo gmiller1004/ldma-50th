@@ -3,6 +3,7 @@ import { getCaretakerContext } from "@/lib/caretaker-auth";
 import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
+import { campTodayStr } from "@/lib/camp-time";
 
 /**
  * POST /api/members/caretaker/payments/record-cash
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
   const lineItems: { label: string; amountCents: number }[] = [];
   if (maintenanceAmountCents > 0) lineItems.push({ label: "Maintenance", amountCents: maintenanceAmountCents });
   if (membershipAmountCents > 0) lineItems.push({ label: "Membership", amountCents: membershipAmountCents });
-  const paymentDate = new Date().toISOString().slice(0, 10);
+  const paymentDate = campTodayStr(caretaker.campSlug);
   const receiptSent = await sendPaymentReceiptEmail(
     recipientEmail,
     caretaker.campName,

@@ -126,7 +126,7 @@ export async function GET(
     const { stripeRefundCents, cashRefundCents } = allocateRefundSplit(
       creditCents,
       totals.cardPaidCents,
-      totals.refundedCents
+      totals.cardRefundedCents
     );
 
     const datesUnchanged = checkInDate === currentCheckIn && checkOutDate === currentCheckOut;
