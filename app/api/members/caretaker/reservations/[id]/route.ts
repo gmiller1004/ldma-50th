@@ -145,7 +145,7 @@ export async function GET(
 
 /**
  * PATCH /api/members/caretaker/reservations/[id]
- * Update dates and/or check in. Regenerates billing periods; additional nights require payment.
+ * Update dates and/or check in. Regenerates billing periods; added balance stays due (optional cash recorded only if sent).
  */
 export async function PATCH(
   request: NextRequest,
@@ -255,6 +255,27 @@ export async function PATCH(
 
     const datesChanged = checkInCandidate !== null || checkOutCandidate !== null;
     const today = new Date().toISOString().slice(0, 10);
+
+    let cashPayment: { amountCents: number; recipientEmail: string; recipientDisplayName: string } | null = null;
+    if (datesChanged && body.paymentMethod === "cash") {
+      if (!caretakerAllowsCashExistingReservationPayment()) {
+        return NextResponse.json({ error: "Cash payment is not available for this reservation." }, { status: 400 });
+      }
+      const amountCents = typeof body.amountCents === "number" ? Math.round(body.amountCents) : 0;
+      const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
+      if (amountCents < 1 || !recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+        return NextResponse.json(
+          { error: "Cash payment needs an amount of at least $0.01 and a valid recipient email." },
+          { status: 400 }
+        );
+      }
+      cashPayment = {
+        amountCents,
+        recipientEmail,
+        recipientDisplayName:
+          typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest",
+      };
+    }
     const rates = siteRatesFromRow(existingRow);
     const isMember = existingRow.reservation_type === "member";
     let refundResult:
@@ -322,7 +343,8 @@ export async function PATCH(
         });
       }
 
-      if (balanceAfterSync.balanceDueCents > 0) {
+      // Date changes never require payment; any added balance is collected later from reservation details.
+      if (cashPayment && balanceAfterSync.balanceDueCents > 0) {
         const periods = await listBillingPeriods(id);
         const payableNowCents = payableBalanceCents({
           periods,
@@ -332,42 +354,8 @@ export async function PATCH(
           today,
         });
         if (payableNowCents > 0) {
-          const paymentMethod = body.paymentMethod === "cash" ? "cash" : null;
-          const cashAllowed = caretakerAllowsCashExistingReservationPayment();
-          if (!paymentMethod) {
-            return NextResponse.json(
-              {
-                error: "Additional site fees are due. Pay with cash here or use card.",
-                amountDueCents: payableNowCents,
-                requirePayment: true,
-              },
-              { status: 400 }
-            );
-          }
-          if (paymentMethod === "cash" && !cashAllowed) {
-            return NextResponse.json(
-              { error: "Cash payment is not available for this reservation." },
-              { status: 400 }
-            );
-          }
-          const amountCents = typeof body.amountCents === "number" ? body.amountCents : 0;
-          const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
-          const recipientDisplayName =
-            typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest";
-          if (
-            amountCents < 1 ||
-            amountCents > payableNowCents ||
-            !recipientEmail ||
-            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
-          ) {
-            return NextResponse.json(
-              {
-                error: `Valid payment required up to $${(payableNowCents / 100).toFixed(2)}`,
-                amountDueCents: payableNowCents,
-              },
-              { status: 400 }
-            );
-          }
+          const { recipientEmail, recipientDisplayName } = cashPayment;
+          const amountCents = Math.min(cashPayment.amountCents, payableNowCents);
 
           await sql`
             INSERT INTO camp_payments (

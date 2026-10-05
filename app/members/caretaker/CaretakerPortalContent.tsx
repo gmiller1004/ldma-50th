@@ -15,7 +15,7 @@ import {
   isSameDay,
   getDay,
 } from "date-fns";
-import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerAllowsCashExistingReservationPayment, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
+import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerEarliestCheckInDate, caretakerEarliestCheckInDateForEdit } from "@/lib/reservation-camps";
 import { isCompleteDateOnly, todayDateOnlyLocal } from "@/lib/reservation-calendar-range";
 import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
 import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
@@ -378,9 +378,6 @@ export function CaretakerPortalContent({
   const [resEditCheckInDate, setResEditCheckInDate] = useState("");
   const [resEditCheckOutDate, setResEditCheckOutDate] = useState("");
   const [resEditSubmitting, setResEditSubmitting] = useState(false);
-  const [resEditMemberLookup, setResEditMemberLookup] = useState<LookupResult | null>(null);
-  const [resEditPaymentDueCents, setResEditPaymentDueCents] = useState<number | null>(null);
-  const [resEditPayAmountCents, setResEditPayAmountCents] = useState(0);
   const [resEditPreview, setResEditPreview] = useState<{
     available: boolean;
     datesUnchanged: boolean;
@@ -1381,30 +1378,15 @@ export function CaretakerPortalContent({
     setEditingReservation(r);
     setResEditCheckInDate(toDateOnly(r.checkInDate));
     setResEditCheckOutDate(toDateOnly(r.checkOutDate));
-    setResEditPaymentDueCents(null);
-    setResEditPayAmountCents(0);
     setResEditPreview(null);
     setResEditPreviewError(null);
     setResEditIssueRefund(false);
-    setResEditMemberLookup(null);
     setResEditModalOpen(true);
-    if (r.reservationType === "member" && r.memberNumber) {
-      fetch("/api/members/caretaker/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memberNumber: r.memberNumber.trim() }),
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => setResEditMemberLookup(data ?? null))
-        .catch(() => setResEditMemberLookup(null));
-    }
   }
 
   function closeResEditModal() {
     setResEditModalOpen(false);
     setEditingReservation(null);
-    setResEditPaymentDueCents(null);
-    setResEditPayAmountCents(0);
     setResEditPreview(null);
     setResEditPreviewError(null);
     setResEditIssueRefund(false);
@@ -1453,7 +1435,6 @@ export function CaretakerPortalContent({
       return;
     }
     setResEditSubmitting(true);
-    setResEditPaymentDueCents(null);
     setResEditPreviewError(null);
     try {
       const res = await fetch(`/api/members/caretaker/reservations/${editingReservation.id}`, {
@@ -1467,11 +1448,6 @@ export function CaretakerPortalContent({
       });
       const data = await res.json();
       if (!res.ok) {
-        if (data.requirePayment && typeof data.amountDueCents === "number") {
-          setResEditPaymentDueCents(data.amountDueCents);
-          setResEditPayAmountCents(data.amountDueCents);
-          return;
-        }
         setResEditPreviewError(data.error ?? "Update failed");
         return;
       }
@@ -1839,122 +1815,6 @@ export function CaretakerPortalContent({
       alert("Checkout failed");
     } finally {
       setDetailsPastDueSubmitting(false);
-    }
-  }
-
-  const resEditNights =
-    resEditCheckInDate && resEditCheckOutDate && resEditCheckInDate < resEditCheckOutDate
-      ? countNights(resEditCheckInDate, resEditCheckOutDate)
-      : 0;
-  const resEditAllowsCash = Boolean(editingReservation && caretakerAllowsCashExistingReservationPayment());
-
-  async function handleResEditPayCash() {
-    if (!editingReservation || resEditPaymentDueCents == null || resEditPaymentDueCents < 1) return;
-    const payAmount = Math.min(
-      Math.max(1, resEditPayAmountCents),
-      resEditPaymentDueCents
-    );
-    const recipientEmail =
-      editingReservation.reservationType === "member"
-        ? resEditMemberLookup?.email?.trim()
-        : editingReservation.guestEmail?.trim();
-    const recipientDisplayName =
-      editingReservation.reservationType === "member"
-        ? (resEditMemberLookup?.displayName || `#${editingReservation.memberNumber}`)
-        : `${editingReservation.guestFirstName ?? ""} ${editingReservation.guestLastName ?? ""}`.trim() || "Guest";
-    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
-      alert("Recipient email required for receipt. For members, ensure lookup has email on file.");
-      return;
-    }
-    setResEditSubmitting(true);
-    try {
-      const res = await fetch(`/api/members/caretaker/reservations/${editingReservation.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          checkInDate: resEditCheckInDate,
-          checkOutDate: resEditCheckOutDate,
-          paymentMethod: "cash",
-          amountCents: payAmount,
-          recipientEmail,
-          recipientDisplayName,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error ?? "Payment failed");
-        return;
-      }
-      closeResEditModal();
-      loadReservations();
-    } catch {
-      alert("Payment failed");
-    } finally {
-      setResEditSubmitting(false);
-    }
-  }
-
-  async function handleResEditPayCard() {
-    if (!editingReservation || resEditPaymentDueCents == null || resEditPaymentDueCents < 1) return;
-    const payAmount = Math.min(
-      Math.max(1, resEditPayAmountCents),
-      resEditPaymentDueCents
-    );
-    const recipientEmail =
-      editingReservation.reservationType === "member"
-        ? resEditMemberLookup?.email?.trim()
-        : editingReservation.guestEmail?.trim();
-    const recipientDisplayName =
-      editingReservation.reservationType === "member"
-        ? (resEditMemberLookup?.displayName || `#${editingReservation.memberNumber}`)
-        : `${editingReservation.guestFirstName ?? ""} ${editingReservation.guestLastName ?? ""}`.trim() || "Guest";
-    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
-      alert("Recipient email required for receipt. For members, ensure lookup has email on file.");
-      return;
-    }
-    setResEditSubmitting(true);
-    try {
-      const checkoutBody: Record<string, unknown> = {
-        amountCents: payAmount,
-        paymentType: "reservation",
-        reservationId: editingReservation.id,
-        recipientEmail,
-        recipientDisplayName,
-        siteId: editingReservation.siteId,
-        checkInDate: resEditCheckInDate,
-        checkOutDate: resEditCheckOutDate,
-        nights: resEditNights,
-        reservationType: editingReservation.reservationType,
-      };
-      if (editingReservation.reservationType === "member") {
-        checkoutBody.memberContactId = editingReservation.memberContactId ?? "";
-        checkoutBody.memberNumber = editingReservation.memberNumber ?? "";
-        checkoutBody.memberDisplayName = editingReservation.memberDisplayName ?? "";
-      } else {
-        checkoutBody.guestFirstName = editingReservation.guestFirstName ?? "";
-        checkoutBody.guestLastName = editingReservation.guestLastName ?? "";
-        checkoutBody.guestEmail = editingReservation.guestEmail ?? "";
-        checkoutBody.guestPhone = editingReservation.guestPhone ?? undefined;
-      }
-      const res = await fetch("/api/members/caretaker/payments/checkout-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(checkoutBody),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error ?? "Checkout failed");
-        return;
-      }
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      alert("Checkout failed");
-    } catch {
-      alert("Checkout failed");
-    } finally {
-      setResEditSubmitting(false);
     }
   }
 
@@ -3301,50 +3161,12 @@ export function CaretakerPortalContent({
             <div className="bg-[#1a120b] border border-[#d4af37]/30 rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-[#f0d48f]">
-                  {resEditPaymentDueCents != null
-                    ? "Pay for additional nights"
-                    : resEditPreview
-                      ? "Review date change"
-                      : "Edit reservation dates"}
+                  {resEditPreview ? "Review date change" : "Edit reservation dates"}
                 </h3>
                 <button type="button" onClick={() => !resEditSubmitting && !resEditPreviewLoading && closeResEditModal()} className="text-[#e8e0d5]/60 hover:text-[#e8e0d5]"><X className="w-5 h-5" /></button>
               </div>
               <p className="text-[#e8e0d5]/80 text-sm mb-4">{editingReservation.siteName} — {editingReservation.reservationType === "member" ? editingReservation.memberDisplayName : `${editingReservation.guestFirstName} ${editingReservation.guestLastName}`}</p>
-              {resEditPaymentDueCents != null ? (
-                <div className="space-y-4">
-                  <p className="text-[#e8e0d5]">
-                    Additional amount due: <strong>{formatCentsAsCurrency(resEditPaymentDueCents)}</strong>
-                  </p>
-                  <div>
-                    <label className="block text-sm font-medium text-[#e8e0d5] mb-2">Payment amount $</label>
-                    <input
-                      type="number"
-                      min={0.01}
-                      max={resEditPaymentDueCents / 100}
-                      step={0.01}
-                      value={resEditPayAmountCents / 100}
-                      onChange={(e) =>
-                        setResEditPayAmountCents(Math.round((parseFloat(e.target.value) || 0) * 100))
-                      }
-                      className="w-full px-4 py-2.5 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5]"
-                    />
-                    <p className="text-[#e8e0d5]/50 text-xs mt-1">
-                      Partial payment allowed — up to {formatCentsAsCurrency(resEditPaymentDueCents)} for this date change.
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {resEditAllowsCash && (
-                      <button type="button" onClick={handleResEditPayCash} disabled={resEditSubmitting} className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2">
-                        {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay cash
-                      </button>
-                    )}
-                    <button type="button" onClick={handleResEditPayCard} disabled={resEditSubmitting} className="flex-1 py-2.5 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 disabled:opacity-50 flex items-center justify-center gap-2">
-                      {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Pay card
-                    </button>
-                  </div>
-                  <button type="button" onClick={() => { setResEditPaymentDueCents(null); setResEditPreview(null); }} className="w-full py-2.5 text-[#e8e0d5]/80 hover:text-[#d4af37]">Back to dates</button>
-                </div>
-              ) : resEditPreview ? (
+              {resEditPreview ? (
                 <div className="space-y-4">
                   <div className="bg-[#0f0a06]/80 border border-[#d4af37]/15 rounded-lg p-3 text-sm space-y-1.5">
                     <div className="flex justify-between text-[#e8e0d5]/80">
@@ -3371,7 +3193,7 @@ export function CaretakerPortalContent({
                     </div>
                     {resEditPreview.additionalDueCents > 0 && (
                       <div className="flex justify-between text-amber-200 font-medium">
-                        <span>Due now</span>
+                        <span>Added balance</span>
                         <span>{formatCentsAsCurrency(resEditPreview.additionalDueCents)}</span>
                       </div>
                     )}
@@ -3432,8 +3254,10 @@ export function CaretakerPortalContent({
                     </p>
                   )}
                   {resEditPreview.additionalDueCents > 0 ? (
-                    <p className="text-[#e8e0d5]/50 text-xs">
-                      Confirming will ask for payment of the amount due now.
+                    <p className="text-amber-300/90 text-xs">
+                      Saving does not collect any payment. The{" "}
+                      {formatCentsAsCurrency(resEditPreview.additionalDueCents)} stays on the reservation — collect it
+                      in reservation details when they pay (cash on arrival or card).
                     </p>
                   ) : (resEditPreview.scheduledRemainingCents ?? 0) > 0 ? (
                     <p className="text-[#e8e0d5]/50 text-xs">
@@ -3461,7 +3285,7 @@ export function CaretakerPortalContent({
                       }
                       className="flex-1 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Confirm save
+                      {resEditSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save dates
                     </button>
                   </div>
                 </div>

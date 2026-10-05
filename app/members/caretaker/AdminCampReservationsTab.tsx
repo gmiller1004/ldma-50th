@@ -861,7 +861,7 @@ export function AdminCampReservationsTab({
                   </div>
                   {editPreview.additionalDueCents > 0 && (
                     <div className="flex justify-between text-amber-200 font-medium">
-                      <span>Due now</span>
+                      <span>Added balance</span>
                       <span>{formatCentsAsCurrency(editPreview.additionalDueCents)}</span>
                     </div>
                   )}
@@ -922,8 +922,9 @@ export function AdminCampReservationsTab({
                   </p>
                 )}
                 {editPreview.additionalDueCents > 0 ? (
-                  <p className="text-[#e8e0d5]/50 text-xs">
-                    Confirming will ask for payment of the amount due now.
+                  <p className="text-amber-300/90 text-xs">
+                    Saving does not collect any payment. The {formatCentsAsCurrency(editPreview.additionalDueCents)}{" "}
+                    stays on the reservation — collect it from reservation details when they pay.
                   </p>
                 ) : (editPreview.scheduledRemainingCents ?? 0) > 0 ? (
                   <p className="text-[#e8e0d5]/50 text-xs">
