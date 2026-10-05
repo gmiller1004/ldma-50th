@@ -52,6 +52,7 @@ export async function GET(
 
     const resRows = await sql`
       SELECT r.id, r.site_id, r.check_in_date, r.check_out_date, r.nights, r.reservation_type, r.status,
+             r.amount_override_cents, r.override_reason, r.price_override_flag,
              s.member_rate_daily, s.member_rate_monthly, s.non_member_rate_daily
       FROM camp_reservations r
       JOIN camp_sites s ON s.id = r.site_id
@@ -67,6 +68,9 @@ export async function GET(
           nights: number;
           reservation_type: string;
           status: string;
+          amount_override_cents: number | null;
+          override_reason: string | null;
+          price_override_flag: boolean | null;
           member_rate_daily: number | string | null;
           member_rate_monthly: number | string | null;
           non_member_rate_daily: number | string | null;
@@ -156,6 +160,10 @@ export async function GET(
       refundBreakdown: { stripeRefundCents, cashRefundCents },
       issuesRefund: false,
       cashAllowed: caretakerAllowsCashExistingReservationPayment(),
+      specialRate:
+        res.price_override_flag && res.amount_override_cents != null
+          ? { totalCents: res.amount_override_cents, reason: res.override_reason ?? "" }
+          : null,
     });
   } catch (e) {
     console.error("[caretaker] edit-preview error:", e);

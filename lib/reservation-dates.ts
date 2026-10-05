@@ -46,7 +46,7 @@ export function countNights(checkInDate: string, checkOutDate: string): number {
   const checkIn = parseDateOnly(checkInDate);
   const checkOut = parseDateOnly(checkOutDate);
   if (checkOut <= checkIn) return 0;
-  return Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / DAY_MS));
+  return Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / DAY_MS));
 }
 
 export function addDays(dateStr: string, days: number): string {

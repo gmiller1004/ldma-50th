@@ -1,4 +1,5 @@
 import { getCampBySlug } from "@/lib/directory-camps";
+import { toDateOnlyStr } from "@/lib/reservation-dates";
 
 export const PAYMENT_EXPORT_HEADERS = [
   "PAYMENT DATE",
@@ -68,10 +69,10 @@ export function formatPaymentTypeLabel(method: string, paymentType: string): str
   return method;
 }
 
-function formatStayDates(checkIn: string | null, checkOut: string | null): string | null {
+function formatStayDates(checkIn: string | Date | null, checkOut: string | Date | null): string | null {
   if (!checkIn || !checkOut) return null;
-  const inDate = String(checkIn).slice(0, 10);
-  const outDate = String(checkOut).slice(0, 10);
+  const inDate = toDateOnlyStr(checkIn);
+  const outDate = toDateOnlyStr(checkOut);
   return `${inDate} – ${outDate}`;
 }
 

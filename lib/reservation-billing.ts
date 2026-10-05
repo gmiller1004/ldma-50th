@@ -266,6 +266,51 @@ export async function syncBillingPeriodsForReservation(input: {
   };
 }
 
+/**
+ * Re-apply all payments across the reservation's existing billing periods without regenerating them,
+ * so special rates and hand-built schedules survive a payment. Falls back to a full resync when no
+ * periods exist yet.
+ */
+export async function applyPaymentsToExistingPeriods(
+  reservationId: string
+): Promise<{ totalDueCents: number; totalPaidCents: number; balanceDueCents: number }> {
+  if (!hasDb() || !sql) {
+    return { totalDueCents: 0, totalPaidCents: 0, balanceDueCents: 0 };
+  }
+  const periods = await listBillingPeriods(reservationId);
+  if (periods.length === 0) {
+    return resyncReservationBillingFromDb(reservationId);
+  }
+
+  const drafts: BillingPeriodDraft[] = periods.filter((p) => p.status !== "cancelled").map((p) => ({
+    periodIndex: p.periodIndex,
+    periodStart: p.periodStart,
+    periodEnd: p.periodEnd,
+    nights: p.nights,
+    amountDueCents: p.amountDueCents,
+    dueDate: p.dueDate,
+    pricingBasis: p.pricingBasis as BillingPeriodDraft["pricingBasis"],
+  }));
+  const totalPaidCents = await getReservationNetPaidCents(reservationId);
+  const allocated = allocatePaidWaterfall(drafts, totalPaidCents);
+
+  for (const p of allocated) {
+    await sql`
+      UPDATE camp_billing_periods
+      SET amount_paid_cents = ${p.amountPaidCents}, status = ${p.status}, updated_at = NOW()
+      WHERE reservation_id = ${reservationId} AND period_index = ${p.periodIndex}
+    `;
+  }
+
+  const totalDueCents = allocated.reduce((s, p) => s + p.amountDueCents, 0);
+  const appliedPaid = allocated.reduce((s, p) => s + p.amountPaidCents, 0);
+  return {
+    totalDueCents,
+    totalPaidCents: appliedPaid,
+    balanceDueCents: Math.max(0, totalDueCents - appliedPaid),
+  };
+}
+
 /** Rebuild billing periods from the reservation's current site and dates in the database. */
 export async function resyncReservationBillingFromDb(reservationId: string): Promise<{
   totalDueCents: number;

@@ -125,8 +125,8 @@ export async function buildCancelPreview(
   const totals = await paymentTotals(reservationId);
   const calc = computeCancellationRefund({
     cancelDate: effectiveCancel,
-    checkInDate: String(res.check_in_date).slice(0, 10),
-    checkOutDate: String(res.check_out_date).slice(0, 10),
+    checkInDate: toDateOnlyStr(res.check_in_date),
+    checkOutDate: toDateOnlyStr(res.check_out_date),
     totalNights: res.nights,
     isMember: res.reservation_type === "member",
     isHookupSite: isHookupSiteType(res.site_type),

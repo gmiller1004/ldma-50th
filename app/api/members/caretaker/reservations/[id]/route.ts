@@ -4,6 +4,7 @@ import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations, caretakerAllowsCashExistingReservationPayment } from "@/lib/reservation-camps";
 import { lookupMember } from "@/lib/salesforce";
 import {
+  applyPaymentsToExistingPeriods,
   getReservationBalance,
   getReservationPaymentTotals,
   listBillingPeriods,
@@ -12,6 +13,8 @@ import {
   stayNights,
   syncBillingPeriodsForReservation,
 } from "@/lib/reservation-billing";
+import { computeStayPricing } from "@/lib/reservation-pricing";
+import { validatePriceOverride } from "@/lib/reservation-price-override";
 import { awardPointsForReservationCheckIn } from "@/lib/rewards";
 import {
   sendCaretakerCheckInWelcomeEmail,
@@ -177,6 +180,8 @@ export async function PATCH(
       recipientEmail?: string;
       recipientDisplayName?: string;
       issueRefund?: boolean;
+      stayTotalOverrideCents?: number;
+      overrideReason?: string;
     };
     try {
       body = await request.json();
@@ -278,6 +283,30 @@ export async function PATCH(
     }
     const rates = siteRatesFromRow(existingRow);
     const isMember = existingRow.reservation_type === "member";
+
+    // New dates get the standard total unless the caretaker enters a special total for them;
+    // the old special rate described the old dates, so it is not carried over.
+    let newPricing: ReturnType<typeof validatePriceOverride> | null = null;
+    if (datesChanged) {
+      const calculatedTotalCents = computeStayPricing({
+        checkInDate: newCheckIn,
+        checkOutDate: newCheckOut,
+        isMember,
+        rates,
+      }).totalCents;
+      newPricing = validatePriceOverride({
+        calculatedTotalCents,
+        amountOverrideCents:
+          typeof body.stayTotalOverrideCents === "number" ? Math.round(body.stayTotalOverrideCents) : undefined,
+        overrideReason: body.overrideReason,
+        paymentAmountCents: 0,
+        allowZeroPayment: true,
+      });
+      if (!newPricing.ok) {
+        return NextResponse.json({ error: newPricing.error }, { status: 400 });
+      }
+    }
+
     let refundResult:
       | { stripeRefundCents: number; cashRefundCents: number; totalRefundedCents: number }
       | null = null;
@@ -297,10 +326,19 @@ export async function PATCH(
       }
 
       const newNights = stayNights(newCheckIn, newCheckOut);
+      const priced = newPricing && newPricing.ok ? newPricing.result : null;
+      if (!priced) {
+        return NextResponse.json({ error: "Could not price the new dates" }, { status: 500 });
+      }
 
       await sql`
         UPDATE camp_reservations
-        SET check_in_date = ${newCheckIn}, check_out_date = ${newCheckOut}, nights = ${newNights}, updated_at = NOW()
+        SET check_in_date = ${newCheckIn}, check_out_date = ${newCheckOut}, nights = ${newNights},
+            calculated_total_cents = ${priced.calculatedTotalCents},
+            amount_override_cents = ${priced.amountOverrideCents},
+            override_reason = ${priced.overrideReason},
+            price_override_flag = ${priced.priceOverrideFlag},
+            updated_at = NOW()
         WHERE id = ${id}
       `;
 
@@ -310,11 +348,13 @@ export async function PATCH(
         checkOutDate: newCheckOut,
         isMember,
         rates,
+        effectiveTotalCents: priced.effectiveTotalCents,
       });
 
+      const ledgerAfterSync = await getReservationPaymentTotals(id);
       const creditCents = Math.max(
         0,
-        balanceAfterSync.totalPaidCents - balanceAfterSync.totalDueCents
+        ledgerAfterSync.netPaidCents - balanceAfterSync.totalDueCents
       );
       if (body.issueRefund === true && creditCents > 0) {
         const refund = await refundReservationSiteFees({
@@ -334,13 +374,7 @@ export async function PATCH(
           );
         }
         refundResult = refund;
-        await syncBillingPeriodsForReservation({
-          reservationId: id,
-          checkInDate: newCheckIn,
-          checkOutDate: newCheckOut,
-          isMember,
-          rates,
-        });
+        await applyPaymentsToExistingPeriods(id);
       }
 
       // Date changes never require payment; any added balance is collected later from reservation details.
@@ -370,13 +404,7 @@ export async function PATCH(
             )
           `;
 
-          await syncBillingPeriodsForReservation({
-            reservationId: id,
-            checkInDate: newCheckIn,
-            checkOutDate: newCheckOut,
-            isMember,
-            rates,
-          });
+          await applyPaymentsToExistingPeriods(id);
 
           const siteResForReceipt = await sql`SELECT name FROM camp_sites WHERE id = ${existingRow.site_id} LIMIT 1`;
           const siteNameForReceipt = ((Array.isArray(siteResForReceipt) ? siteResForReceipt : []) as { name: string }[])[0]

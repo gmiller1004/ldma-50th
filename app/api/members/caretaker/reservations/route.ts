@@ -18,6 +18,7 @@ import { sendPaymentReceiptEmail, sendReservationConfirmationEmail } from "@/lib
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 import { summarizeReservationBalances } from "@/lib/reservation-billing";
 import { parseReservationPricingBody, withReservationInvoice } from "@/lib/reservation-create-metadata";
+import { toDateOnlyStr } from "@/lib/reservation-dates";
 
 type ReservationRow = {
   id: string;
@@ -166,11 +167,13 @@ async function sendReservationConfirmation(
   campName: string,
   siteName: string
 ): Promise<void> {
+  const checkIn = toDateOnlyStr(row.check_in_date);
+  const checkOut = toDateOnlyStr(row.check_out_date);
   if (row.reservation_type === "guest") {
     const email = row.guest_email?.trim();
     if (email && EMAIL_REGEX.test(email)) {
       const name = [row.guest_first_name, row.guest_last_name].filter(Boolean).join(" ").trim() || "Guest";
-      await sendReservationConfirmationEmail(email, campName, siteName, row.check_in_date, row.check_out_date, name);
+      await sendReservationConfirmationEmail(email, campName, siteName, checkIn, checkOut, name);
     }
     return;
   }
@@ -180,7 +183,7 @@ async function sendReservationConfirmation(
       row.member_display_name?.trim() ||
       [member.firstName, member.lastName].filter(Boolean).join(" ").trim() ||
       "Member";
-    await sendReservationConfirmationEmail(member.email.trim(), campName, siteName, row.check_in_date, row.check_out_date, name);
+    await sendReservationConfirmationEmail(member.email.trim(), campName, siteName, checkIn, checkOut, name);
   }
 }
 
@@ -323,8 +326,8 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (!isComp && (!recipientEmail || !EMAIL_REGEX.test(recipientEmail))) {
-    return NextResponse.json({ error: "Valid recipient email required for payment" }, { status: 400 });
+  if (!isComp && payCents > 0 && (!recipientEmail || !EMAIL_REGEX.test(recipientEmail))) {
+    return NextResponse.json({ error: "Valid recipient email required for payment receipt" }, { status: 400 });
   }
 
   const overlap = await sql`
@@ -451,8 +454,8 @@ export async function POST(request: NextRequest) {
       row.reservation_type === "member"
         ? row.member_display_name?.trim() || "Member"
         : [row.guest_first_name, row.guest_last_name].filter(Boolean).join(" ").trim() || "Guest",
-    checkInDate: row.check_in_date,
-    checkOutDate: row.check_out_date,
+    checkInDate,
+    checkOutDate,
     siteName: siteNameStr,
   };
   const receiptSent =

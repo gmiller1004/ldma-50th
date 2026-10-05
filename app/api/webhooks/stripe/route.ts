@@ -5,7 +5,11 @@ import { getCampBySlug } from "@/lib/directory-camps";
 import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
 import { syncReservationToKlaviyo } from "@/lib/klaviyo-camp-stay";
 import { sendPublicReservationConfirmationIfPending } from "@/lib/public-booking-confirmation";
-import { siteRatesFromRow, syncBillingPeriodsForReservation } from "@/lib/reservation-billing";
+import {
+  applyPaymentsToExistingPeriods,
+  siteRatesFromRow,
+  syncBillingPeriodsForReservation,
+} from "@/lib/reservation-billing";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { withReservationInvoice } from "@/lib/reservation-create-metadata";
 import {
@@ -408,7 +412,14 @@ export async function POST(request: NextRequest) {
     const resDatesRow = (Array.isArray(resDates) ? resDates[0] : undefined) as
       | { check_in_date: string | Date; check_out_date: string | Date; reservation_type: string }
       | undefined;
-    if (resDatesRow) {
+    const existingPeriods = await sql`SELECT 1 FROM camp_billing_periods WHERE reservation_id = ${reservationId} LIMIT 1`;
+    if (resDatesRow && Array.isArray(existingPeriods) && existingPeriods.length > 0) {
+      try {
+        await applyPaymentsToExistingPeriods(reservationId);
+      } catch (e) {
+        console.error("[webhook] Billing payment apply failed (continuing to email):", e);
+      }
+    } else if (resDatesRow) {
       try {
         await syncBillingPeriodsForReservation({
           reservationId,

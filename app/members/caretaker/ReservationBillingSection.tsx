@@ -74,14 +74,14 @@ export function ReservationBillingSection({
     [billingPeriods, balance.balanceDueCents]
   );
 
-  const [amountCents, setAmountCents] = useState(suggestedCents);
+  const [amountInput, setAmountInput] = useState("");
   const [emailInput, setEmailInput] = useState(recipientEmail.trim());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setAmountCents(suggestedCents);
-  }, [reservationId, suggestedCents]);
+    setAmountInput("");
+  }, [reservationId]);
 
   useEffect(() => {
     setEmailInput(recipientEmail.trim());
@@ -90,11 +90,20 @@ export function ReservationBillingSection({
   const effectiveEmail = recipientEmail.trim() || emailInput.trim();
   const canPay = balance.balanceDueCents > 0;
   const emailValid = EMAIL_REGEX.test(effectiveEmail);
-  const payAmount = Math.min(Math.max(1, amountCents), balance.balanceDueCents);
+  const amountCents = Math.round((parseFloat(amountInput) || 0) * 100);
+  const payAmount = Math.min(Math.max(0, amountCents), balance.balanceDueCents);
   const canSubmit = canPay && emailValid && payAmount >= 1;
+
+  function fillAmount(cents: number) {
+    setAmountInput((cents / 100).toFixed(2));
+  }
 
   async function payCash() {
     if (!canSubmit) return;
+    const confirmed = window.confirm(
+      `Record ${formatCentsAsCurrency(payAmount)} cash received from ${recipientDisplayName}?\n\nOnly confirm if you are holding this cash now. A receipt will be emailed.`
+    );
+    if (!confirmed) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -235,8 +244,9 @@ export function ReservationBillingSection({
                 min={0.01}
                 max={balance.balanceDueCents / 100}
                 step={0.01}
-                value={amountCents / 100}
-                onChange={(e) => setAmountCents(Math.round((parseFloat(e.target.value) || 0) * 100))}
+                value={amountInput}
+                onChange={(e) => setAmountInput(e.target.value)}
+                placeholder="0.00"
                 autoFocus={autoFocusAmount}
                 className="w-32 px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded text-[#e8e0d5] text-sm"
               />
@@ -245,7 +255,7 @@ export function ReservationBillingSection({
               {suggestedCents > 0 && suggestedCents < balance.balanceDueCents && (
                 <button
                   type="button"
-                  onClick={() => setAmountCents(suggestedCents)}
+                  onClick={() => fillAmount(suggestedCents)}
                   className="text-xs text-[#d4af37] hover:underline"
                 >
                   Current period ({formatCentsAsCurrency(suggestedCents)})
@@ -253,7 +263,7 @@ export function ReservationBillingSection({
               )}
               <button
                 type="button"
-                onClick={() => setAmountCents(balance.balanceDueCents)}
+                onClick={() => fillAmount(balance.balanceDueCents)}
                 className="text-xs text-[#d4af37] hover:underline"
               >
                 Full balance ({formatCentsAsCurrency(balance.balanceDueCents)})
@@ -261,7 +271,9 @@ export function ReservationBillingSection({
             </div>
           </div>
           <p className="text-[#e8e0d5]/50 text-xs">
-            Collecting {formatCentsAsCurrency(payAmount)} of {formatCentsAsCurrency(balance.balanceDueCents)} due
+            {payAmount > 0
+              ? `Collecting ${formatCentsAsCurrency(payAmount)} of ${formatCentsAsCurrency(balance.balanceDueCents)} remaining`
+              : "Enter the amount you are collecting now. Cash: only record money you are holding."}
           </p>
           <div className="flex gap-2">
             {allowsCash && (
@@ -272,7 +284,7 @@ export function ReservationBillingSection({
                 className="flex-1 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-1"
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Pay cash
+                {payAmount > 0 ? `Record ${formatCentsAsCurrency(payAmount)} cash received` : "Record cash received"}
               </button>
             )}
             <button

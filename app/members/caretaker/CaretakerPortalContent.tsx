@@ -403,10 +403,14 @@ export function CaretakerPortalContent({
     isLongTermMember?: boolean;
     creditCents: number;
     refundBreakdown: { stripeRefundCents: number; cashRefundCents: number };
+    specialRate?: { totalCents: number; reason: string } | null;
   } | null>(null);
   const [resEditPreviewLoading, setResEditPreviewLoading] = useState(false);
   const [resEditPreviewError, setResEditPreviewError] = useState<string | null>(null);
   const [resEditIssueRefund, setResEditIssueRefund] = useState(false);
+  const [resEditSpecialTotal, setResEditSpecialTotal] = useState("");
+  const [resEditSpecialReason, setResEditSpecialReason] = useState("");
+  const [resEditShowSpecial, setResEditShowSpecial] = useState(false);
   const [movingReservation, setMovingReservation] = useState<Reservation | null>(null);
   const [resMoveModalOpen, setResMoveModalOpen] = useState(false);
   const [resMoveNewSiteId, setResMoveNewSiteId] = useState("");
@@ -748,7 +752,7 @@ export function CaretakerPortalContent({
   }, [resTotalCents, resStayTotalOverride, resOverrideReason, resPaymentAmount]);
 
   const resStayTotalCents = createPricingResolved?.stayTotalCents ?? resTotalCents;
-  const resCollectCents = createPricingResolved?.collectCents ?? resStayTotalCents;
+  const resCollectCents = createPricingResolved?.collectCents ?? 0;
   const resBalanceAfterCents = createPricingResolved?.balanceAfterCents ?? 0;
 
   const resSuggestedFirstPeriodCents = useMemo(() => {
@@ -805,6 +809,12 @@ export function CaretakerPortalContent({
       }),
     [archivedReservations, archivedResSearch, archivedResFilter, archivedResSortKey, archivedResSortDir]
   );
+
+  function resetCreateReservationPricing() {
+    setResPaymentAmount("");
+    setResStayTotalOverride("");
+    setResOverrideReason("");
+  }
 
   function applyCreatePricingFields(
     body: Record<string, unknown>,
@@ -897,6 +907,7 @@ export function CaretakerPortalContent({
         return;
       }
       setCreateResModalOpen(false);
+      resetCreateReservationPricing();
       setResSiteId("");
       setResMemberLookup(null);
       setResMemberNumber("");
@@ -923,8 +934,10 @@ export function CaretakerPortalContent({
         setResError("Look up member first");
         return;
       }
-      if (!resMemberLookup.email?.trim()) {
-        setResError("Member email is required for receipt; not on file. Use card payment or add email in Salesforce.");
+      if (resCollectCents > 0 && !resMemberLookup.email?.trim()) {
+        setResError(
+          "No email on file for this member, so a cash receipt can't be sent. Leave Collect now blank (pay on arrival) or add an email in Salesforce."
+        );
         return;
       }
     } else {
@@ -953,7 +966,7 @@ export function CaretakerPortalContent({
         checkOutDate: resCheckOutDate,
         type: resType,
         paymentMethod: "cash",
-        recipientEmail: resType === "member" ? resMemberLookup!.email!.trim() : resGuestEmail.trim(),
+        recipientEmail: resType === "member" ? resMemberLookup?.email?.trim() ?? "" : resGuestEmail.trim(),
         recipientDisplayName:
           resType === "member"
             ? resMemberLookup!.displayName || `#${resMemberLookup!.memberNumber}`
@@ -985,6 +998,7 @@ export function CaretakerPortalContent({
         return;
       }
       setCreateResModalOpen(false);
+      resetCreateReservationPricing();
       setResSiteId("");
       setResMemberLookup(null);
       setResMemberNumber("");
@@ -1421,6 +1435,9 @@ export function CaretakerPortalContent({
       }
       setResEditPreview(data);
       setResEditIssueRefund(false);
+      setResEditSpecialTotal("");
+      setResEditSpecialReason("");
+      setResEditShowSpecial(Boolean(data.specialRate));
     } catch {
       setResEditPreviewError("Could not preview date change");
     } finally {
@@ -1434,6 +1451,17 @@ export function CaretakerPortalContent({
       setResEditPreviewError("Site is not available for the new dates");
       return;
     }
+    const specialTotalCents = resEditSpecialTotal.trim()
+      ? Math.round(parseFloat(resEditSpecialTotal) * 100)
+      : null;
+    if (specialTotalCents != null && (Number.isNaN(specialTotalCents) || specialTotalCents < 0)) {
+      setResEditPreviewError("Enter a valid special stay total, or leave it blank for standard pricing.");
+      return;
+    }
+    if (specialTotalCents != null && resEditSpecialReason.trim().length < 3) {
+      setResEditPreviewError("Add a short reason for the special stay total.");
+      return;
+    }
     setResEditSubmitting(true);
     setResEditPreviewError(null);
     try {
@@ -1444,6 +1472,9 @@ export function CaretakerPortalContent({
           checkInDate: resEditCheckInDate,
           checkOutDate: resEditCheckOutDate,
           issueRefund: resEditIssueRefund && (resEditPreview.creditCents ?? 0) > 0,
+          ...(specialTotalCents != null
+            ? { stayTotalOverrideCents: specialTotalCents, overrideReason: resEditSpecialReason.trim() }
+            : {}),
         }),
       });
       const data = await res.json();
@@ -2160,7 +2191,7 @@ export function CaretakerPortalContent({
           </p>
           <button
             type="button"
-            onClick={() => { setResError(null); setCreateResModalOpen(true); }}
+            onClick={() => { setResError(null); resetCreateReservationPricing(); setCreateResModalOpen(true); }}
             className="px-4 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f]"
           >
             Create reservation
@@ -3227,6 +3258,57 @@ export function CaretakerPortalContent({
                       </p>
                     )}
                   </div>
+                  {resEditPreview.specialRate && (
+                    <p className="text-amber-300/90 text-xs">
+                      This reservation has a special rate of{" "}
+                      {formatCentsAsCurrency(resEditPreview.specialRate.totalCents)}
+                      {resEditPreview.specialRate.reason ? ` (${resEditPreview.specialRate.reason})` : ""}. The new
+                      dates use standard pricing ({formatCentsAsCurrency(resEditPreview.proposed.totalCents)}) unless
+                      you enter a special total for them below.
+                    </p>
+                  )}
+                  {resEditShowSpecial ? (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-[#e8e0d5]">
+                        Special stay total for the new dates $ <span className="text-[#e8e0d5]/50">(optional)</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={resEditSpecialTotal}
+                        onChange={(e) => setResEditSpecialTotal(e.target.value)}
+                        placeholder={(resEditPreview.proposed.totalCents / 100).toFixed(2)}
+                        className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                      />
+                      {resEditSpecialTotal.trim() && (
+                        <input
+                          type="text"
+                          value={resEditSpecialReason}
+                          onChange={(e) => setResEditSpecialReason(e.target.value)}
+                          placeholder="Reason (e.g. Flat $510 × 6 months)"
+                          className="w-full px-3 py-2 bg-[#0f0a06] border border-[#d4af37]/30 rounded-lg text-[#e8e0d5] text-sm"
+                        />
+                      )}
+                      {resEditSpecialTotal.trim() && !Number.isNaN(parseFloat(resEditSpecialTotal)) && (
+                        <p className="text-[#e8e0d5]/70 text-xs">
+                          New total {formatCentsAsCurrency(Math.round(parseFloat(resEditSpecialTotal) * 100))} ·
+                          balance after change{" "}
+                          {formatCentsAsCurrency(
+                            Math.max(0, Math.round(parseFloat(resEditSpecialTotal) * 100) - resEditPreview.netPaidCents)
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setResEditShowSpecial(true)}
+                      className="text-xs text-[#d4af37] hover:underline"
+                    >
+                      Use a special stay total instead of standard pricing
+                    </button>
+                  )}
                   {!resEditPreview.available && (
                     <p className="text-red-400 text-sm">Site is not available for these dates.</p>
                   )}

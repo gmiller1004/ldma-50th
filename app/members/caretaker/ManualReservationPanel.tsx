@@ -98,8 +98,9 @@ export function ManualReservationPanel() {
       stayTotalOverrideDollars: stayTotalOverride,
       overrideReason,
       paymentAmountDollars: paymentAmount,
+      blankPaymentMeans: "zero",
     });
-    return r.ok ? r.collectCents : effectiveTotalCents;
+    return r.ok ? r.collectCents : 0;
   })();
   const balanceAfterCents = Math.max(0, effectiveTotalCents - collectCents);
 
@@ -128,11 +129,15 @@ export function ManualReservationPanel() {
     );
   }, [selectedSite, nights, checkInDate, checkOutDate, resType, effectiveTotalCents, calculatedTotalCents]);
 
-  function applyPricingFields(body: Record<string, unknown>): string | null {
+  function applyPricingFields(
+    body: Record<string, unknown>,
+    blankPaymentMeans: "full" | "zero"
+  ): string | null {
     const resolved = resolveCreateReservationPricing(Math.max(0, calculatedTotalCents), {
       stayTotalOverrideDollars: stayTotalOverride,
       overrideReason,
       paymentAmountDollars: paymentAmount,
+      blankPaymentMeans,
     });
     if (!resolved.ok) return resolved.error;
     Object.assign(body, resolved.fields);
@@ -296,7 +301,7 @@ export function ManualReservationPanel() {
       setError("Stay total is still loading — please wait a moment");
       return false;
     }
-    const pricingCheck = applyPricingFields({});
+    const pricingCheck = applyPricingFields({}, "zero");
     if (pricingCheck && effectiveTotalCents > 0) {
       setError(pricingCheck);
       return false;
@@ -347,7 +352,7 @@ export function ManualReservationPanel() {
     setSuccess(null);
     try {
       const body = buildBaseBody("cash");
-      const pricingErr = applyPricingFields(body);
+      const pricingErr = applyPricingFields(body, "zero");
       if (pricingErr) {
         setError(pricingErr);
         return;
@@ -401,7 +406,7 @@ export function ManualReservationPanel() {
         checkoutBody.guestEmail = guestEmail.trim();
         checkoutBody.guestPhone = guestPhone.trim() || undefined;
       }
-      const pricingErr = applyPricingFields(checkoutBody);
+      const pricingErr = applyPricingFields(checkoutBody, "full");
       if (pricingErr) {
         setError(pricingErr);
         return;
@@ -616,7 +621,7 @@ export function ManualReservationPanel() {
               min={0}
               max={effectiveTotalCents / 100}
               step={0.01}
-              placeholder={(collectCents / 100).toFixed(2)}
+              placeholder="0.00"
               value={paymentAmount}
               onChange={(e) => setPaymentAmount(e.target.value)}
               className={`${inputClass} mt-1`}
@@ -682,7 +687,10 @@ export function ManualReservationPanel() {
                 disabled={submitting}
                 className="px-4 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50"
               >
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Pay cash
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null}{" "}
+                {collectCents > 0
+                  ? `Record ${formatCentsAsCurrency(collectCents)} cash received`
+                  : "Create — pay on arrival"}
               </button>
             )}
             <button

@@ -4,11 +4,7 @@ import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations } from "@/lib/reservation-camps";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { sendPaymentReceiptEmail } from "@/lib/sendgrid";
-import {
-  getReservationBalance,
-  syncBillingPeriodsForReservation,
-  siteRatesFromRow,
-} from "@/lib/reservation-billing";
+import { getReservationBalance, applyPaymentsToExistingPeriods } from "@/lib/reservation-billing";
 
 /**
  * POST /api/members/caretaker/payments/record-reservation-payment
@@ -131,14 +127,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const rates = siteRatesFromRow(res);
-      balance = await syncBillingPeriodsForReservation({
-        reservationId,
-        checkInDate,
-        checkOutDate,
-        isMember: res.reservation_type === "member",
-        rates,
-      });
+      balance = await applyPaymentsToExistingPeriods(reservationId);
     } catch (syncErr) {
       console.error("[caretaker] reservation payment sync failed, rolling back payment:", syncErr);
       await sql`DELETE FROM camp_payments WHERE id = ${paymentId.id}`;
