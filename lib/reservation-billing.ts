@@ -12,7 +12,7 @@ import {
 } from "@/lib/reservation-pricing";
 import { countNights, toDateOnlyStr } from "@/lib/reservation-dates";
 import { campTodayStr } from "@/lib/camp-time";
-import { scalePeriodDraftsToTotal } from "@/lib/reservation-price-override";
+import { fitPeriodDraftsToTotal } from "@/lib/reservation-price-override";
 
 export type BillingPeriodSummary = {
   id: string;
@@ -295,7 +295,7 @@ export async function syncBillingPeriodsForReservation(input: {
   });
 
   if (typeof input.effectiveTotalCents === "number" && input.effectiveTotalCents >= 0) {
-    drafts = scalePeriodDraftsToTotal(drafts, input.effectiveTotalCents);
+    drafts = fitPeriodDraftsToTotal(drafts, input.effectiveTotalCents);
   }
 
   const totalPaidCents = await getReservationNetPaidCents(input.reservationId);

@@ -21,7 +21,7 @@ import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
 import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
 import { countNights } from "@/lib/reservation-dates";
 import { suggestedReservationPaymentCents } from "@/lib/reservation-billing";
-import { scalePeriodDraftsToTotal } from "@/lib/reservation-price-override";
+import { fitPeriodDraftsToTotal } from "@/lib/reservation-price-override";
 import { resolveCreateReservationPricing } from "@/lib/reservation-create-metadata";
 import { ReservationCalendarView } from "@/app/members/caretaker/ReservationCalendarView";
 import {
@@ -824,7 +824,7 @@ export function CaretakerPortalContent({
       },
     });
     if (resStayTotalCents !== resTotalCents && resTotalCents > 0) {
-      drafts = scalePeriodDraftsToTotal(drafts, resStayTotalCents);
+      drafts = fitPeriodDraftsToTotal(drafts, resStayTotalCents);
     }
     return suggestedReservationPaymentCents(
       drafts.map((d) => ({

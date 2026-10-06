@@ -7,7 +7,7 @@ import { campUsesReservations, caretakerAllowsCashCheckIn } from "@/lib/reservat
 import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
 import { countNights } from "@/lib/reservation-dates";
 import { suggestedReservationPaymentCents } from "@/lib/reservation-billing";
-import { scalePeriodDraftsToTotal } from "@/lib/reservation-price-override";
+import { fitPeriodDraftsToTotal } from "@/lib/reservation-price-override";
 import { resolveCreateReservationPricing } from "@/lib/reservation-create-metadata";
 import { parseCaretakerLookupInput } from "@/lib/member-contact-search";
 import { campTodayStr } from "@/lib/camp-time";
@@ -117,7 +117,7 @@ export function ManualReservationPanel() {
       },
     });
     if (effectiveTotalCents !== calculatedTotalCents && calculatedTotalCents > 0) {
-      drafts = scalePeriodDraftsToTotal(drafts, effectiveTotalCents);
+      drafts = fitPeriodDraftsToTotal(drafts, effectiveTotalCents);
     }
     return suggestedReservationPaymentCents(
       drafts.map((d) => ({

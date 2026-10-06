@@ -2,7 +2,7 @@
  * Price override validation for caretaker reservations.
  */
 
-import type { BillingPeriodDraft } from "@/lib/reservation-pricing";
+import { BILLING_PERIOD_DAYS, type BillingPeriodDraft } from "@/lib/reservation-pricing";
 
 export type PriceOverrideInput = {
   calculatedTotalCents: number;
@@ -89,27 +89,66 @@ export function validatePriceOverride(input: PriceOverrideInput):
   };
 }
 
-/** Scale billing period drafts so sum(amountDueCents) equals targetTotalCents. */
-export function scalePeriodDraftsToTotal(
+/**
+ * Fit standard billing period drafts to a special stay total without uneven cent amounts:
+ * flat whole-dollar months when the total divides evenly, otherwise standard months with the
+ * difference on the partial period, otherwise even whole-dollar months.
+ */
+export function fitPeriodDraftsToTotal(
   drafts: BillingPeriodDraft[],
   targetTotalCents: number
 ): BillingPeriodDraft[] {
   if (drafts.length === 0) return drafts;
+  const target = Math.max(0, Math.round(targetTotalCents));
   const sum = drafts.reduce((s, d) => s + d.amountDueCents, 0);
-  if (sum <= 0 || sum === targetTotalCents) return drafts;
+  if (sum === target) return drafts;
 
-  const scaled = drafts.map((d) => ({
-    ...d,
-    amountDueCents: Math.max(0, Math.round((d.amountDueCents * targetTotalCents) / sum)),
-  }));
-  const scaledSum = scaled.reduce((s, d) => s + d.amountDueCents, 0);
-  const delta = targetTotalCents - scaledSum;
-  if (delta !== 0) {
-    const last = scaled[scaled.length - 1];
-    scaled[scaled.length - 1] = {
-      ...last,
-      amountDueCents: Math.max(0, last.amountDueCents + delta),
-    };
+  const isFull = (d: BillingPeriodDraft) => d.nights >= BILLING_PERIOD_DAYS;
+  const fullCount = drafts.filter(isFull).length;
+  const partialSum = drafts.filter((d) => !isFull(d)).reduce((s, d) => s + d.amountDueCents, 0);
+
+  let fitted: BillingPeriodDraft[];
+  if (fullCount > 0 && target % (fullCount * 100) === 0) {
+    // Flat whole-dollar months (e.g. "$540 × 8 months"); leftover nights are free.
+    const each = target / fullCount;
+    fitted = drafts.map((d) => ({ ...d, amountDueCents: isFull(d) ? each : 0 }));
+  } else if (fullCount < drafts.length && partialSum + (target - sum) >= 0) {
+    // Months keep their standard amount; the difference lands on the partial period(s).
+    fitted = drafts.map((d) => ({ ...d }));
+    let delta = target - sum;
+    for (let i = fitted.length - 1; i >= 0 && delta !== 0; i--) {
+      if (isFull(fitted[i])) continue;
+      const next = Math.max(0, fitted[i].amountDueCents + delta);
+      delta -= next - fitted[i].amountDueCents;
+      fitted[i].amountDueCents = next;
+    }
+  } else {
+    // Even whole-dollar months; leftover cents on the last month, partial nights free.
+    const months = fullCount > 0 ? fullCount : drafts.length;
+    const each = Math.floor(target / months / 100) * 100;
+    const lastMonthIdx = drafts.reduce((last, d, i) => (fullCount === 0 || isFull(d) ? i : last), 0);
+    fitted = drafts.map((d, i) => {
+      if (fullCount > 0 && !isFull(d)) return { ...d, amountDueCents: 0 };
+      return { ...d, amountDueCents: i === lastMonthIdx ? target - each * (months - 1) : each };
+    });
   }
-  return scaled;
+
+  return foldFreePartialPeriods(fitted, isFull);
+}
+
+/** Merge $0 partial periods into the period before them so schedules don't show free stub periods. */
+function foldFreePartialPeriods(
+  drafts: BillingPeriodDraft[],
+  isFull: (d: BillingPeriodDraft) => boolean
+): BillingPeriodDraft[] {
+  const out: BillingPeriodDraft[] = [];
+  for (const d of drafts) {
+    const prev = out[out.length - 1];
+    if (prev && !isFull(d) && d.amountDueCents === 0) {
+      out[out.length - 1] = { ...prev, periodEnd: d.periodEnd, nights: prev.nights + d.nights };
+    } else {
+      out.push({ ...d });
+    }
+  }
+  return out.map((d, i) => ({ ...d, periodIndex: i }));
 }
