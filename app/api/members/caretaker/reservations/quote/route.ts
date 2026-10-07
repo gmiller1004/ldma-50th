@@ -4,6 +4,7 @@ import { sql, hasDb } from "@/lib/db";
 import { campUsesReservations, isNonBookableSite } from "@/lib/reservation-camps";
 import { computeStayPricing } from "@/lib/reservation-pricing";
 import { siteRatesFromRow } from "@/lib/reservation-billing";
+import { campDefaultBillingMode } from "@/lib/camp-billing-mode";
 
 /**
  * GET /api/members/caretaker/reservations/quote
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
     checkOutDate,
     isMember: type === "member",
     rates,
+    billingMode: campDefaultBillingMode(caretaker.campSlug),
   });
 
   return NextResponse.json({

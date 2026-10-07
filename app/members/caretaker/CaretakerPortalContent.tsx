@@ -19,6 +19,7 @@ import { campUsesReservations, caretakerAllowsCashCheckIn, caretakerEarliestChec
 import { isCompleteDateOnly, todayDateOnlyLocal } from "@/lib/reservation-calendar-range";
 import { EVENT_RESERVATION_PRODUCTS } from "@/lib/events-config";
 import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
+import { campDefaultBillingMode } from "@/lib/camp-billing-mode";
 import { countNights } from "@/lib/reservation-dates";
 import { suggestedReservationPaymentCents } from "@/lib/reservation-billing";
 import { fitPeriodDraftsToTotal } from "@/lib/reservation-price-override";
@@ -792,6 +793,7 @@ export function CaretakerPortalContent({
             memberRateMonthly: resSelectedSite.memberRateMonthly,
             nonMemberRateDaily: resSelectedSite.nonMemberRateDaily,
           },
+          billingMode: campDefaultBillingMode(campSlug),
         }).totalCents
       : 0;
   const resTotalCents = resQuotedTotalCents ?? resLocalTotalCents;
@@ -822,15 +824,17 @@ export function CaretakerPortalContent({
         memberRateMonthly: resSelectedSite.memberRateMonthly,
         nonMemberRateDaily: resSelectedSite.nonMemberRateDaily,
       },
+      billingMode: campDefaultBillingMode(campSlug),
     });
     if (resStayTotalCents !== resTotalCents && resTotalCents > 0) {
-      drafts = fitPeriodDraftsToTotal(drafts, resStayTotalCents);
+      drafts = fitPeriodDraftsToTotal(drafts, resStayTotalCents, campDefaultBillingMode(campSlug));
     }
     return suggestedReservationPaymentCents(
       drafts.map((d) => ({
         status: "unpaid",
         amountDueCents: d.amountDueCents,
         amountPaidCents: 0,
+        dueDate: d.dueDate,
       })),
       resStayTotalCents
     );
@@ -842,6 +846,7 @@ export function CaretakerPortalContent({
     resType,
     resStayTotalCents,
     resTotalCents,
+    campSlug,
   ]);
 
   const filteredActiveReservations = useMemo(
@@ -1462,10 +1467,11 @@ export function CaretakerPortalContent({
     loadReservations();
   }
 
-  async function handleVoidCashEntry(p: { id: string; amountCents: number; createdAt: string }) {
+  async function handleVoidCashEntry(p: { id: string; amountCents: number; createdAt: string; method: string }) {
+    const kind = p.method === "check" ? "check" : "cash";
     const reason = window.prompt(
-      `Void the ${formatCentsAsCurrency(p.amountCents)} cash entry from ${toDateOnly(p.createdAt)}?\n\n` +
-        "Only void cash that was never actually received (entered by mistake). " +
+      `Void the ${formatCentsAsCurrency(p.amountCents)} ${kind} entry from ${toDateOnly(p.createdAt)}?\n\n` +
+        `Only void ${kind === "check" ? "a check" : "cash"} that was never actually received (entered by mistake). ` +
         "The amount goes back onto the balance due.\n\nReason:"
     );
     if (reason === null) return;
@@ -2063,6 +2069,27 @@ export function CaretakerPortalContent({
     }
   }
 
+  async function handleResUndoCheckIn(r: Reservation) {
+    const name = r.reservationType === "member" ? r.memberDisplayName || `#${r.memberNumber}` : `${r.guestFirstName} ${r.guestLastName}`;
+    if (!window.confirm(`Undo check-in for ${name}?\n\nUse this if they were checked in by mistake and haven't arrived yet. You can check them in again when they get here.`)) {
+      return;
+    }
+    setResCheckInSubmitting(true);
+    try {
+      const res = await fetch(`/api/members/caretaker/reservations/${r.id}/undo-check-in`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error ?? "Could not undo check-in");
+        return;
+      }
+      loadReservations();
+    } catch {
+      alert("Could not undo check-in");
+    } finally {
+      setResCheckInSubmitting(false);
+    }
+  }
+
   async function handleResCheckIn(r: Reservation) {
     setCheckingInReservation(r);
     setResCheckInSubmitting(true);
@@ -2463,7 +2490,18 @@ export function CaretakerPortalContent({
                     {r.eventProductHandle ? <span className="text-xs px-1.5 py-0.5 rounded bg-[#d4af37]/20 text-[#f0d48f]">Event{r.eventSiteType === "upgrade_hookup" ? " (hookup)" : ""}</span> : null}
                     <ReservationDateRange checkInDate={r.checkInDate} checkOutDate={r.checkOutDate} nights={r.nights} />
                     {r.checkedInAt ? (
-                      <span className="ml-1 px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm">Checked in</span>
+                      <span className="ml-1 px-2 py-0.5 rounded bg-[#0f3d1e] text-[#6dd472] text-sm">
+                        Checked in
+                        <button
+                          type="button"
+                          onClick={() => void handleResUndoCheckIn(r)}
+                          disabled={resCheckInSubmitting}
+                          className="ml-2 text-xs text-[#e8e0d5]/60 hover:text-[#e8e0d5] underline disabled:opacity-50"
+                          title="Checked in by mistake? Put this reservation back to not arrived."
+                        >
+                          Undo
+                        </button>
+                      </span>
                     ) : null}
                     <PaymentDueBadge
                       balanceDueCents={r.balanceDueCents ?? 0}
@@ -3008,12 +3046,12 @@ export function CaretakerPortalContent({
                           ) : (
                             <span className="text-[#e8e0d5]">{formatCentsAsCurrency(p.amountCents)}</span>
                           )}
-                          {" · "}{p.method === "card" ? "Card" : "Cash"}
+                          {" · "}{p.method === "card" ? "Card" : p.method === "check" ? "Check" : "Cash"}
                           {" · "}{toDateOnly(p.createdAt)}
                           {p.stripePaymentIntentId && (
                             <p className="text-[#e8e0d5]/50 font-mono truncate" title={p.stripePaymentIntentId}>PI: {p.stripePaymentIntentId}</p>
                           )}
-                          {p.method === "cash" && p.paymentType !== "refund" && (
+                          {(p.method === "cash" || p.method === "check") && p.paymentType !== "refund" && (
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-[#e8e0d5]/50 font-mono truncate" title={p.id}>ID: {p.id}</p>
                               {detailsReservation.status !== "cancelled" && (
@@ -3022,7 +3060,7 @@ export function CaretakerPortalContent({
                                   onClick={() => void handleVoidCashEntry(p)}
                                   disabled={detailsVoidingPaymentId !== null}
                                   className="shrink-0 text-red-300 hover:text-red-200 hover:underline disabled:opacity-50"
-                                  title="Remove a cash entry that was recorded by mistake (cash never received)"
+                                  title="Remove a cash or check entry that was recorded by mistake (money never received)"
                                 >
                                   {detailsVoidingPaymentId === p.id ? "Voiding…" : "Void entry"}
                                 </button>
@@ -3034,7 +3072,7 @@ export function CaretakerPortalContent({
                       {detailsVoidedPayments.map((v) => (
                         <li key={v.id} className="text-[#e8e0d5]/50">
                           <span className="line-through">{formatCentsAsCurrency(v.amountCents)}</span>
-                          {" · "}Cash · {toDateOnly(v.originalCreatedAt)}
+                          {" · "}{v.method === "check" ? "Check" : "Cash"} · {toDateOnly(v.originalCreatedAt)}
                           {" · "}<span className="text-amber-300/80">Voided {toDateOnly(v.voidedAt)}</span>
                           <p className="italic">Reason: {v.reason}</p>
                         </li>

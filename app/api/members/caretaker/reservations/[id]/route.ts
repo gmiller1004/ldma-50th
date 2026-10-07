@@ -15,6 +15,7 @@ import {
   syncBillingPeriodsForReservation,
 } from "@/lib/reservation-billing";
 import { computeStayPricing } from "@/lib/reservation-pricing";
+import { reservationBillingMode } from "@/lib/camp-billing-mode";
 import { validatePriceOverride } from "@/lib/reservation-price-override";
 import { awardPointsForReservationCheckIn } from "@/lib/rewards";
 import {
@@ -197,7 +198,7 @@ export async function PATCH(
     const existing = await sql`
       SELECT r.id, r.site_id, r.camp_slug, r.check_in_date, r.check_out_date, r.nights, r.status,
              r.reservation_type, r.member_contact_id, r.member_number, r.member_display_name,
-             r.guest_first_name, r.guest_last_name, r.guest_email, r.guest_phone,
+             r.guest_first_name, r.guest_last_name, r.guest_email, r.guest_phone, r.billing_mode,
              s.member_rate_daily, s.member_rate_monthly, s.non_member_rate_daily
       FROM camp_reservations r
       JOIN camp_sites s ON s.id = r.site_id
@@ -205,6 +206,7 @@ export async function PATCH(
       LIMIT 1
     `;
     type ExistingRow = {
+      billing_mode: string | null;
       site_id: string;
       check_in_date: string;
       check_out_date: string;
@@ -288,6 +290,7 @@ export async function PATCH(
     }
     const rates = siteRatesFromRow(existingRow);
     const isMember = existingRow.reservation_type === "member";
+    const billingMode = reservationBillingMode(existingRow.billing_mode);
 
     // New dates get the standard total unless the caretaker enters a special total for them;
     // the old special rate described the old dates, so it is not carried over.
@@ -298,6 +301,7 @@ export async function PATCH(
         checkOutDate: newCheckOut,
         isMember,
         rates,
+        billingMode,
       }).totalCents;
       newPricing = validatePriceOverride({
         calculatedTotalCents,
@@ -353,6 +357,7 @@ export async function PATCH(
         checkOutDate: newCheckOut,
         isMember,
         rates,
+        billingMode,
         effectiveTotalCents: priced.effectiveTotalCents,
       });
 

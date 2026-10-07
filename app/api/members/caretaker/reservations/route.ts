@@ -19,6 +19,7 @@ import { summarizeReservationBalances } from "@/lib/reservation-billing";
 import { parseReservationPricingBody, withReservationInvoice } from "@/lib/reservation-create-metadata";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { campTodayStr } from "@/lib/camp-time";
+import { campDefaultBillingMode } from "@/lib/camp-billing-mode";
 
 type ReservationRow = {
   id: string;
@@ -277,7 +278,8 @@ export async function POST(request: NextRequest) {
 
   const rates = siteRatesFromRow(siteRow);
   const isMember = type === "member";
-  const totalDueCents = computeStayTotalCents({ checkInDate, checkOutDate, isMember, rates });
+  const billingMode = campDefaultBillingMode(caretaker.campSlug);
+  const totalDueCents = computeStayTotalCents({ checkInDate, checkOutDate, isMember, rates, billingMode });
 
   const pricingParsed = parseReservationPricingBody(body, totalDueCents < 1 ? 0 : totalDueCents, {
     allowZeroPayment: body.paymentMethod === "cash",
@@ -350,14 +352,16 @@ export async function POST(request: NextRequest) {
         site_id, camp_slug, check_in_date, check_out_date, nights,
         reservation_type, member_contact_id, member_number, member_display_name,
         status, created_by_contact_id,
-        invoice_number, calculated_total_cents, amount_override_cents, override_reason, price_override_flag
+        invoice_number, calculated_total_cents, amount_override_cents, override_reason, price_override_flag,
+        billing_mode
       )
       VALUES (
         ${siteId}, ${caretaker.campSlug}, ${checkInDate}, ${checkOutDate}, ${nights},
         'member', ${memberContactId}, ${memberNumber}, ${memberDisplayName},
         'reserved', ${caretaker.contactId},
         ${pricing.invoiceNumber}, ${pricing.calculatedTotalCents}, ${pricing.amountOverrideCents},
-        ${pricing.overrideReason}, ${pricing.priceOverrideFlag}
+        ${pricing.overrideReason}, ${pricing.priceOverrideFlag},
+        ${billingMode}
       )
       RETURNING id, site_id, camp_slug, check_in_date, check_out_date, nights,
                 reservation_type, member_contact_id, member_number, member_display_name,
@@ -403,14 +407,16 @@ export async function POST(request: NextRequest) {
         site_id, camp_slug, check_in_date, check_out_date, nights,
         reservation_type, guest_first_name, guest_last_name, guest_email, guest_phone,
         status, created_by_contact_id,
-        invoice_number, calculated_total_cents, amount_override_cents, override_reason, price_override_flag
+        invoice_number, calculated_total_cents, amount_override_cents, override_reason, price_override_flag,
+        billing_mode
       )
       VALUES (
         ${siteId}, ${caretaker.campSlug}, ${checkInDate}, ${checkOutDate}, ${nights},
         'guest', ${guestFirstName}, ${guestLastName}, ${guestEmail || null}, ${guestPhone},
         'reserved', ${caretaker.contactId},
         ${pricing.invoiceNumber}, ${pricing.calculatedTotalCents}, ${pricing.amountOverrideCents},
-        ${pricing.overrideReason}, ${pricing.priceOverrideFlag}
+        ${pricing.overrideReason}, ${pricing.priceOverrideFlag},
+        ${billingMode}
       )
       RETURNING id, site_id, camp_slug, check_in_date, check_out_date, nights,
                 reservation_type, member_contact_id, member_number, member_display_name,
@@ -442,6 +448,7 @@ export async function POST(request: NextRequest) {
     checkOutDate,
     isMember,
     rates,
+    billingMode,
     effectiveTotalCents: pricing.effectiveTotalCents,
   });
 

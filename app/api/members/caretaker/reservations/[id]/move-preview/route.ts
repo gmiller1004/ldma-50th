@@ -8,6 +8,7 @@ import {
 } from "@/lib/reservation-camps";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
+import { reservationBillingMode } from "@/lib/camp-billing-mode";
 import { getReservationBalance, siteRatesFromRow } from "@/lib/reservation-billing";
 import { previewSiteMovePaymentObligations } from "@/lib/reservation-balance-due";
 import {
@@ -43,7 +44,7 @@ export async function GET(
 
     const resRows = await sql`
       SELECT id, site_id, check_in_date, check_out_date, nights, reservation_type, status,
-             amount_override_cents, override_reason, price_override_flag
+             amount_override_cents, override_reason, price_override_flag, billing_mode
       FROM camp_reservations
       WHERE id = ${id} AND camp_slug = ${caretaker.campSlug}
       LIMIT 1
@@ -60,6 +61,7 @@ export async function GET(
           amount_override_cents: number | null;
           override_reason: string | null;
           price_override_flag: boolean | null;
+          billing_mode: string | null;
         }
       | undefined;
     if (!res) return NextResponse.json({ error: "Reservation not found" }, { status: 404 });
@@ -112,7 +114,8 @@ export async function GET(
     }
 
     const rates = siteRatesFromRow(newSite);
-    const pricing = computeStayPricing({ checkInDate, checkOutDate, isMember, rates });
+    const billingMode = reservationBillingMode(res.billing_mode);
+    const pricing = computeStayPricing({ checkInDate, checkOutDate, isMember, rates, billingMode });
     const newTotalCents = pricing.totalCents;
 
     const currentBalance = await getReservationBalance(id);
@@ -125,6 +128,7 @@ export async function GET(
       checkOutDate,
       reservationType: res.reservation_type,
       rates,
+      billingMode,
       netPaidCents: totals.netPaidCents,
     });
     const additionalDueCents = obligations.payableNowCents;

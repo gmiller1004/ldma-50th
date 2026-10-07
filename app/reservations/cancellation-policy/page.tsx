@@ -90,7 +90,7 @@ export default function CampCancellationPolicyPage() {
                       <strong>Less than {policy.fullRefundDaysBeforeCheckIn} days before</strong> check-in, or{" "}
                       <strong>during your stay</strong>, for a <strong>monthly-priced member</strong> reservation
                       <span className="block mt-1 text-[#e8e0d5]/60 text-xs">
-                        Member stays longer than {policy.memberDailyMaxNights} nights (billed in 30-day periods)
+                        Member stays longer than {policy.memberDailyMaxNights} nights (billed monthly)
                       </span>
                     </td>
                     <td className="px-4 py-3 align-top">
@@ -114,8 +114,8 @@ export default function CampCancellationPolicyPage() {
                 on the reservation, not the full stay total unless that amount was collected.
               </li>
               <li>
-                Long member stays may be billed in rolling 30-day periods. Future periods that have not been paid
-                are not charged upon cancellation.
+                Long member stays are billed monthly, either by calendar month or in 30-day periods depending on the
+                camp. Future months that have not been paid are not charged upon cancellation.
               </li>
               <li>
                 Card payments are refunded to the original payment method when possible. Processing times depend on

@@ -7,6 +7,7 @@ import {
 } from "@/lib/reservation-camps";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
+import { reservationBillingMode } from "@/lib/camp-billing-mode";
 import {
   getReservationBalance,
   siteRatesFromRow,
@@ -37,6 +38,7 @@ type ReservationRow = {
   guest_last_name: string | null;
   guest_email: string | null;
   status: string;
+  billing_mode: string | null;
 };
 
 /**
@@ -82,7 +84,7 @@ export async function POST(
     const resRows = await sql`
       SELECT id, site_id, camp_slug, check_in_date, check_out_date, nights, reservation_type,
              member_contact_id, member_number, member_display_name,
-             guest_first_name, guest_last_name, guest_email, status
+             guest_first_name, guest_last_name, guest_email, status, billing_mode
       FROM camp_reservations
       WHERE id = ${id} AND camp_slug = ${caretaker.campSlug}
       LIMIT 1
@@ -183,7 +185,8 @@ export async function POST(
     }
 
     const rates = siteRatesFromRow(newSite);
-    const pricing = computeStayPricing({ checkInDate, checkOutDate, isMember, rates });
+    const billingMode = reservationBillingMode(reservation.billing_mode);
+    const pricing = computeStayPricing({ checkInDate, checkOutDate, isMember, rates, billingMode });
     if (pricing.totalCents < 1) {
       return NextResponse.json(
         { error: "Destination site rates are not configured" },
@@ -243,6 +246,7 @@ export async function POST(
       checkOutDate,
       isMember,
       rates,
+      billingMode,
       effectiveTotalCents: newTotalCents,
     });
 

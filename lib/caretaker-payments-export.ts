@@ -62,10 +62,12 @@ export function formatPaymentTypeLabel(method: string, paymentType: string): str
   if (paymentType === "refund") {
     if (method === "card") return "Credit Card Refund";
     if (method === "cash") return "Cash Refund";
+    if (method === "check") return "Check Refund";
     return "Refund";
   }
   if (method === "card") return "Credit Card";
   if (method === "cash") return "Cash";
+  if (method === "check") return "Check";
   return method;
 }
 

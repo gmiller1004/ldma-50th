@@ -76,7 +76,7 @@ export function buildReceiptHtml(r: PrintableReceiptInput, printedOn: string): s
           .map((p) => {
             const isRefund = p.paymentType === "refund";
             const amount = `${isRefund ? "−" : ""}${formatCentsAsCurrency(p.amountCents)}`;
-            const method = `${p.method === "card" ? "Card" : "Cash"}${isRefund ? " refund" : ""}`;
+            const method = `${p.method === "card" ? "Card" : p.method === "check" ? "Check" : "Cash"}${isRefund ? " refund" : ""}`;
             return `<tr><td>${esc(p.createdAt.slice(0, 10))}</td><td>${method}</td><td class="num">${amount}</td></tr>`;
           })
           .join("")}</tbody>

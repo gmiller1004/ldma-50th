@@ -9,12 +9,13 @@ import { getReservationBalance, applyPaymentsToExistingPeriods } from "@/lib/res
 
 /**
  * POST /api/members/caretaker/payments/record-reservation-payment
- * Record a cash (or external) payment against an existing reservation; waterfall across billing periods.
+ * Record a cash or check payment against an existing reservation; waterfall across billing periods.
  */
 export async function POST(request: NextRequest) {
   let body: {
     reservationId?: string;
     amountCents?: number;
+    method?: string;
     recipientEmail?: string;
     recipientDisplayName?: string;
     campSlug?: string;
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
 
   const reservationId = typeof body.reservationId === "string" ? body.reservationId.trim() : "";
   const amountCents = typeof body.amountCents === "number" ? body.amountCents : 0;
+  const method: "cash" | "check" = body.method === "check" ? "check" : "cash";
   const recipientEmail = typeof body.recipientEmail === "string" ? body.recipientEmail.trim() : "";
   const recipientDisplayName =
     typeof body.recipientDisplayName === "string" ? body.recipientDisplayName.trim() : "Guest";
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
         invoice_number, created_by_contact_id, created_at
       )
       VALUES (
-        ${caretaker.campSlug}, 'reservation', 'cash', ${amountCents}, ${reservationId},
+        ${caretaker.campSlug}, 'reservation', ${method}, ${amountCents}, ${reservationId},
         ${res.member_contact_id}, ${res.member_number}, ${recipientEmail}, ${recipientDisplayName},
         ${res.invoice_number}, ${caretaker.contactId}, NOW()
       )
@@ -140,7 +142,7 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (e) {
-    console.error("[caretaker] reservation cash payment failed:", e);
+    console.error(`[caretaker] reservation ${method} payment failed:`, e);
     return NextResponse.json({ error: "Payment failed" }, { status: 500 });
   }
 
@@ -155,7 +157,7 @@ export async function POST(request: NextRequest) {
         caretaker.campName,
         [{ label: "Camp site fee", amountCents }],
         amountCents,
-        "cash",
+        method,
         today,
         {
           recipientName,

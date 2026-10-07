@@ -69,7 +69,7 @@ export async function getReservationSiteFeeTotals(
       COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation'), 0)::int AS paid,
       COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'refund'), 0)::int AS refunded,
       COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation' AND method = 'card'), 0)::int AS card_paid,
-      COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation' AND method = 'cash'), 0)::int AS cash_paid,
+      COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'reservation' AND method IN ('cash', 'check')), 0)::int AS cash_paid,
       COALESCE(SUM(amount_cents) FILTER (WHERE payment_type = 'refund' AND method = 'card'), 0)::int AS card_refunded
     FROM camp_payments
     WHERE reservation_id = ${reservationId}

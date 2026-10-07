@@ -2,7 +2,12 @@
  * Price override validation for caretaker reservations.
  */
 
-import { BILLING_PERIOD_DAYS, type BillingPeriodDraft } from "@/lib/reservation-pricing";
+import {
+  BILLING_PERIOD_DAYS,
+  CALENDAR_LATE_ARRIVAL_NIGHTS,
+  type BillingMode,
+  type BillingPeriodDraft,
+} from "@/lib/reservation-pricing";
 
 export type PriceOverrideInput = {
   calculatedTotalCents: number;
@@ -92,27 +97,40 @@ export function validatePriceOverride(input: PriceOverrideInput):
 /**
  * Fit standard billing period drafts to a special stay total without uneven cent amounts:
  * flat whole-dollar months when the total divides evenly, otherwise standard months with the
- * difference on the partial period, otherwise even whole-dollar months.
+ * difference on the partial period, otherwise even whole-dollar months. Calendar-month stays
+ * prefer the partial-period fit when an arrival/final month is longer than a short stub.
  */
 export function fitPeriodDraftsToTotal(
   drafts: BillingPeriodDraft[],
-  targetTotalCents: number
+  targetTotalCents: number,
+  billingMode: BillingMode = "rolling_30"
 ): BillingPeriodDraft[] {
   if (drafts.length === 0) return drafts;
   const target = Math.max(0, Math.round(targetTotalCents));
   const sum = drafts.reduce((s, d) => s + d.amountDueCents, 0);
   if (sum === target) return drafts;
 
-  const isFull = (d: BillingPeriodDraft) => d.nights >= BILLING_PERIOD_DAYS;
-  const fullCount = drafts.filter(isFull).length;
-  const partialSum = drafts.filter((d) => !isFull(d)).reduce((s, d) => s + d.amountDueCents, 0);
+  const isFull = (d: BillingPeriodDraft) => d.fullMonth ?? d.nights >= BILLING_PERIOD_DAYS;
+  const partials = drafts.filter((d) => !isFull(d));
+  const fullCount = drafts.length - partials.length;
+  const partialSum = partials.reduce((s, d) => s + d.amountDueCents, 0);
+
+  const flatEven = fullCount > 0 && target % (fullCount * 100) === 0;
+  const canAbsorb = partials.length > 0 && partialSum + (target - sum) >= 0;
+  // Calendar stays only give partial months away for a flat deal (at or below the standard
+  // monthly amount) when they are short stubs, not partial months of a week or more.
+  const standardMonthCents = Math.max(0, ...drafts.filter(isFull).map((d) => d.amountDueCents));
+  const freeStubsFit =
+    billingMode !== "calendar_month" ||
+    (partials.every((d) => d.nights <= CALENDAR_LATE_ARRIVAL_NIGHTS) &&
+      target / Math.max(1, fullCount) <= standardMonthCents);
 
   let fitted: BillingPeriodDraft[];
-  if (fullCount > 0 && target % (fullCount * 100) === 0) {
+  if (flatEven && (freeStubsFit || !canAbsorb)) {
     // Flat whole-dollar months (e.g. "$540 × 8 months"); leftover nights are free.
     const each = target / fullCount;
     fitted = drafts.map((d) => ({ ...d, amountDueCents: isFull(d) ? each : 0 }));
-  } else if (fullCount < drafts.length && partialSum + (target - sum) >= 0) {
+  } else if (canAbsorb) {
     // Months keep their standard amount; the difference lands on the partial period(s).
     fitted = drafts.map((d) => ({ ...d }));
     let delta = target - sum;
@@ -136,19 +154,35 @@ export function fitPeriodDraftsToTotal(
   return foldFreePartialPeriods(fitted, isFull);
 }
 
-/** Merge $0 partial periods into the period before them so schedules don't show free stub periods. */
+/**
+ * Merge $0 partial periods into the period before them (or, for a free arrival-month stub, the
+ * period after) so schedules don't show free stub periods.
+ */
 function foldFreePartialPeriods(
   drafts: BillingPeriodDraft[],
   isFull: (d: BillingPeriodDraft) => boolean
 ): BillingPeriodDraft[] {
   const out: BillingPeriodDraft[] = [];
+  let leadingFree: BillingPeriodDraft | null = null;
   for (const d of drafts) {
+    const free = !isFull(d) && d.amountDueCents === 0;
     const prev = out[out.length - 1];
-    if (prev && !isFull(d) && d.amountDueCents === 0) {
+    if (free && prev) {
       out[out.length - 1] = { ...prev, periodEnd: d.periodEnd, nights: prev.nights + d.nights };
+    } else if (free && drafts.length > 1 && !leadingFree) {
+      leadingFree = d;
+    } else if (leadingFree) {
+      out.push({
+        ...d,
+        periodStart: leadingFree.periodStart,
+        nights: leadingFree.nights + d.nights,
+        dueDate: leadingFree.dueDate,
+      });
+      leadingFree = null;
     } else {
       out.push({ ...d });
     }
   }
+  if (leadingFree) out.push(leadingFree);
   return out.map((d, i) => ({ ...d, periodIndex: i }));
 }

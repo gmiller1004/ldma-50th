@@ -111,10 +111,11 @@ export function ReservationBillingSection({
     setAmountInput((cents / 100).toFixed(2));
   }
 
-  async function payCash() {
+  async function payCash(method: "cash" | "check") {
     if (!canSubmitCash) return;
+    const holding = method === "check" ? "Only confirm if you are holding the check now." : "Only confirm if you are holding this cash now.";
     const confirmed = window.confirm(
-      `Record ${formatCentsAsCurrency(payAmount)} cash received from ${recipientDisplayName}?\n\nOnly confirm if you are holding this cash now. ${
+      `Record ${formatCentsAsCurrency(payAmount)} ${method} received from ${recipientDisplayName}?\n\n${holding} ${
         effectiveEmail ? `A receipt will be emailed to ${effectiveEmail}.` : "No receipt email will be sent."
       }`
     );
@@ -128,6 +129,7 @@ export function ReservationBillingSection({
         body: JSON.stringify({
           reservationId,
           amountCents: payAmount,
+          method,
           recipientEmail: effectiveEmail,
           recipientDisplayName,
           ...(campSlug ? { campSlug } : {}),
@@ -303,12 +305,23 @@ export function ReservationBillingSection({
             {allowsCash && (
               <button
                 type="button"
-                onClick={payCash}
+                onClick={() => void payCash("cash")}
                 disabled={submitting || !canSubmitCash}
                 className="flex-1 py-2 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-1"
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {payAmount > 0 ? `Record ${formatCentsAsCurrency(payAmount)} cash received` : "Record cash received"}
+              </button>
+            )}
+            {allowsCash && (
+              <button
+                type="button"
+                onClick={() => void payCash("check")}
+                disabled={submitting || !canSubmitCash}
+                className="flex-1 py-2 bg-[#2a1f14] border border-[#d4af37]/50 text-[#f0d48f] font-semibold rounded-lg text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Record check
               </button>
             )}
             <button

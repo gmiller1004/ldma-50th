@@ -9,6 +9,7 @@ import { lookupMember } from "@/lib/salesforce";
 import { memberQualifiesForCampBooking } from "@/lib/reservation-member";
 import { siteRatesFromRow } from "@/lib/reservation-billing";
 import { computeStayPricing } from "@/lib/reservation-pricing";
+import { campDefaultBillingMode } from "@/lib/camp-billing-mode";
 import {
   buildSiteTypeAvailability,
   computePublicPaymentOptions,
@@ -166,8 +167,9 @@ export async function POST(request: NextRequest) {
 
   const rates = siteRatesFromRow(assignedSite);
   const isMember = reservationType === "member";
-  const pricing = computeStayPricing({ checkInDate: checkIn, checkOutDate: checkOut, isMember, rates });
-  const firstPeriodCents = firstBillingPeriodCents(checkIn, checkOut, isMember, rates);
+  const billingMode = campDefaultBillingMode(campSlug);
+  const pricing = computeStayPricing({ checkInDate: checkIn, checkOutDate: checkOut, isMember, rates, billingMode });
+  const firstPeriodCents = firstBillingPeriodCents(checkIn, checkOut, isMember, rates, billingMode);
   const paymentOptions = computePublicPaymentOptions({
     totalCents: pricing.totalCents,
     firstPeriodCents,

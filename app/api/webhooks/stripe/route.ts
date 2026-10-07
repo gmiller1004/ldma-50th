@@ -12,6 +12,7 @@ import {
 } from "@/lib/reservation-billing";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { campTodayStr } from "@/lib/camp-time";
+import { campDefaultBillingMode, reservationBillingMode } from "@/lib/camp-billing-mode";
 import { withReservationInvoice } from "@/lib/reservation-create-metadata";
 import {
   filterBookableSites,
@@ -324,7 +325,8 @@ export async function POST(request: NextRequest) {
           reservation_type, member_contact_id, member_number, member_display_name,
           guest_email,
           status, created_by_contact_id, import_source, booked_site_type_label,
-          invoice_number, calculated_total_cents, amount_override_cents, override_reason, price_override_flag
+          invoice_number, calculated_total_cents, amount_override_cents, override_reason, price_override_flag,
+          billing_mode
         )
         VALUES (
           ${siteId}, ${campSlug}, ${checkInDate}, ${checkOutDate}, ${nights},
@@ -332,7 +334,8 @@ export async function POST(request: NextRequest) {
           ${memberEmail},
           'reserved', ${createdByContactId}, ${importSource}, ${bookedSiteTypeLabel},
           ${invoicePricing.invoiceNumber}, ${invoicePricing.calculatedTotalCents},
-          ${invoicePricing.amountOverrideCents}, ${invoicePricing.overrideReason}, ${invoicePricing.priceOverrideFlag}
+          ${invoicePricing.amountOverrideCents}, ${invoicePricing.overrideReason}, ${invoicePricing.priceOverrideFlag},
+          ${campDefaultBillingMode(campSlug)}
         )
         RETURNING id
       `;
@@ -348,14 +351,16 @@ export async function POST(request: NextRequest) {
           site_id, camp_slug, check_in_date, check_out_date, nights,
           reservation_type, guest_first_name, guest_last_name, guest_email, guest_phone,
           status, created_by_contact_id, import_source, booked_site_type_label,
-          invoice_number, calculated_total_cents, amount_override_cents, override_reason, price_override_flag
+          invoice_number, calculated_total_cents, amount_override_cents, override_reason, price_override_flag,
+          billing_mode
         )
         VALUES (
           ${siteId}, ${campSlug}, ${checkInDate}, ${checkOutDate}, ${nights},
           'guest', ${guestFirstName}, ${guestLastName}, ${guestEmail}, ${guestPhone},
           'reserved', ${createdByContactId}, ${importSource}, ${bookedSiteTypeLabel},
           ${invoicePricing.invoiceNumber}, ${invoicePricing.calculatedTotalCents},
-          ${invoicePricing.amountOverrideCents}, ${invoicePricing.overrideReason}, ${invoicePricing.priceOverrideFlag}
+          ${invoicePricing.amountOverrideCents}, ${invoicePricing.overrideReason}, ${invoicePricing.priceOverrideFlag},
+          ${campDefaultBillingMode(campSlug)}
         )
         RETURNING id
       `;
@@ -407,11 +412,16 @@ export async function POST(request: NextRequest) {
 
   if (paymentType === "reservation" && reservationId && siteRates) {
     const resDates = await sql`
-      SELECT check_in_date, check_out_date, reservation_type
+      SELECT check_in_date, check_out_date, reservation_type, billing_mode
       FROM camp_reservations WHERE id = ${reservationId} LIMIT 1
     `;
     const resDatesRow = (Array.isArray(resDates) ? resDates[0] : undefined) as
-      | { check_in_date: string | Date; check_out_date: string | Date; reservation_type: string }
+      | {
+          check_in_date: string | Date;
+          check_out_date: string | Date;
+          reservation_type: string;
+          billing_mode: string | null;
+        }
       | undefined;
     const existingPeriods = await sql`SELECT 1 FROM camp_billing_periods WHERE reservation_id = ${reservationId} LIMIT 1`;
     if (resDatesRow && Array.isArray(existingPeriods) && existingPeriods.length > 0) {
@@ -428,6 +438,7 @@ export async function POST(request: NextRequest) {
           checkOutDate: toDateOnlyStr(resDatesRow.check_out_date),
           isMember: resDatesRow.reservation_type === "member",
           rates: siteRates,
+          billingMode: reservationBillingMode(resDatesRow.billing_mode),
           effectiveTotalCents,
         });
       } catch (e) {

@@ -130,6 +130,7 @@ async function run() {
         checkOutDate,
         isMember: row.reservation_type === "member",
         rates,
+        billingMode: "rolling_30",
         effectiveTotalCents: currentTotal,
       });
     }

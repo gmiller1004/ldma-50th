@@ -652,7 +652,7 @@ export async function sendPaymentReceiptEmail(
   campName: string,
   lineItems: PaymentReceiptLineItem[],
   totalCents: number,
-  method: "cash" | "card",
+  method: "cash" | "card" | "check",
   paymentDate: string,
   reservationDetails?: PaymentReceiptReservationDetails | null,
   options?: { bccMrs?: boolean }
@@ -670,7 +670,7 @@ export async function sendPaymentReceiptEmail(
   sgMail.setApiKey(apiKey);
 
   const totalDollars = (totalCents / 100).toFixed(2);
-  const methodLabel = method === "card" ? "Card" : "Cash";
+  const methodLabel = method === "card" ? "Card" : method === "check" ? "Check" : "Cash";
   const linesText = lineItems.map((l) => `${l.label}: $${(l.amountCents / 100).toFixed(2)}`).join("\n");
 
   const reservationBlurb =

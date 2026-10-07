@@ -133,6 +133,7 @@ describe("previewStayPaymentObligations", () => {
         memberRateMonthly: 450,
         nonMemberRateDaily: 45,
       },
+      billingMode: "rolling_30",
       netPaidCents: 51_000,
       today: "2026-07-22",
     });
@@ -156,6 +157,7 @@ describe("previewSiteMovePaymentObligations", () => {
         memberRateMonthly: 540,
         nonMemberRateDaily: 55,
       },
+      billingMode: "rolling_30",
       netPaidCents: 10_000,
       today: "2026-07-29",
     });
@@ -165,5 +167,38 @@ describe("previewSiteMovePaymentObligations", () => {
     assert.equal(preview.totalUnpaidCents, 44_000);
     assert.equal(preview.scheduledRemainingCents, 44_000);
     assert.equal(preview.balanceDueBeforeArrivalCents, 44_000);
+  });
+});
+
+describe("calendar_month late arrival", () => {
+  it("asks for the arrival stub and the first whole month before arrival", () => {
+    const preview = previewStayPaymentObligations({
+      checkInDate: "2026-10-27",
+      checkOutDate: "2027-03-01",
+      reservationType: "member",
+      rates: { memberRateDaily: 19, memberRateMonthly: 510, nonMemberRateDaily: 45 },
+      billingMode: "calendar_month",
+      netPaidCents: 0,
+      today: "2026-10-20",
+    });
+
+    assert.equal(preview.balanceDueBeforeArrivalCents, 5 * 1900 + 51_000);
+    assert.equal(preview.payableNowCents, 5 * 1900 + 51_000);
+    assert.equal(preview.nextScheduledPayment?.dueDate, "2026-10-27");
+  });
+
+  it("after arrival, both are due now and December is next", () => {
+    const preview = previewStayPaymentObligations({
+      checkInDate: "2026-10-27",
+      checkOutDate: "2027-03-01",
+      reservationType: "member",
+      rates: { memberRateDaily: 19, memberRateMonthly: 510, nonMemberRateDaily: 45 },
+      billingMode: "calendar_month",
+      netPaidCents: 0,
+      today: "2026-10-27",
+    });
+
+    assert.equal(preview.payableNowCents, 5 * 1900 + 51_000);
+    assert.equal(preview.nextScheduledPayment?.dueDate, "2026-12-01");
   });
 });

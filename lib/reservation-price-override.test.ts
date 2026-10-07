@@ -110,6 +110,59 @@ describe("fitPeriodDraftsToTotal", () => {
     assert.equal(fitted.length, 8);
   });
 
+  const calendar = (checkInDate: string, checkOutDate: string, monthly: number, daily: number) =>
+    generateBillingPeriods({
+      checkInDate,
+      checkOutDate,
+      isMember: true,
+      rates: { memberRateMonthly: monthly, memberRateDaily: daily, nonMemberRateDaily: null },
+      billingMode: "calendar_month",
+    });
+
+  it("calendar months: flat season deal matches the standard schedule", () => {
+    const drafts = calendar("2026-10-01", "2027-05-31", 540, 21);
+    assert.equal(total(drafts), 432000);
+    assert.deepEqual(amounts(fitPeriodDraftsToTotal(drafts, 432000, "calendar_month")), Array(8).fill(54000));
+  });
+
+  it("calendar months: February counts as a whole month in a flat deal", () => {
+    const fitted = fitPeriodDraftsToTotal(calendar("2026-11-01", "2027-03-01", 540, 21), 200000, "calendar_month");
+    assert.deepEqual(amounts(fitted), Array(4).fill(50000));
+  });
+
+  it("calendar months: checking out on the last day still counts as that month", () => {
+    const drafts = calendar("2026-11-01", "2027-03-31", 510, 19);
+    assert.equal(drafts[4].fullMonth, true);
+    assert.equal(drafts[4].amountDueCents, 51000);
+    const fitted = fitPeriodDraftsToTotal(drafts, 50000, "calendar_month");
+    assert.deepEqual(amounts(fitted), Array(5).fill(10000));
+  });
+
+  it("calendar months: long arrival/final months absorb the difference instead of going free", () => {
+    const fitted = fitPeriodDraftsToTotal(calendar("2026-10-15", "2027-04-15", 510, 19), 300000, "calendar_month");
+    assert.deepEqual(amounts(fitted), [32300, ...Array(5).fill(51000), 12700]);
+  });
+
+  it("calendar months: charged stubs keep their amounts even when the total divides evenly", () => {
+    const fitted = fitPeriodDraftsToTotal(calendar("2027-01-29", "2027-03-08", 540, 21), 77100, "calendar_month");
+    assert.deepEqual(amounts(fitted), [6300, 54000, 16800]);
+  });
+
+  it("rolling periods keep the flat-month fit with a long final remainder", () => {
+    const fitted = fitPeriodDraftsToTotal(member("2026-10-01", "2027-04-20", 510, 19), 330000);
+    assert.deepEqual(amounts(fitted), Array(6).fill(55000));
+    assert.equal(fitted[5].periodEnd, "2027-04-20");
+  });
+
+  it("calendar months: free arrival stub folds into the first whole month", () => {
+    const fitted = fitPeriodDraftsToTotal(calendar("2026-10-10", "2027-03-01", 510, 19), 204000, "calendar_month");
+    assert.deepEqual(amounts(fitted), Array(4).fill(51000));
+    assert.equal(fitted[0].periodStart, "2026-10-10");
+    assert.equal(fitted[0].dueDate, "2026-10-10");
+    assert.equal(fitted[0].periodEnd, "2026-12-01");
+    assert.deepEqual(fitted.map((d) => d.periodIndex), [0, 1, 2, 3]);
+  });
+
   it("guest monthly rate lock collapses to one period", () => {
     const drafts = generateBillingPeriods({
       checkInDate: "2026-10-01",

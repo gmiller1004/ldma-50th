@@ -12,7 +12,7 @@ const CARETAKER_CASH_VOID_WINDOW_DAYS = 30;
 
 /**
  * POST /api/members/caretaker/payments/void-cash
- * Remove a mistaken cash entry (cash never received). Keeps an audit snapshot in camp_payment_voids
+ * Remove a mistaken cash or check entry (money never received). Keeps an audit snapshot in camp_payment_voids
  * and re-applies remaining payments to the reservation's billing periods.
  * Body: { paymentId, reason, campSlug? }
  */
@@ -72,8 +72,12 @@ export async function POST(request: NextRequest) {
   if (!payment) {
     return NextResponse.json({ error: "Payment not found" }, { status: 404 });
   }
-  if (payment.method !== "cash" || payment.payment_type !== "reservation" || !payment.reservation_id) {
-    return NextResponse.json({ error: "Only cash site-fee entries can be voided" }, { status: 400 });
+  if (
+    (payment.method !== "cash" && payment.method !== "check") ||
+    payment.payment_type !== "reservation" ||
+    !payment.reservation_id
+  ) {
+    return NextResponse.json({ error: "Only cash or check site-fee entries can be voided" }, { status: 400 });
   }
   if (payment.reservation_status === "cancelled") {
     return NextResponse.json(
@@ -92,7 +96,7 @@ export async function POST(request: NextRequest) {
     if (ageDays > CARETAKER_CASH_VOID_WINDOW_DAYS) {
       return NextResponse.json(
         {
-          error: `Cash entries older than ${CARETAKER_CASH_VOID_WINDOW_DAYS} days can only be voided by the LDMA office.`,
+          error: `Cash and check entries older than ${CARETAKER_CASH_VOID_WINDOW_DAYS} days can only be voided by the LDMA office.`,
         },
         { status: 403 }
       );

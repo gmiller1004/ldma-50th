@@ -5,11 +5,14 @@
 import { formatSiteDisplayName } from "@/lib/camp-master";
 import { isNonBookableSite } from "@/lib/reservation-camps";
 import {
+  amountDueAtArrivalCents,
   computeStayPricing,
   generateBillingPeriods,
   MEMBER_DAILY_MAX_NIGHTS,
+  type BillingMode,
   type SiteRates,
 } from "@/lib/reservation-pricing";
+import { campDefaultBillingMode } from "@/lib/camp-billing-mode";
 import { siteRatesFromRow } from "@/lib/reservation-billing";
 import { validateStayWithinOpenSeason } from "@/lib/camp-seasons";
 import { countNights, toDateOnlyStr } from "@/lib/reservation-dates";
@@ -150,6 +153,7 @@ export function buildSiteTypeAvailability(input: {
       checkOutDate: checkOut,
       isMember: true,
       rates,
+      billingMode: campDefaultBillingMode(campSlug),
     });
     const guestPricing = computeStayPricing({
       checkInDate: checkIn,
@@ -220,19 +224,23 @@ export function computePublicPaymentOptions(input: {
   return options;
 }
 
+/** Amount due at arrival: the first billing period (plus the next month for calendar late arrivals). */
 export function firstBillingPeriodCents(
   checkIn: string,
   checkOut: string,
   isMember: boolean,
-  rates: SiteRates
+  rates: SiteRates,
+  billingMode: BillingMode
 ): number {
-  const periods = generateBillingPeriods({
-    checkInDate: checkIn,
-    checkOutDate: checkOut,
-    isMember,
-    rates,
-  });
-  return periods[0]?.amountDueCents ?? 0;
+  return amountDueAtArrivalCents(
+    generateBillingPeriods({
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      isMember,
+      rates,
+      billingMode,
+    })
+  );
 }
 
 export function validatePublicBookingRequest(input: {

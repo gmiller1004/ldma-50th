@@ -7,6 +7,7 @@ import {
 } from "@/lib/reservation-camps";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { computeStayPricing } from "@/lib/reservation-pricing";
+import { reservationBillingMode } from "@/lib/camp-billing-mode";
 import { getReservationBalance, siteRatesFromRow } from "@/lib/reservation-billing";
 import { previewStayPaymentObligations } from "@/lib/reservation-balance-due";
 import {
@@ -52,7 +53,7 @@ export async function GET(
 
     const resRows = await sql`
       SELECT r.id, r.site_id, r.check_in_date, r.check_out_date, r.nights, r.reservation_type, r.status,
-             r.amount_override_cents, r.override_reason, r.price_override_flag,
+             r.amount_override_cents, r.override_reason, r.price_override_flag, r.billing_mode,
              s.member_rate_daily, s.member_rate_monthly, s.non_member_rate_daily
       FROM camp_reservations r
       JOIN camp_sites s ON s.id = r.site_id
@@ -71,6 +72,7 @@ export async function GET(
           amount_override_cents: number | null;
           override_reason: string | null;
           price_override_flag: boolean | null;
+          billing_mode: string | null;
           member_rate_daily: number | string | null;
           member_rate_monthly: number | string | null;
           non_member_rate_daily: number | string | null;
@@ -85,6 +87,7 @@ export async function GET(
     const currentCheckOut = toDateOnlyStr(res.check_out_date);
     const isMember = res.reservation_type === "member";
     const rates = siteRatesFromRow(res);
+    const billingMode = reservationBillingMode(res.billing_mode);
 
     const overlap = await sql`
       SELECT id FROM camp_reservations
@@ -102,12 +105,14 @@ export async function GET(
       checkOutDate: currentCheckOut,
       isMember,
       rates,
+      billingMode,
     });
     const proposedPricing = computeStayPricing({
       checkInDate,
       checkOutDate,
       isMember,
       rates,
+      billingMode,
     });
 
     const currentBalance = await getReservationBalance(id);
@@ -120,6 +125,7 @@ export async function GET(
       checkOutDate,
       reservationType: res.reservation_type,
       rates,
+      billingMode,
       netPaidCents: totals.netPaidCents,
     });
     const additionalDueCents = obligations.payableNowCents;

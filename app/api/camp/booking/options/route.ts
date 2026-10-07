@@ -8,6 +8,7 @@ import { lookupMember } from "@/lib/salesforce";
 import { memberQualifiesForCampBooking } from "@/lib/reservation-member";
 import { siteRatesFromRow } from "@/lib/reservation-billing";
 import { campOpenSeasonSummary } from "@/lib/camp-seasons";
+import { campDefaultBillingMode } from "@/lib/camp-billing-mode";
 import {
   buildSiteTypeAvailability,
   computePublicPaymentOptions,
@@ -95,7 +96,8 @@ export async function GET(request: NextRequest) {
       member_rate_monthly: row.memberRateMonthly,
       non_member_rate_daily: row.nonMemberRateDaily,
     });
-    const memberFirstPeriod = firstBillingPeriodCents(checkIn, checkOut, true, rates);
+    const billingMode = campDefaultBillingMode(campSlug);
+    const memberFirstPeriod = firstBillingPeriodCents(checkIn, checkOut, true, rates, billingMode);
     const paymentOptionsMember = computePublicPaymentOptions({
       totalCents: row.memberTotalCents,
       firstPeriodCents: memberFirstPeriod,
@@ -104,7 +106,7 @@ export async function GET(request: NextRequest) {
     });
     const paymentOptionsGuest = computePublicPaymentOptions({
       totalCents: row.guestTotalCents,
-      firstPeriodCents: firstBillingPeriodCents(checkIn, checkOut, false, rates),
+      firstPeriodCents: firstBillingPeriodCents(checkIn, checkOut, false, rates, billingMode),
       usesMonthlyMemberRate: false,
       isMember: false,
     });

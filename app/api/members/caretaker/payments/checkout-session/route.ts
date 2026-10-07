@@ -4,6 +4,7 @@ import { getCaretakerWriteContext } from "@/lib/caretaker-auth";
 import { campUsesReservations, isNonBookableSite } from "@/lib/reservation-camps";
 import { hasDb, sql } from "@/lib/db";
 import { computeStayTotalCents, siteRatesFromRow } from "@/lib/reservation-billing";
+import { campDefaultBillingMode } from "@/lib/camp-billing-mode";
 import { parseReservationPricingBody } from "@/lib/reservation-create-metadata";
 
 /**
@@ -176,6 +177,7 @@ export async function POST(request: NextRequest) {
         checkOutDate,
         isMember: reservationType === "member",
         rates,
+        billingMode: campDefaultBillingMode(caretaker.campSlug),
       });
       const pricingParsed = parseReservationPricingBody(
         { amountCents, amountOverrideCents: body.amountOverrideCents, overrideReason: body.overrideReason },

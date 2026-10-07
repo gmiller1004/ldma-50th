@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { directoryCamps } from "@/lib/directory-camps";
 import { campUsesReservations, caretakerAllowsCashCheckIn } from "@/lib/reservation-camps";
 import { computeStayPricing, formatCentsAsCurrency, generateBillingPeriods } from "@/lib/reservation-pricing";
+import { campDefaultBillingMode } from "@/lib/camp-billing-mode";
 import { countNights } from "@/lib/reservation-dates";
 import { suggestedReservationPaymentCents } from "@/lib/reservation-billing";
 import { fitPeriodDraftsToTotal } from "@/lib/reservation-price-override";
@@ -82,6 +83,7 @@ export function ManualReservationPanel() {
             memberRateMonthly: selectedSite.memberRateMonthly,
             nonMemberRateDaily: selectedSite.nonMemberRateDaily,
           },
+          billingMode: campDefaultBillingMode(campSlug),
         }).totalCents
       : 0;
   const calculatedTotalCents = quotedTotalCents ?? localTotalCents;
@@ -115,19 +117,21 @@ export function ManualReservationPanel() {
         memberRateMonthly: selectedSite.memberRateMonthly,
         nonMemberRateDaily: selectedSite.nonMemberRateDaily,
       },
+      billingMode: campDefaultBillingMode(campSlug),
     });
     if (effectiveTotalCents !== calculatedTotalCents && calculatedTotalCents > 0) {
-      drafts = fitPeriodDraftsToTotal(drafts, effectiveTotalCents);
+      drafts = fitPeriodDraftsToTotal(drafts, effectiveTotalCents, campDefaultBillingMode(campSlug));
     }
     return suggestedReservationPaymentCents(
       drafts.map((d) => ({
         status: "unpaid",
         amountDueCents: d.amountDueCents,
         amountPaidCents: 0,
+        dueDate: d.dueDate,
       })),
       effectiveTotalCents
     );
-  }, [selectedSite, nights, checkInDate, checkOutDate, resType, effectiveTotalCents, calculatedTotalCents]);
+  }, [selectedSite, nights, checkInDate, checkOutDate, resType, effectiveTotalCents, calculatedTotalCents, campSlug]);
 
   function applyPricingFields(
     body: Record<string, unknown>,

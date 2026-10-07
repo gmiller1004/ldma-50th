@@ -7,6 +7,7 @@ import { campTodayStr } from "@/lib/camp-time";
 import {
   MEMBER_DAILY_MAX_NIGHTS,
   generateBillingPeriods,
+  type BillingMode,
   type SiteRates,
 } from "@/lib/reservation-pricing";
 import { allocatePaidWaterfall } from "@/lib/backfill-billing-periods";
@@ -49,12 +50,13 @@ export function totalUnpaidBalanceCents(
     .reduce((sum, p) => sum + Math.max(0, p.amountDueCents - p.amountPaidCents), 0);
 }
 
-/** Long-term member: first billing period only. Short stay / guest: entire unpaid balance. */
+/**
+ * Long-term member: first billing period, plus any period due the same day (calendar-month late
+ * arrivals). Short stay / guest: entire unpaid balance.
+ */
 export function balanceDueBeforeArrivalCents(
-  periods: Pick<
-    BillingPeriodSummary,
-    "periodIndex" | "status" | "amountDueCents" | "amountPaidCents"
-  >[],
+  periods: (Pick<BillingPeriodSummary, "periodIndex" | "status" | "amountDueCents" | "amountPaidCents"> &
+    Partial<Pick<BillingPeriodSummary, "dueDate">>)[],
   isLongTermMember: boolean
 ): number {
   const active = periods.filter((p) => p.status !== "cancelled");
@@ -65,7 +67,10 @@ export function balanceDueBeforeArrivalCents(
   }
 
   const first = active.find((p) => p.periodIndex === 0) ?? active[0];
-  return Math.max(0, first.amountDueCents - first.amountPaidCents);
+  const firstDue = first.dueDate?.slice(0, 10);
+  return active
+    .filter((p) => p === first || (firstDue != null && p.dueDate != null && p.dueDate.slice(0, 10) <= firstDue))
+    .reduce((sum, p) => sum + Math.max(0, p.amountDueCents - p.amountPaidCents), 0);
 }
 
 export function daysBetweenIso(from: string, to: string): number {
@@ -186,6 +191,7 @@ export function previewStayPaymentObligations(input: {
   checkOutDate: string;
   reservationType: string;
   rates: SiteRates;
+  billingMode: BillingMode;
   netPaidCents: number;
   today?: string;
 }): ReservationPaymentObligations & {
@@ -198,6 +204,7 @@ export function previewStayPaymentObligations(input: {
     checkOutDate: input.checkOutDate,
     isMember,
     rates: input.rates,
+    billingMode: input.billingMode,
   });
   const allocated = allocatePaidWaterfall(drafts, Math.max(0, input.netPaidCents));
   const periods: BillingPeriodSummary[] = allocated.map((p) => ({
@@ -239,6 +246,7 @@ export function previewSiteMovePaymentObligations(input: {
   checkOutDate: string;
   reservationType: string;
   rates: SiteRates;
+  billingMode: BillingMode;
   netPaidCents: number;
   today?: string;
 }): ReservationPaymentObligations & {

@@ -54,3 +54,14 @@ export function addDays(dateStr: string, days: number): string {
   d.setDate(d.getDate() + days);
   return formatDateOnly(d);
 }
+
+/** First day of the month after dateStr (YYYY-MM-DD). String math only, so no time zone drift. */
+export function firstOfNextMonth(dateStr: string): string {
+  const y = Number(dateStr.slice(0, 4));
+  const m = Number(dateStr.slice(5, 7));
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+}
+
+export function isFirstOfMonth(dateStr: string): boolean {
+  return dateStr.slice(8, 10) === "01";
+}
