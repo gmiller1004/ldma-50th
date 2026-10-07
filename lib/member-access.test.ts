@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   applyMemberAccess,
+  caretakerMaintenanceDue,
   contactIsActiveLdma,
   memberCanUseLegacyOffers,
   memberHasWebsiteAccess,
@@ -99,5 +100,39 @@ describe("applyMemberAccess", () => {
     assert.equal(memberHasWebsiteAccess(result), true);
     assert.equal(memberQualifiesForCampBooking(result), true);
     assert.equal(memberCanUseLegacyOffers(result), true);
+  });
+});
+
+describe("caretakerMaintenanceDue", () => {
+  it("shows dues for an active LDMA member who is not exempt", () => {
+    assert.equal(
+      caretakerMaintenanceDue({ valid: true, active: true, duesOwed: 530, showMaintenance: true, hideMaintenance: false }),
+      530
+    );
+  });
+
+  it("hides dues for a new LDMA member without an active LDMA type, but still allows booking", () => {
+    const member = applyMemberAccess(
+      { valid: true, active: true, email: "x@example.com", duesOwed: 530, showMaintenance: false, hideMaintenance: true },
+      "primary"
+    );
+    assert.equal(caretakerMaintenanceDue(member), null);
+    assert.equal(memberQualifiesForCampBooking(member), true);
+  });
+
+  it("hides dues for maintenance exempt members", () => {
+    assert.equal(
+      caretakerMaintenanceDue({ valid: true, active: true, duesOwed: 400, maintenanceExempt: true, hideMaintenance: false }),
+      null
+    );
+  });
+
+  it("hides dues for a named companion", () => {
+    const result = applyMemberAccess({ ...companionContact, duesOwed: 250 }, "companion", {
+      contactId: "003primary",
+      memberNumber: "2935760",
+      name: "Kaylene Monson",
+    });
+    assert.equal(caretakerMaintenanceDue(result), null);
   });
 });

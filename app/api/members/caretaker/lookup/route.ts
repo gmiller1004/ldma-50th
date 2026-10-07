@@ -6,6 +6,7 @@ import {
   type MemberLookupResult,
 } from "@/lib/salesforce";
 import { caretakerLookupFieldsFromBody } from "@/lib/member-contact-search";
+import { caretakerMaintenanceDue } from "@/lib/member-access";
 
 function memberToCaretakerJson(member: MemberLookupResult, memberNumber: string | null) {
   const displayName =
@@ -18,7 +19,7 @@ function memberToCaretakerJson(member: MemberLookupResult, memberNumber: string 
     email: member.email?.trim() || null,
     phone: member.phone?.trim() || null,
     isLdmaMember: member.hasMemberAccess === true || member.active === true,
-    maintenanceFeesDue: member.duesOwed ?? null,
+    maintenanceFeesDue: caretakerMaintenanceDue(member),
     membershipDuesOwed: member.membershipDuesOwed ?? null,
     membershipBalance: member.membershipBalance ?? null,
   };

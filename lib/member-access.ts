@@ -67,6 +67,15 @@ export function memberHasWebsiteAccess(
   return Boolean(member.valid && member.hasMemberAccess && member.email);
 }
 
+/**
+ * Past-due maintenance a caretaker should see/collect. Null when the member is
+ * maintenance exempt, or new LDMA member without an active LDMA type (incl. companions).
+ */
+export function caretakerMaintenanceDue(member: MemberLookupResult): number | null {
+  if (member.maintenanceExempt === true || member.hideMaintenance === true) return null;
+  return member.duesOwed ?? null;
+}
+
 export function memberCanUseLegacyOffers(member: MemberLookupResult): boolean {
   return member.accessRole !== "companion" && member.active === true;
 }

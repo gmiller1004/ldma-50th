@@ -225,6 +225,7 @@ function mapContactRecord(c: Record<string, unknown>): MemberLookupResult {
     duesOwed,
     maintenancePaidThru,
     showMaintenance,
+    hideMaintenance,
     maintenanceExempt,
     isOnAutoPay,
     companionTransferable,
