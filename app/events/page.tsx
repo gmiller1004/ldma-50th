@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Events | LDMA 50th Anniversary",
   description:
-    "Gold Diggin's, Dirt Party, detector days, and more across LDMA campgrounds. Register for gold prospecting events at Stanton, Italian Bar, Oconee, and more.",
+    "Learn gold prospecting from the pros at LDMA's private gold camps: metal detecting, dry washing, high banking, and more. Events are open to everyone, no membership needed.",
 };
 
 export default async function EventsPage() {

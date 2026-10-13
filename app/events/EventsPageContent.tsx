@@ -10,6 +10,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { EventsExitIntentSignup } from "@/components/EventsExitIntentSignup";
 import { AddToCartButton } from "@/components/AddToCartButton";
+import { FourWaysToLearn, ThrowdownSpotlight, THROWDOWN_HANDLE } from "./EventsLearningSections";
 import { EVENT_TYPES, CAMP_FILTERS, PRICE_LEVEL_METAFIELD } from "@/lib/events-config";
 import {
   getEventDates,
@@ -317,6 +318,8 @@ export function EventsPageContent({
     });
   }, [eventsWithVariant, eventType, camp]);
 
+  const throwdown = eventsWithVariant.find((e) => e.handle === THROWDOWN_HANDLE);
+
   useEffect(() => {
     if (!highlightHandle) return;
     router.replace(`/events/${encodeURIComponent(highlightHandle)}`);
@@ -338,13 +341,21 @@ export function EventsPageContent({
         <div className="absolute inset-0 bg-gradient-to-b from-[#0f3d1e]/40 via-transparent to-transparent" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(212,175,55,0.08)_0%,transparent_70%)]" />
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <motion.p
+            className="text-[#d4af37] text-xs sm:text-sm font-semibold tracking-[0.2em] uppercase mb-4"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            LDMA Events · Hands-on gold camp events
+          </motion.p>
           <motion.h1
-            className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-[#f0d48f] tracking-tight mb-4"
+            className="font-serif text-4xl sm:text-5xl md:text-6xl font-bold text-[#f0d48f] tracking-tight text-balance mb-5"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            Events
+            Learn to find gold from the pros.
           </motion.h1>
           <motion.p
             className="text-[#e8e0d5]/90 text-lg md:text-xl max-w-2xl mx-auto"
@@ -352,54 +363,53 @@ export function EventsPageContent({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            Gold Diggin&apos;s, Dirt Party, detector days, and more — across all LDMA
-            campgrounds. Register for your next adventure.
+            Metal detecting, dry washing, high banking, and more, taught hands-on at LDMA&apos;s
+            private gold camps. Real instruction, real ground, real gold.
           </motion.p>
-          <motion.p
-            className="mt-4 text-[#e8e0d5]/80 text-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.35 }}
+          <motion.div
+            className="mt-6 flex flex-col items-center gap-3"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
           >
-            <Link
-              href="/about-events"
-              className="text-[#d4af37] hover:text-[#f0d48f] font-medium underline underline-offset-2"
-            >
-              Learn more about LDMA events
-            </Link>
-          </motion.p>
-          {!isMemberLoggedIn && (
-            <motion.p
-              className="mt-6 text-[#e8e0d5]/80 text-sm md:text-base max-w-xl mx-auto"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              Log in to see member-only pricing.{" "}
+            <span className="inline-flex items-center rounded-full border border-[#d4af37]/40 bg-[#d4af37]/10 px-4 py-1.5 text-xs sm:text-sm font-semibold text-[#f0d48f]">
+              Open to everyone · No LDMA membership needed
+            </span>
+            <p className="text-[#e8e0d5]/70 text-sm">
               <Link
-                href="/members/login?redirect=/events"
-                className="font-medium text-[#d4af37] hover:text-[#f0d48f] underline underline-offset-2 transition-colors"
+                href="/about-events"
+                className="text-[#d4af37] hover:text-[#f0d48f] font-medium underline underline-offset-2"
               >
-                Sign in
+                Learn more about LDMA events
               </Link>
-            </motion.p>
-          )}
+              {!isMemberLoggedIn && (
+                <>
+                  {" · "}LDMA members:{" "}
+                  <Link
+                    href="/members/login?redirect=/events"
+                    className="font-medium text-[#d4af37] hover:text-[#f0d48f] underline underline-offset-2 transition-colors"
+                  >
+                    sign in for member pricing
+                  </Link>
+                </>
+              )}
+            </p>
+          </motion.div>
         </div>
       </section>
 
-      <NewsletterSignup
-        variant="banner"
-        id="events-email-signup"
-        analyticsSource="events"
-        title="Get email updates on LDMA events"
-        description="Sign up to hear when we announce new Gold Diggin's, Dirt Party, detector days, and camp events — plus heads-up when registration opens so you don't miss a spot."
-        successTitle="You're on the list"
-        successMessage="Watch your inbox for new events and registration news from LDMA."
-        submitLabel="Notify me"
-      />
+      <FourWaysToLearn />
+
+      {throwdown && <ThrowdownSpotlight event={throwdown} />}
 
       {/* Filters */}
-      <section className="py-8 border-b border-[#d4af37]/10">
+      <section id="all-events" className="py-8 border-y border-[#d4af37]/10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 mb-6">
+          <h2 className="font-serif text-3xl md:text-4xl font-bold text-[#f0d48f]">
+            Upcoming events
+          </h2>
+          <p className="mt-1 text-[#e8e0d5]/70">Find the one that fits you.</p>
+        </div>
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
@@ -487,6 +497,17 @@ export function EventsPageContent({
 
         </div>
       </section>
+
+      <NewsletterSignup
+        variant="banner"
+        id="events-email-signup"
+        analyticsSource="events"
+        title="Get email updates on LDMA events"
+        description="Sign up to hear when we announce new Gold Diggin's, Dirt Party, detector days, and camp events — plus heads-up when registration opens so you don't miss a spot."
+        successTitle="You're on the list"
+        successMessage="Watch your inbox for new events and registration news from LDMA."
+        submitLabel="Notify me"
+      />
 
       <EventsExitIntentSignup isMemberLoggedIn={isMemberLoggedIn} blockTriggers={false} />
     </>
