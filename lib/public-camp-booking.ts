@@ -3,7 +3,7 @@
  */
 
 import { formatSiteDisplayName } from "@/lib/camp-master";
-import { isNonBookableSite } from "@/lib/reservation-camps";
+import { isOnlineBookableSite } from "@/lib/reservation-camps";
 import {
   amountDueAtArrivalCents,
   computeStayPricing,
@@ -66,7 +66,7 @@ export function siteMatchesTypeGroup(
 }
 
 export function filterBookableSites(campSlug: string, sites: CampSiteRow[]): CampSiteRow[] {
-  return sites.filter((s) => !isNonBookableSite(campSlug, s.name, s.site_code));
+  return sites.filter((s) => isOnlineBookableSite(campSlug, s.name, s.site_code));
 }
 
 export function reservationOverlapsStay(

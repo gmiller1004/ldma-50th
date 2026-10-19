@@ -109,6 +109,30 @@ describe("buildSiteTypeAvailability", () => {
     assert.equal(rows[0].totalCount, 2);
     assert.equal(rows[0].soldOut, false);
   });
+
+  it("leaves Stanton 1 & 2 out of online availability", () => {
+    const site = (code: string) => ({
+      id: code,
+      name: `${code} — Premium — 30 Amp - Full Hook-Up`,
+      site_code: code,
+      site_type: "30 Amp - Full Hook-Up",
+      special_type: "Premium",
+      sort_order: Number(code),
+      member_rate_daily: 30,
+      member_rate_monthly: 510,
+      non_member_rate_daily: 40,
+    });
+    const rows = buildSiteTypeAvailability({
+      campSlug: "stanton-arizona",
+      checkIn: "2026-11-01",
+      checkOut: "2026-11-03",
+      sites: [site("1"), site("2"), site("3")],
+      reservations: [],
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].totalCount, 1);
+    assert.equal(rows[0].availableCount, 1);
+  });
 });
 
 describe("computePublicPaymentOptions", () => {

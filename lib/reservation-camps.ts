@@ -86,6 +86,25 @@ export function isNonBookableSite(
   return isNonBookableSiteName(campSlug, siteName);
 }
 
+/**
+ * Sites caretakers can still assign but online booking never offers
+ * (e.g. Stanton 1 & 2, held for late arrivals during quiet hours).
+ */
+const CARETAKER_ONLY_SITE_CODES_BY_CAMP: Record<string, Set<string>> = {
+  "stanton-arizona": new Set(["1", "2"]),
+  "vein-mountain-north-carolina": new Set(["UC-02"]),
+};
+
+export function isOnlineBookableSite(
+  campSlug: string,
+  siteName: string,
+  siteCode?: string | null
+): boolean {
+  if (isNonBookableSite(campSlug, siteName, siteCode)) return false;
+  const caretakerOnly = CARETAKER_ONLY_SITE_CODES_BY_CAMP[campSlug];
+  return !(siteCode && caretakerOnly?.has(siteCode.trim()));
+}
+
 /** True if site_type indicates a hookup site (30/50 amp, full hookup, etc.). Used for event upgrade vs included dry. */
 export function isHookupSiteType(siteType: string): boolean {
   const t = (siteType || "").toLowerCase();

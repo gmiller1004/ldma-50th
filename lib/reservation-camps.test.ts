@@ -7,6 +7,8 @@ import {
   caretakerEarliestCheckInDate,
   caretakerEarliestCheckInDateForEdit,
   isHookupSiteType,
+  isNonBookableSite,
+  isOnlineBookableSite,
   parseCapacitySiteFilter,
   siteMatchesCapacityFilter,
 } from "./reservation-camps.ts";
@@ -60,6 +62,29 @@ describe("caretakerEarliestCheckInDateForEdit", () => {
       caretakerEarliestCheckInDateForEdit("2026-07-10", "2026-07-13"),
       "2026-07-06"
     );
+  });
+});
+
+describe("isOnlineBookableSite", () => {
+  it("hides Stanton 1 & 2 online but keeps them assignable by caretakers", () => {
+    for (const code of ["1", "2"]) {
+      const name = `${code} — Premium — 30 Amp - Full Hook-Up`;
+      assert.equal(isOnlineBookableSite("stanton-arizona", name, code), false);
+      assert.equal(isNonBookableSite("stanton-arizona", name, code), false);
+    }
+    assert.equal(isOnlineBookableSite("stanton-arizona", "3 — Premium — 30 Amp - Full Hook-Up", "3"), true);
+    assert.equal(isOnlineBookableSite("oconee-south-carolina", "Site 1", "1"), true);
+  });
+
+  it("hides Vein Mountain UC-02 online but keeps it assignable by caretakers", () => {
+    const name = "UC-02 — 30 Amp w/ Water";
+    assert.equal(isOnlineBookableSite("vein-mountain-north-carolina", name, "UC-02"), false);
+    assert.equal(isNonBookableSite("vein-mountain-north-carolina", name, "UC-02"), false);
+    assert.equal(isOnlineBookableSite("vein-mountain-north-carolina", "LC-02 — 30 Amp w/ Water", "LC-02"), true);
+  });
+
+  it("never offers never-bookable sites online", () => {
+    assert.equal(isOnlineBookableSite("vein-mountain-north-carolina", "Upper 1", "UC-01"), false);
   });
 });
 
