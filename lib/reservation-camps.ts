@@ -92,7 +92,7 @@ export function isNonBookableSite(
  */
 const CARETAKER_ONLY_SITE_CODES_BY_CAMP: Record<string, Set<string>> = {
   "stanton-arizona": new Set(["1", "2"]),
-  "vein-mountain-north-carolina": new Set(["UC-02"]),
+  "vein-mountain-north-carolina": new Set(["LC-02"]),
 };
 
 export function isOnlineBookableSite(

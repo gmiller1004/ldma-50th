@@ -76,11 +76,11 @@ describe("isOnlineBookableSite", () => {
     assert.equal(isOnlineBookableSite("oconee-south-carolina", "Site 1", "1"), true);
   });
 
-  it("hides Vein Mountain UC-02 online but keeps it assignable by caretakers", () => {
-    const name = "UC-02 — 30 Amp w/ Water";
-    assert.equal(isOnlineBookableSite("vein-mountain-north-carolina", name, "UC-02"), false);
-    assert.equal(isNonBookableSite("vein-mountain-north-carolina", name, "UC-02"), false);
-    assert.equal(isOnlineBookableSite("vein-mountain-north-carolina", "LC-02 — 30 Amp w/ Water", "LC-02"), true);
+  it("hides Vein Mountain LC-02 online but keeps it assignable by caretakers", () => {
+    const name = "LC-02 — 30 Amp w/ Water";
+    assert.equal(isOnlineBookableSite("vein-mountain-north-carolina", name, "LC-02"), false);
+    assert.equal(isNonBookableSite("vein-mountain-north-carolina", name, "LC-02"), false);
+    assert.equal(isOnlineBookableSite("vein-mountain-north-carolina", "UC-02 — 30 Amp w/ Water", "UC-02"), true);
   });
 
   it("never offers never-bookable sites online", () => {
