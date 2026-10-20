@@ -76,6 +76,14 @@ describe("isOnlineBookableSite", () => {
     assert.equal(isOnlineBookableSite("oconee-south-carolina", "Site 1", "1"), true);
   });
 
+  it("hides Stanton parking sites online", () => {
+    for (const code of ["78", "86", "105", "127"]) {
+      assert.equal(isOnlineBookableSite("stanton-arizona", `${code} — Parking`, code), false);
+      assert.equal(isNonBookableSite("stanton-arizona", `${code} — Parking`, code), false);
+    }
+    assert.equal(isOnlineBookableSite("stanton-arizona", "106 — 30 Amp - Full Hook-Up", "106"), true);
+  });
+
   it("hides Vein Mountain LC-02 online but keeps it assignable by caretakers", () => {
     const name = "LC-02 — 30 Amp w/ Water";
     assert.equal(isOnlineBookableSite("vein-mountain-north-carolina", name, "LC-02"), false);

@@ -88,10 +88,14 @@ export function isNonBookableSite(
 
 /**
  * Sites caretakers can still assign but online booking never offers
- * (e.g. Stanton 1 & 2, held for late arrivals during quiet hours).
+ * (e.g. Stanton 1 & 2, held for late arrivals during quiet hours, and Stanton's parking sites).
  */
 const CARETAKER_ONLY_SITE_CODES_BY_CAMP: Record<string, Set<string>> = {
-  "stanton-arizona": new Set(["1", "2"]),
+  "stanton-arizona": new Set([
+    "1", "2",
+    "78", "82", "84", "86",
+    "105", "107", "109", "111", "113", "115", "117", "119", "121", "123", "125", "127",
+  ]),
   "vein-mountain-north-carolina": new Set(["LC-02"]),
 };
 
