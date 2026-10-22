@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { isSeptMemberActive } from "@/lib/membership-bundle-config";
 import { MembershipsPageContent as LegacyMembershipsPageContent } from "./MembershipsPageContent";
 import { BundleMembershipsPageContent } from "./BundleMembershipsPageContent";
 
@@ -9,10 +8,9 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Lifetime Membership Bundle | LDMA 50th Anniversary",
-    description: isSeptMemberActive()
-      ? "Join LDMA and GPAA for life, bring a companion, keep it in the family, and take home a Garrett Axiom Lite. Through September 30, The Founder Bag is included free with new membership."
-      : "Join LDMA and GPAA for life, bring a companion, keep it in the family, and take home a Garrett Axiom Lite.",
+    title: "Lifetime Membership + Garrett Axiom Lite | LDMA 50th Anniversary",
+    description:
+      "Lifetime membership in the Lost Dutchman's Mining Association and the Gold Prospectors Association of America. Includes a Companion membership to share with anyone, the right to pass yours on to a person of your choice, a Garrett Axiom Lite gold detector, and PayDirt. Member camping from $6/night.",
   };
 }
 
@@ -25,7 +23,7 @@ export default function MembershipsPage() {
       <Navbar />
       <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
         {showBundleExperience ? (
-          <BundleMembershipsPageContent septMemberActiveAtRender={isSeptMemberActive()} />
+          <BundleMembershipsPageContent />
         ) : (
           <LegacyMembershipsPageContent />
         )}
