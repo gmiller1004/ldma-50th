@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRightLeft,
   BadgeCheck,
-  CalendarClock,
   Check,
   ChevronDown,
   FileText,
@@ -98,9 +97,9 @@ const BEFORE_YOU_BUY = [
     Icon: FileText,
   },
   {
-    title: "$120 a year after year one",
-    body: "Annual maintenance is $120, starting after your first year. Camping is billed separately at the nightly rate.",
-    Icon: CalendarClock,
+    title: "Camping from $6 a night",
+    body: "Stay at member rates of $6 a night dry or $12 with RV hookups. Rates vary by camp.",
+    Icon: Tent,
   },
   {
     title: "A real person to talk to",
@@ -199,7 +198,7 @@ export function BundleMembershipsPageContent() {
       },
       {
         q: "Are there ongoing costs?",
-        a: "Yes, and we want you to know up front. Annual maintenance is $120, starting after your first year. Camping is billed separately at the member nightly rate of $6 dry or $12 with RV hookups.",
+        a: "Annual maintenance is $120 a year, starting after your first year. Camping is billed separately at the member nightly rate of $6 dry or $12 with RV hookups.",
       },
       {
         q: "What if I change my mind?",
@@ -387,10 +386,6 @@ export function BundleMembershipsPageContent() {
                 <li className="flex items-start gap-2">
                   <FileText className="w-4 h-4 mt-0.5 text-[#6dd472] shrink-0" />
                   Contract emailed after purchase. Review and sign before activation.
-                </li>
-                <li className="flex items-start gap-2">
-                  <CalendarClock className="w-4 h-4 mt-0.5 text-[#6dd472] shrink-0" />
-                  $120 a year maintenance starts after year one
                 </li>
                 <li className="flex items-start gap-2">
                   <Phone className="w-4 h-4 mt-0.5 text-[#6dd472] shrink-0" />
@@ -808,7 +803,7 @@ export function BundleMembershipsPageContent() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="font-serif text-3xl md:text-4xl font-bold text-[#f0d48f]">Before you buy</h2>
           <p className="text-[#e8e0d5]/80 mt-4 max-w-3xl mx-auto">
-            This is a real commitment, so here is what happens next and what it costs.
+            Here is what happens after you join.
           </p>
           <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-left">
             {BEFORE_YOU_BUY.map(({ title, body, Icon }) => (
