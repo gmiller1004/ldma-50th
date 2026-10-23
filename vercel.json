@@ -14,7 +14,7 @@
     },
     {
       "path": "/api/cron/camp-payment-due",
-      "schedule": "0 7 * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/api/cron/mrs-reservation-digest",

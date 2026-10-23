@@ -1,4 +1,5 @@
 import sgMail from "@sendgrid/mail";
+import { buildBalanceReminderEmail, type BalanceReminderEmailInput } from "@/lib/balance-reminder-email";
 import { campCancellationPolicyUrl } from "@/lib/camp-cancellation-policy";
 import { mrsNotifyBcc } from "@/lib/reservation-notify";
 
@@ -1080,111 +1081,38 @@ Lost Dutchman's Mining Association`;
   }
 }
 
-export type BalanceReminderDays = 14 | 7 | 3;
-export type BalanceReminderKind = "before_arrival" | "billing_period";
+export {
+  BALANCE_REMINDER_DAYS_BEFORE,
+  BALANCE_REMINDER_STAGES,
+  type BalanceReminderKind,
+  type BalanceReminderStage,
+} from "@/lib/balance-reminder-email";
 
 /**
  * Remind guest/member to pay campsite balance before check-in or before a billing period.
  */
-export async function sendReservationBalanceReminderEmail(input: {
-  to: string;
-  campName: string;
-  guestOrMemberName: string;
-  checkInDate: string;
-  checkOutDate: string;
-  balanceDueCents: number;
-  daysBefore: BalanceReminderDays;
-  payBalanceUrl: string;
-  reminderKind?: BalanceReminderKind;
-  paymentDueDate?: string;
-}): Promise<boolean> {
-  const kind = input.reminderKind ?? "before_arrival";
+export async function sendReservationBalanceReminderEmail(
+  input: BalanceReminderEmailInput & { to: string }
+): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
   if (!apiKey) {
     if (process.env.NODE_ENV === "development") {
-      console.log(`[DEV] Balance reminder (${input.daysBefore}d, ${kind}) for ${input.to}`);
+      console.log(`[DEV] Balance reminder (${input.stage}, ${input.reminderKind ?? "before_arrival"}) for ${input.to}`);
       return true;
     }
     return false;
   }
 
   sgMail.setApiKey(apiKey);
-  const name = input.guestOrMemberName?.trim() || "there";
-  const balance = (input.balanceDueCents / 100).toFixed(2);
-  const dueDate = input.paymentDueDate ?? input.checkInDate;
-
-  const urgency =
-    kind === "billing_period"
-      ? input.daysBefore === 3
-        ? `Your next campsite payment is due in 3 days (${dueDate})`
-        : input.daysBefore === 7
-          ? `Your next campsite payment is due in one week (${dueDate})`
-          : `Upcoming campsite payment for ${input.campName}`
-      : input.daysBefore === 3
-        ? "Your check-in is in 3 days"
-        : input.daysBefore === 7
-          ? "Your check-in is in one week"
-          : "Your upcoming stay at LDMA";
-
-  const balanceLabel =
-    kind === "billing_period"
-      ? `Payment due by ${dueDate}`
-      : "Balance due before arrival";
-
-  const heading =
-    kind === "billing_period" ? "Campsite payment due" : "Balance due before arrival";
-
-  const subject =
-    kind === "billing_period"
-      ? `Campsite payment due — ${input.campName} (${dueDate})`
-      : `Balance due — ${input.campName} (${input.checkInDate})`;
-
-  const textContent = `${urgency} — ${input.campName}
-
-Hi ${name},
-
-You have a campsite reservation from ${input.checkInDate} to ${input.checkOutDate}.
-
-${balanceLabel}: $${balance}
-
-Pay online: ${input.payBalanceUrl}
-
-Questions? Contact Member Relations at info@lostdutchmans.com or (888) 465-3717.
-
-Lost Dutchman's Mining Association`;
-
-  const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#1a120b;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#1a120b;padding:32px 16px;">
-    <tr><td align="center">
-      <table role="presentation" width="100%" style="max-width:520px;background:#2a1f14;border-radius:8px;border:1px solid #d4af3740;">
-        <tr><td style="padding:28px 24px;text-align:center;border-bottom:1px solid #d4af3720;">
-          <h1 style="margin:0;font-size:20px;color:#f0d48f;">${escapeHtml(heading)}</h1>
-          <p style="margin:8px 0 0;font-size:14px;color:#e8e0d5b3;">${escapeHtml(input.campName)} · ${escapeHtml(kind === "billing_period" ? `due ${dueDate}` : `check-in ${input.checkInDate}`)}</p>
-        </td></tr>
-        <tr><td style="padding:28px 24px;color:#e8e0d5;font-size:16px;line-height:1.55;">
-          <p style="margin:0 0 16px;">Hi ${escapeHtml(name)},</p>
-          <p style="margin:0 0 16px;">${escapeHtml(urgency)}. Your reservation is <strong>${escapeHtml(input.checkInDate)}</strong> to <strong>${escapeHtml(input.checkOutDate)}</strong>.</p>
-          <p style="margin:0 0 20px;font-size:18px;color:#f0d48f;"><strong>${escapeHtml(balanceLabel)}: $${balance}</strong></p>
-          <p style="margin:0 0 20px;"><a href="${escapeHtml(input.payBalanceUrl)}" style="display:inline-block;padding:12px 20px;background:#d4af37;color:#1a120b;text-decoration:none;border-radius:6px;font-weight:600;">Pay online</a></p>
-          <p style="margin:0;font-size:14px;color:#e8e0d5b3;">Questions? <a href="mailto:info@lostdutchmans.com" style="color:#d4af37;">info@lostdutchmans.com</a> or (888) 465-3717.</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`.trim();
+  const { subject, text, html } = buildBalanceReminderEmail(input);
 
   try {
     await sgMail.send({
       to: input.to,
       from: { email: SENDER_EMAIL, name: SENDER_NAME },
       subject,
-      text: textContent,
-      html: htmlContent,
+      text,
+      html,
     });
     return true;
   } catch (e) {

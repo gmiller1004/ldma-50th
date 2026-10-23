@@ -1,6 +1,6 @@
 /**
- * Balance-due reminder emails at 14, 7, and 3 days before check-in (arrival-month balance)
- * and before each subsequent billing period on long member stays.
+ * Balance-due reminder emails 5 days before and on the due date (check-in for the arrival
+ * balance, or each later billing period's due date on long member stays), skipped once paid.
  */
 
 import { sql, hasDb } from "@/lib/db";
@@ -11,8 +11,10 @@ import { createReservationPayToken } from "@/lib/reservation-pay-token";
 import { reservationPayPageUrl } from "@/lib/reservation-notify";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import {
+  BALANCE_REMINDER_DAYS_BEFORE,
+  BALANCE_REMINDER_STAGES,
   sendReservationBalanceReminderEmail,
-  type BalanceReminderDays,
+  type BalanceReminderStage,
 } from "@/lib/sendgrid";
 import { formatSiteAssignmentLabel, type CampSiteRow } from "@/lib/public-camp-booking";
 import {
@@ -68,173 +70,129 @@ async function resolveRecipient(row: ReminderRow): Promise<{ email: string; name
   return { email: member.email.trim(), name };
 }
 
-async function fetchBeforeArrivalCandidates(daysBefore: BalanceReminderDays): Promise<ReminderRow[]> {
+async function fetchBeforeArrivalCandidates(stage: BalanceReminderStage): Promise<ReminderRow[]> {
   if (!hasDb() || !sql) return [];
   const today = new Date().toISOString().slice(0, 10);
-  const targetCheckIn = addDaysIso(today, daysBefore);
+  const targetCheckIn = addDaysIso(today, BALANCE_REMINDER_DAYS_BEFORE[stage]);
 
-  let rows: unknown;
-  if (daysBefore === 14) {
-    rows = await sql`
-      SELECT id, camp_slug, check_in_date, check_out_date, reservation_type,
-             member_number, member_display_name, guest_email, guest_first_name, guest_last_name
-      FROM camp_reservations
-      WHERE status NOT IN ('cancelled', 'completed')
-        AND check_in_date = ${targetCheckIn}::date
-        AND balance_reminder_14d_sent_at IS NULL
-      ORDER BY created_at ASC
-      LIMIT 100
-    `;
-  } else if (daysBefore === 7) {
-    rows = await sql`
-      SELECT id, camp_slug, check_in_date, check_out_date, reservation_type,
-             member_number, member_display_name, guest_email, guest_first_name, guest_last_name
-      FROM camp_reservations
-      WHERE status NOT IN ('cancelled', 'completed')
-        AND check_in_date = ${targetCheckIn}::date
-        AND balance_reminder_7d_sent_at IS NULL
-      ORDER BY created_at ASC
-      LIMIT 100
-    `;
-  } else {
-    rows = await sql`
-      SELECT id, camp_slug, check_in_date, check_out_date, reservation_type,
-             member_number, member_display_name, guest_email, guest_first_name, guest_last_name
-      FROM camp_reservations
-      WHERE status NOT IN ('cancelled', 'completed')
-        AND check_in_date = ${targetCheckIn}::date
-        AND balance_reminder_3d_sent_at IS NULL
-      ORDER BY created_at ASC
-      LIMIT 100
-    `;
-  }
+  const rows =
+    stage === "five_days"
+      ? await sql`
+          SELECT id, camp_slug, check_in_date, check_out_date, reservation_type,
+                 member_number, member_display_name, guest_email, guest_first_name, guest_last_name
+          FROM camp_reservations
+          WHERE status NOT IN ('cancelled', 'completed')
+            AND check_in_date = ${targetCheckIn}::date
+            AND balance_reminder_5d_sent_at IS NULL
+          ORDER BY created_at ASC
+          LIMIT 100
+        `
+      : await sql`
+          SELECT id, camp_slug, check_in_date, check_out_date, reservation_type,
+                 member_number, member_display_name, guest_email, guest_first_name, guest_last_name
+          FROM camp_reservations
+          WHERE status NOT IN ('cancelled', 'completed')
+            AND check_in_date = ${targetCheckIn}::date
+            AND balance_reminder_due_sent_at IS NULL
+          ORDER BY created_at ASC
+          LIMIT 100
+        `;
 
   return (Array.isArray(rows) ? rows : []) as ReminderRow[];
 }
 
 async function markBeforeArrivalReminderSent(
   reservationId: string,
-  daysBefore: BalanceReminderDays
+  stage: BalanceReminderStage
 ): Promise<void> {
   if (!sql) return;
-  if (daysBefore === 14) {
+  if (stage === "five_days") {
     await sql`
       UPDATE camp_reservations
-      SET balance_reminder_14d_sent_at = NOW(), updated_at = NOW()
-      WHERE id = ${reservationId} AND balance_reminder_14d_sent_at IS NULL
-    `;
-  } else if (daysBefore === 7) {
-    await sql`
-      UPDATE camp_reservations
-      SET balance_reminder_7d_sent_at = NOW(), updated_at = NOW()
-      WHERE id = ${reservationId} AND balance_reminder_7d_sent_at IS NULL
+      SET balance_reminder_5d_sent_at = NOW(), updated_at = NOW()
+      WHERE id = ${reservationId} AND balance_reminder_5d_sent_at IS NULL
     `;
   } else {
     await sql`
       UPDATE camp_reservations
-      SET balance_reminder_3d_sent_at = NOW(), updated_at = NOW()
-      WHERE id = ${reservationId} AND balance_reminder_3d_sent_at IS NULL
+      SET balance_reminder_due_sent_at = NOW(), updated_at = NOW()
+      WHERE id = ${reservationId} AND balance_reminder_due_sent_at IS NULL
     `;
   }
 }
 
 async function fetchBillingPeriodCandidates(
-  daysBefore: BalanceReminderDays
+  stage: BalanceReminderStage
 ): Promise<BillingPeriodReminderRow[]> {
   if (!hasDb() || !sql) return [];
   const today = new Date().toISOString().slice(0, 10);
-  const targetDueDate = addDaysIso(today, daysBefore);
+  const targetDueDate = addDaysIso(today, BALANCE_REMINDER_DAYS_BEFORE[stage]);
 
-  let rows: unknown;
-  if (daysBefore === 14) {
-    rows = await sql`
-      SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.reservation_type,
-             r.member_number, r.member_display_name, r.guest_email, r.guest_first_name, r.guest_last_name,
-             bp.id AS period_id, bp.period_index, bp.due_date,
-             bp.amount_due_cents, bp.amount_paid_cents
-      FROM camp_billing_periods bp
-      JOIN camp_reservations r ON r.id = bp.reservation_id
-      WHERE r.status NOT IN ('cancelled', 'completed')
-        AND bp.period_index >= 1
-        AND bp.status IN ('unpaid', 'partial')
-        AND bp.due_date = ${targetDueDate}::date
-        AND bp.amount_due_cents > bp.amount_paid_cents
-        AND bp.balance_reminder_14d_sent_at IS NULL
-      ORDER BY bp.due_date ASC
-      LIMIT 100
-    `;
-  } else if (daysBefore === 7) {
-    rows = await sql`
-      SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.reservation_type,
-             r.member_number, r.member_display_name, r.guest_email, r.guest_first_name, r.guest_last_name,
-             bp.id AS period_id, bp.period_index, bp.due_date,
-             bp.amount_due_cents, bp.amount_paid_cents
-      FROM camp_billing_periods bp
-      JOIN camp_reservations r ON r.id = bp.reservation_id
-      WHERE r.status NOT IN ('cancelled', 'completed')
-        AND bp.period_index >= 1
-        AND bp.status IN ('unpaid', 'partial')
-        AND bp.due_date = ${targetDueDate}::date
-        AND bp.amount_due_cents > bp.amount_paid_cents
-        AND bp.balance_reminder_7d_sent_at IS NULL
-      ORDER BY bp.due_date ASC
-      LIMIT 100
-    `;
-  } else {
-    rows = await sql`
-      SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.reservation_type,
-             r.member_number, r.member_display_name, r.guest_email, r.guest_first_name, r.guest_last_name,
-             bp.id AS period_id, bp.period_index, bp.due_date,
-             bp.amount_due_cents, bp.amount_paid_cents
-      FROM camp_billing_periods bp
-      JOIN camp_reservations r ON r.id = bp.reservation_id
-      WHERE r.status NOT IN ('cancelled', 'completed')
-        AND bp.period_index >= 1
-        AND bp.status IN ('unpaid', 'partial')
-        AND bp.due_date = ${targetDueDate}::date
-        AND bp.amount_due_cents > bp.amount_paid_cents
-        AND bp.balance_reminder_3d_sent_at IS NULL
-      ORDER BY bp.due_date ASC
-      LIMIT 100
-    `;
-  }
+  const rows =
+    stage === "five_days"
+      ? await sql`
+          SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.reservation_type,
+                 r.member_number, r.member_display_name, r.guest_email, r.guest_first_name, r.guest_last_name,
+                 bp.id AS period_id, bp.period_index, bp.due_date,
+                 bp.amount_due_cents, bp.amount_paid_cents
+          FROM camp_billing_periods bp
+          JOIN camp_reservations r ON r.id = bp.reservation_id
+          WHERE r.status NOT IN ('cancelled', 'completed')
+            AND bp.period_index >= 1
+            AND bp.status IN ('unpaid', 'partial')
+            AND bp.due_date = ${targetDueDate}::date
+            AND bp.amount_due_cents > bp.amount_paid_cents
+            AND bp.balance_reminder_5d_sent_at IS NULL
+          ORDER BY bp.due_date ASC
+          LIMIT 100
+        `
+      : await sql`
+          SELECT r.id, r.camp_slug, r.check_in_date, r.check_out_date, r.reservation_type,
+                 r.member_number, r.member_display_name, r.guest_email, r.guest_first_name, r.guest_last_name,
+                 bp.id AS period_id, bp.period_index, bp.due_date,
+                 bp.amount_due_cents, bp.amount_paid_cents
+          FROM camp_billing_periods bp
+          JOIN camp_reservations r ON r.id = bp.reservation_id
+          WHERE r.status NOT IN ('cancelled', 'completed')
+            AND bp.period_index >= 1
+            AND bp.status IN ('unpaid', 'partial')
+            AND bp.due_date = ${targetDueDate}::date
+            AND bp.amount_due_cents > bp.amount_paid_cents
+            AND bp.balance_reminder_due_sent_at IS NULL
+          ORDER BY bp.due_date ASC
+          LIMIT 100
+        `;
 
   return (Array.isArray(rows) ? rows : []) as BillingPeriodReminderRow[];
 }
 
 async function markBillingPeriodReminderSent(
   periodId: string,
-  daysBefore: BalanceReminderDays
+  stage: BalanceReminderStage
 ): Promise<void> {
   if (!sql) return;
-  if (daysBefore === 14) {
+  if (stage === "five_days") {
     await sql`
       UPDATE camp_billing_periods
-      SET balance_reminder_14d_sent_at = NOW(), updated_at = NOW()
-      WHERE id = ${periodId} AND balance_reminder_14d_sent_at IS NULL
-    `;
-  } else if (daysBefore === 7) {
-    await sql`
-      UPDATE camp_billing_periods
-      SET balance_reminder_7d_sent_at = NOW(), updated_at = NOW()
-      WHERE id = ${periodId} AND balance_reminder_7d_sent_at IS NULL
+      SET balance_reminder_5d_sent_at = NOW(), updated_at = NOW()
+      WHERE id = ${periodId} AND balance_reminder_5d_sent_at IS NULL
     `;
   } else {
     await sql`
       UPDATE camp_billing_periods
-      SET balance_reminder_3d_sent_at = NOW(), updated_at = NOW()
-      WHERE id = ${periodId} AND balance_reminder_3d_sent_at IS NULL
+      SET balance_reminder_due_sent_at = NOW(), updated_at = NOW()
+      WHERE id = ${periodId} AND balance_reminder_due_sent_at IS NULL
     `;
   }
 }
 
-export async function sendBalanceRemindersForDay(
-  daysBefore: BalanceReminderDays
+export async function sendBalanceRemindersForStage(
+  stage: BalanceReminderStage
 ): Promise<{ sent: number; skipped: number }> {
   let sent = 0;
   let skipped = 0;
 
-  const candidates = await fetchBeforeArrivalCandidates(daysBefore);
+  const candidates = await fetchBeforeArrivalCandidates(stage);
   for (const row of candidates) {
     const periods = await listBillingPeriods(row.id);
     const checkIn = toDateOnlyStr(row.check_in_date);
@@ -267,20 +225,20 @@ export async function sendBalanceRemindersForDay(
       checkInDate: checkIn,
       checkOutDate: checkOut,
       balanceDueCents: beforeArrivalCents,
-      daysBefore,
+      stage,
       payBalanceUrl,
       reminderKind: "before_arrival",
     });
 
     if (ok) {
-      await markBeforeArrivalReminderSent(row.id, daysBefore);
+      await markBeforeArrivalReminderSent(row.id, stage);
       sent++;
     } else {
       skipped++;
     }
   }
 
-  const periodCandidates = await fetchBillingPeriodCandidates(daysBefore);
+  const periodCandidates = await fetchBillingPeriodCandidates(stage);
   for (const row of periodCandidates) {
     const periodBalance = Math.max(0, row.amount_due_cents - row.amount_paid_cents);
     if (periodBalance < 1) {
@@ -306,14 +264,14 @@ export async function sendBalanceRemindersForDay(
       checkInDate: toDateOnlyStr(row.check_in_date),
       checkOutDate: toDateOnlyStr(row.check_out_date),
       balanceDueCents: periodBalance,
-      daysBefore,
+      stage,
       payBalanceUrl,
       reminderKind: "billing_period",
       paymentDueDate: dueDate,
     });
 
     if (ok) {
-      await markBillingPeriodReminderSent(row.period_id, daysBefore);
+      await markBillingPeriodReminderSent(row.period_id, stage);
       sent++;
     } else {
       skipped++;
@@ -324,11 +282,11 @@ export async function sendBalanceRemindersForDay(
 }
 
 export async function sendAllBalanceReminders(): Promise<
-  Record<BalanceReminderDays, { sent: number; skipped: number }>
+  Record<BalanceReminderStage, { sent: number; skipped: number }>
 > {
-  const results = {} as Record<BalanceReminderDays, { sent: number; skipped: number }>;
-  for (const days of [14, 7, 3] as const) {
-    results[days] = await sendBalanceRemindersForDay(days);
+  const results = {} as Record<BalanceReminderStage, { sent: number; skipped: number }>;
+  for (const stage of BALANCE_REMINDER_STAGES) {
+    results[stage] = await sendBalanceRemindersForStage(stage);
   }
   return results;
 }

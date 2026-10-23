@@ -5,7 +5,7 @@ import { sendAllBalanceReminders } from "@/lib/reservation-balance-reminders";
 
 /**
  * GET /api/cron/camp-payment-due
- * Daily: log AR summary and send 14/7/3-day balance reminder emails.
+ * Daily: log AR summary and send balance reminder emails (5 days before and on the due date).
  */
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
