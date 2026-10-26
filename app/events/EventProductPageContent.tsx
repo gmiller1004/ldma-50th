@@ -18,6 +18,7 @@ import {
   getEventDates,
   getEventType,
   getEventTypeLabel,
+  isPastEvent,
 } from "@/lib/event-display";
 import { parseEventDescriptionHtml } from "@/lib/event-description";
 import { EventCampHighlight } from "@/components/EventCampHighlight";
@@ -50,6 +51,7 @@ export function EventProductPageContent({
   const cardTitle = getCardTitle(event.title);
   const parsed = useMemo(() => parseEventDescriptionHtml(event.descriptionHtml), [event.descriptionHtml]);
   const pagePath = `/events/${event.handle}`;
+  const hasEnded = isPastEvent(event);
 
   const galleryImages = useMemo(() => {
     const primary = event.featuredImage;
@@ -178,13 +180,17 @@ export function EventProductPageContent({
 
             {/* Mobile purchase — above fold on small screens */}
             <div className="lg:hidden mb-10">
-              <EventPurchaseSection
-                event={filteredEvent}
-                isMemberLoggedIn={isMemberLoggedIn}
-                selectedVariantId={selectedVariantId}
-                onSelectVariant={setSelectedVariantId}
-                loginRedirectPath={pagePath}
-              />
+              {hasEnded ? (
+                <EventEndedNotice dates={dates.formatted} />
+              ) : (
+                <EventPurchaseSection
+                  event={filteredEvent}
+                  isMemberLoggedIn={isMemberLoggedIn}
+                  selectedVariantId={selectedVariantId}
+                  onSelectVariant={setSelectedVariantId}
+                  loginRedirectPath={pagePath}
+                />
+              )}
             </div>
 
             {parsed.sections.length > 0 ? (
@@ -250,13 +256,17 @@ export function EventProductPageContent({
 
           {/* Sticky sidebar */}
           <aside className="hidden lg:block lg:sticky lg:top-28 space-y-6">
-            <EventPurchaseSection
-              event={filteredEvent}
-              isMemberLoggedIn={isMemberLoggedIn}
-              selectedVariantId={selectedVariantId}
-              onSelectVariant={setSelectedVariantId}
-              loginRedirectPath={pagePath}
-            />
+            {hasEnded ? (
+              <EventEndedNotice dates={dates.formatted} />
+            ) : (
+              <EventPurchaseSection
+                event={filteredEvent}
+                isMemberLoggedIn={isMemberLoggedIn}
+                selectedVariantId={selectedVariantId}
+                onSelectVariant={setSelectedVariantId}
+                loginRedirectPath={pagePath}
+              />
+            )}
 
             {sidebarHighlights.length > 0 && (
               <div className="rounded-xl border border-[#d4af37]/15 bg-[#0f0a06]/50 p-5">
@@ -274,6 +284,26 @@ export function EventProductPageContent({
           </aside>
         </div>
       </div>
+    </div>
+  );
+}
+
+function EventEndedNotice({ dates }: { dates: string | null | undefined }) {
+  return (
+    <div className="rounded-xl border border-[#d4af37]/25 bg-[#0f0a06]/60 p-6">
+      <p className="text-[#d4af37] text-xs font-semibold tracking-[0.2em] uppercase mb-2">Registration closed</p>
+      <h2 className="font-serif text-2xl font-semibold text-[#f0d48f] mb-2">This event has ended</h2>
+      <p className="text-[#e8e0d5]/80 text-sm leading-relaxed mb-5">
+        {dates ? `It took place ${dates}. ` : ""}Thanks to everyone who came out. Find your next hands-on gold
+        prospecting event on our calendar.
+      </p>
+      <Link
+        href="/events"
+        className="inline-flex w-full items-center justify-center gap-2 px-5 py-3 rounded-lg bg-[#d4af37] text-[#1a120b] font-semibold hover:bg-[#f0d48f] transition-colors"
+      >
+        See upcoming events
+        <ChevronRight className="w-4 h-4" />
+      </Link>
     </div>
   );
 }
