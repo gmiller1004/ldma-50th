@@ -73,6 +73,11 @@ export function balanceDueBeforeArrivalCents(
     .reduce((sum, p) => sum + Math.max(0, p.amountDueCents - p.amountPaidCents), 0);
 }
 
+/** Periods due on or before arrival are part of the before-arrival balance and its reminder. */
+export function isCoveredByArrivalReminder(periodDueDate: string, checkInDate: string): boolean {
+  return periodDueDate.slice(0, 10) <= checkInDate.slice(0, 10);
+}
+
 export function daysBetweenIso(from: string, to: string): number {
   const a = new Date(`${from.slice(0, 10)}T12:00:00`).getTime();
   const b = new Date(`${to.slice(0, 10)}T12:00:00`).getTime();

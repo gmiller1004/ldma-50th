@@ -116,6 +116,7 @@ type Reservation = {
   cancellationFeeWaived?: boolean;
   cancellationFeeWaivedCents?: number | null;
   cancellationFeeWaivedAt?: string | null;
+  importedPaidCents?: number;
   invoiceNumber?: string | null;
   calculatedTotalCents?: number | null;
   amountOverrideCents?: number | null;
@@ -3102,6 +3103,7 @@ export function CaretakerPortalContent({
                         status: detailsReservation.status,
                         billingPeriods: detailsBillingPeriods,
                         payments: detailsPayments,
+                        importedPaidCents: detailsReservation.importedPaidCents ?? 0,
                         totalDueCents: detailsSiteBalance.totalDueCents,
                         totalPaidCents: detailsSiteBalance.totalPaidCents,
                         balanceDueCents: detailsSiteBalance.balanceDueCents,

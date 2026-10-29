@@ -19,10 +19,39 @@ export type PrintableReceiptInput = {
     status: string;
   }>;
   payments: Array<{ method: string; amountCents: number; paymentType: string; createdAt: string }>;
+  /** Paid through ResNexus before the switch; counted in totalPaidCents but has no payment row. */
+  importedPaidCents?: number | null;
   totalDueCents: number;
   totalPaidCents: number;
   balanceDueCents: number;
 };
+
+export type ReceiptPaymentLine = { date: string; label: string; amountCents: number; isRefund: boolean };
+
+/** Payment rows plus credit lines so the Payments section always adds up to Total paid. */
+export function receiptPaymentLines(r: PrintableReceiptInput): ReceiptPaymentLine[] {
+  const lines: ReceiptPaymentLine[] = r.payments.map((p) => {
+    const isRefund = p.paymentType === "refund";
+    const method = p.method === "card" ? "Card" : p.method === "check" ? "Check" : "Cash";
+    return {
+      date: p.createdAt.slice(0, 10),
+      label: `${method}${isRefund ? " refund" : ""}`,
+      amountCents: p.amountCents,
+      isRefund,
+    };
+  });
+
+  const listedNet = lines.reduce((s, l) => s + (l.isRefund ? -l.amountCents : l.amountCents), 0);
+  const imported = Math.max(0, Math.min(r.importedPaidCents ?? 0, r.totalPaidCents - listedNet));
+  if (imported > 0) {
+    lines.unshift({ date: "Prior season", label: "Paid through ResNexus", amountCents: imported, isRefund: false });
+  }
+  const other = r.totalPaidCents - listedNet - imported;
+  if (other > 0) {
+    lines.unshift({ date: "—", label: "Credit applied", amountCents: other, isRefund: false });
+  }
+  return lines;
+}
 
 function esc(value: string): string {
   return value
@@ -68,16 +97,15 @@ export function buildReceiptHtml(r: PrintableReceiptInput, printedOn: string): s
       </table>`
     : "";
 
-  const payments = r.payments.length
+  const paymentLines = receiptPaymentLines(r);
+  const payments = paymentLines.length
     ? `<h2>Payments</h2>
       <table class="grid">
         <thead><tr><th>Date</th><th>Method</th><th class="num">Amount</th></tr></thead>
-        <tbody>${r.payments
-          .map((p) => {
-            const isRefund = p.paymentType === "refund";
-            const amount = `${isRefund ? "−" : ""}${formatCentsAsCurrency(p.amountCents)}`;
-            const method = `${p.method === "card" ? "Card" : p.method === "check" ? "Check" : "Cash"}${isRefund ? " refund" : ""}`;
-            return `<tr><td>${esc(p.createdAt.slice(0, 10))}</td><td>${method}</td><td class="num">${amount}</td></tr>`;
+        <tbody>${paymentLines
+          .map((l) => {
+            const amount = `${l.isRefund ? "−" : ""}${formatCentsAsCurrency(l.amountCents)}`;
+            return `<tr><td>${esc(l.date)}</td><td>${esc(l.label)}</td><td class="num">${amount}</td></tr>`;
           })
           .join("")}</tbody>
       </table>`

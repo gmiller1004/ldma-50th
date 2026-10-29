@@ -20,6 +20,7 @@ import { formatSiteAssignmentLabel, type CampSiteRow } from "@/lib/public-camp-b
 import {
   balanceDueBeforeArrivalCents,
   daysBetweenIso,
+  isCoveredByArrivalReminder,
   isLongTermMemberStay,
   summarizeReservationPaymentObligations,
 } from "@/lib/reservation-balance-due";
@@ -240,6 +241,10 @@ export async function sendBalanceRemindersForStage(
 
   const periodCandidates = await fetchBillingPeriodCandidates(stage);
   for (const row of periodCandidates) {
+    if (isCoveredByArrivalReminder(toDateOnlyStr(row.due_date), toDateOnlyStr(row.check_in_date))) {
+      skipped++;
+      continue;
+    }
     const periodBalance = Math.max(0, row.amount_due_cents - row.amount_paid_cents);
     if (periodBalance < 1) {
       skipped++;

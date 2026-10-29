@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   balanceDueBeforeArrivalCents,
+  isCoveredByArrivalReminder,
   payableBalanceCents,
   previewSiteMovePaymentObligations,
   previewStayPaymentObligations,
@@ -200,5 +201,20 @@ describe("calendar_month late arrival", () => {
 
     assert.equal(preview.payableNowCents, 5 * 1900 + 51_000);
     assert.equal(preview.nextScheduledPayment?.dueDate, "2026-12-01");
+  });
+});
+
+describe("isCoveredByArrivalReminder", () => {
+  it("covers a monthly period due on the arrival date (late-month calendar arrival)", () => {
+    const periods = [
+      period({ periodIndex: 0, dueDate: "2026-10-28", amountDueCents: 7600, amountPaidCents: 7600, status: "paid" }),
+      period({ periodIndex: 1, dueDate: "2026-10-28", amountDueCents: 51000, amountPaidCents: 7600, status: "partial" }),
+    ];
+    assert.equal(balanceDueBeforeArrivalCents(periods, true), 43400);
+    assert.equal(isCoveredByArrivalReminder("2026-10-28", "2026-10-28"), true);
+  });
+
+  it("leaves later monthly periods to their own reminders", () => {
+    assert.equal(isCoveredByArrivalReminder("2026-12-01", "2026-10-28"), false);
   });
 });
