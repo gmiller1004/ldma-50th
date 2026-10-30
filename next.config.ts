@@ -37,11 +37,18 @@ const nextConfig: NextConfig = {
     // Load blog redirects from .js so compiled config can resolve it (Node does not load .ts)
     const { BLOG_REDIRECTS } = require("./lib/blog-redirects.generated.js");
     const all = [...BLOG_REDIRECTS, ...LEGACY_REDIRECTS];
-    return all.map(({ source, destination }) => ({
-      source,
-      destination,
-      permanent: true,
-    }));
+    return [
+      ...all.map(({ source, destination }) => ({
+        source,
+        destination,
+        permanent: true,
+      })),
+      {
+        source: "/products/complete-family-legacy-add-on-special-offer",
+        destination: "/members/family-legacy-offer",
+        permanent: false,
+      },
+    ];
   },
   images: {
     remotePatterns: [

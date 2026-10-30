@@ -12,6 +12,8 @@ import {
 } from "@/lib/reservation-billing";
 import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { campTodayStr } from "@/lib/camp-time";
+import { FAMILY_LEGACY_PAYMENT_TYPE } from "@/lib/family-legacy-offer";
+import { fulfillFamilyLegacyCheckout } from "@/lib/family-legacy-orders";
 import { campDefaultBillingMode, reservationBillingMode } from "@/lib/camp-billing-mode";
 import { withReservationInvoice } from "@/lib/reservation-create-metadata";
 import {
@@ -67,6 +69,20 @@ export async function POST(request: NextRequest) {
   }
 
   const metadata = session.metadata as Record<string, string> | null;
+
+  if (metadata?.payment_type === FAMILY_LEGACY_PAYMENT_TYPE) {
+    const result = await fulfillFamilyLegacyCheckout(session);
+    if (!result.found) {
+      console.error("[webhook] Family Legacy order not found:", result.errors.join(" | "));
+      return NextResponse.json({ error: "Order not found" }, { status: 400 });
+    }
+    // Retry (non-2xx) only when Member Services got neither the Salesforce task nor the email.
+    if (!result.notified) {
+      return NextResponse.json({ error: "Member Services not notified", details: result.errors }, { status: 500 });
+    }
+    return NextResponse.json({ received: true, warnings: result.errors });
+  }
+
   const isSelfService = metadata?.self_service === "true";
   if (
     !metadata?.payment_type ||

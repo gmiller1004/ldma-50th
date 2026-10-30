@@ -630,6 +630,157 @@ Lost Dutchman's Mining Association`;
   }
 }
 
+function familyLegacyEmailShell(heading: string, bodyHtml: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#1a120b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#1a120b;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" style="max-width:560px;background:#2a1f14;border-radius:8px;border:1px solid #d4af3740;">
+        <tr><td style="padding:28px 24px;text-align:center;border-bottom:1px solid #d4af3720;">
+          <h1 style="margin:0;font-size:20px;color:#f0d48f;">${escapeHtml(heading)}</h1>
+        </td></tr>
+        <tr><td style="padding:28px 24px;color:#e8e0d5;font-size:15px;line-height:1.55;">${bodyHtml}</td></tr>
+        <tr><td style="padding:14px 24px;background:#1a120b;border-top:1px solid #d4af3720;">
+          <p style="margin:0;font-size:12px;color:#e8e0d560;">Lost Dutchman's Mining Association</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+/** Tells the member's Salesforce contact owner a Family Legacy order was paid and the addendum is needed. */
+export async function sendFamilyLegacyOwnerNotificationEmail(input: {
+  to: string;
+  ownerName: string;
+  memberName: string;
+  memberNumber: string | null;
+  memberEmail: string | null;
+  description: string;
+  salesforceUrl: string | null;
+  taskCreated: boolean;
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV] Family Legacy owner notice to ${input.to}:\n${input.description}`);
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping Family Legacy owner notice");
+    return false;
+  }
+  sgMail.setApiKey(apiKey);
+
+  const greeting = input.ownerName ? `Hi ${input.ownerName.split(" ")[0]},` : "Hi,";
+  const taskLine = input.taskCreated
+    ? "A Salesforce task has been added to your list on this member's contact record."
+    : "The website could not create a Salesforce task for this order, so please track it from this email.";
+  const memberLine = `${input.memberName}${input.memberNumber ? ` (#${input.memberNumber})` : ""}${
+    input.memberEmail ? ` · ${input.memberEmail}` : ""
+  }`;
+
+  const text = `${greeting}
+
+${memberLine} paid for the Complete Family Legacy add-on online. ${taskLine}
+
+${input.description}
+${input.salesforceUrl ? `\nOpen in Salesforce: ${input.salesforceUrl}\n` : ""}
+Lost Dutchman's Mining Association website`;
+
+  const html = familyLegacyEmailShell(
+    "Family Legacy add-on paid: addendum needed",
+    `<p style="margin:0 0 16px;">${escapeHtml(greeting)}</p>
+     <p style="margin:0 0 16px;"><strong>${escapeHtml(memberLine)}</strong> paid for the Complete Family Legacy add-on online. ${escapeHtml(taskLine)}</p>
+     <pre style="margin:0 0 20px;padding:14px 16px;background:#1a120b;border:1px solid #d4af3725;border-radius:6px;white-space:pre-wrap;font-family:inherit;font-size:14px;color:#e8e0d5;">${escapeHtml(input.description)}</pre>
+     ${
+       input.salesforceUrl
+         ? `<p style="margin:0;"><a href="${escapeHtml(input.salesforceUrl)}" style="display:inline-block;padding:12px 20px;background:#d4af37;color:#1a120b;text-decoration:none;border-radius:6px;font-weight:600;">Open contact in Salesforce</a></p>`
+         : ""
+     }`
+  );
+
+  try {
+    await sgMail.send({
+      to: input.to,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `Family Legacy add-on paid — send addendum to ${input.memberName}`,
+      text,
+      html,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid Family Legacy owner notice error:", e);
+    return false;
+  }
+}
+
+/** Member confirmation after paying for the Family Legacy add-on online. */
+export async function sendFamilyLegacyMemberConfirmationEmail(input: {
+  to: string;
+  memberName: string;
+  amountCents: number;
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV] Family Legacy confirmation to ${input.to}`);
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping Family Legacy confirmation");
+    return false;
+  }
+  sgMail.setApiKey(apiKey);
+
+  const firstName = input.memberName.split(" ")[0] || "there";
+  const amount = `$${(input.amountCents / 100).toFixed(2)}`;
+  const addOns = "Transferability, Companion, and Pre-Paid Transfer Fee";
+
+  const text = `Thank you, ${firstName}.
+
+We received your ${amount} payment for the Complete Family Legacy add-on (${addOns}).
+
+What happens next:
+1. Member Services will email you the Family Legacy addendum through Adobe Sign.
+2. Once you sign it, your add-ons are applied to your membership.
+
+If you haven't chosen a companion or heir yet, that's fine. Member Services will help you with that when they send the addendum.
+
+Questions? Call (888) 465-3717.
+
+Lost Dutchman's Mining Association`;
+
+  const html = familyLegacyEmailShell(
+    "Your Family Legacy add-on is paid",
+    `<p style="margin:0 0 16px;">Thank you, ${escapeHtml(firstName)}.</p>
+     <p style="margin:0 0 16px;">We received your <strong>${escapeHtml(amount)}</strong> payment for the Complete Family Legacy add-on (${escapeHtml(addOns)}).</p>
+     <p style="margin:0 0 8px;"><strong style="color:#f0d48f;">What happens next</strong></p>
+     <ol style="margin:0 0 16px;padding-left:20px;">
+       <li style="margin-bottom:6px;">Member Services will email you the Family Legacy addendum through Adobe Sign.</li>
+       <li>Once you sign it, your add-ons are applied to your membership.</li>
+     </ol>
+     <p style="margin:0 0 16px;">If you haven't chosen a companion or heir yet, that's fine. Member Services will help you with that when they send the addendum.</p>
+     <p style="margin:0;font-size:14px;color:#e8e0d5b3;">Questions? Call (888) 465-3717.</p>`
+  );
+
+  try {
+    await sgMail.send({
+      to: input.to,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: "Your Family Legacy add-on purchase — next steps",
+      text,
+      html,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid Family Legacy confirmation error:", e);
+    return false;
+  }
+}
+
 const RECEIPT_CC_EMAIL = "gricci@goldprospectors.org";
 
 export type PaymentReceiptLineItem = {

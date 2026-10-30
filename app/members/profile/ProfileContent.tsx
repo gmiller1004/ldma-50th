@@ -6,6 +6,7 @@ import { Pickaxe, Camera, Loader2, Bell, Users, HelpCircle, X, Plus, Info, Shopp
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { getCompanionAddOnProduct } from "@/app/actions/membership";
 import { deriveLegacyOfferType, getLegacyOfferConfig, getLegacyOfferProductHandle } from "@/lib/legacy-offer";
+import { isLegacyPaidPendingAddendum } from "@/lib/family-legacy-offer";
 import type { MembershipProductInfo } from "@/app/actions/membership";
 
 function LegacyOfferModal({ onClose }: { onClose: () => void }) {
@@ -364,6 +365,7 @@ export function ProfileContent() {
   const legacyOfferReviewed =
     typeof profile.legacyOfferStatus === "string" &&
     profile.legacyOfferStatus.toLowerCase().includes("reviewed");
+  const legacyOfferPaidPending = isLegacyPaidPendingAddendum(profile.legacyOfferStatus);
   const legacyOfferType = legacyOfferReviewed
     ? deriveLegacyOfferType(
         profile.legacyOfferIsTransferable ?? false,
@@ -420,9 +422,18 @@ export function ProfileContent() {
         <div className="p-6">
           <h3 className="font-serif text-lg font-semibold text-[#f0d48f] flex items-center gap-2 mb-2">
             <Sparkles className="w-5 h-5 text-[#d4af37]" />
-            {legacyOfferConfig ? legacyOfferConfig.headline : "Build Your Family Legacy"}
+            {legacyOfferPaidPending
+              ? "Your Family Legacy add-on is purchased"
+              : legacyOfferConfig
+                ? legacyOfferConfig.headline
+                : "Build Your Family Legacy"}
           </h3>
-          {legacyOfferConfig ? (
+          {legacyOfferPaidPending ? (
+            <p className="text-[#e8e0d5]/90 text-sm">
+              Member Services will email you the Family Legacy addendum through Adobe Sign. Once you sign it, your
+              add-ons are applied to your membership. Questions? Call (888) 465-3717.
+            </p>
+          ) : legacyOfferConfig ? (
             <>
               <p className="text-[#e8e0d5]/90 text-sm mb-3">{legacyOfferConfig.body}</p>
               <p className="text-[#d4af37] font-bold text-lg mb-4">
