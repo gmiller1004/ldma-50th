@@ -6,7 +6,7 @@ import { Pickaxe, Camera, Loader2, Bell, Users, HelpCircle, X, Plus, Info, Shopp
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { getCompanionAddOnProduct } from "@/app/actions/membership";
 import { deriveLegacyOfferType, getLegacyOfferConfig, getLegacyOfferProductHandle } from "@/lib/legacy-offer";
-import { isLegacyPaidPendingAddendum } from "@/lib/family-legacy-offer";
+import { FAMILY_LEGACY_OFFER_PATH, isLegacyPaidPendingAddendum } from "@/lib/family-legacy-offer";
 import type { MembershipProductInfo } from "@/app/actions/membership";
 
 function LegacyOfferModal({ onClose }: { onClose: () => void }) {
@@ -88,6 +88,9 @@ const SHOW_PURCHASE_HISTORY_TAB = false;
 
 /** Hidden for now. Set to true to show the Add Companion & Transferability card. */
 const SHOW_COMPANION_ADD_ON_CARD = false;
+
+/** Hidden while the $600 Family Legacy offer runs. Set to true to bring back "Request My Personalized Offer". */
+const SHOW_LEGACY_OFFER_REQUEST = false;
 
 type Profile = {
   authenticated: boolean;
@@ -468,14 +471,13 @@ export function ProfileContent() {
                 We can also prepay the transfer fee so your heir receives the membership without paying it. You cover it now; they get the benefit later.
               </p>
               <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => setLegacyModalOpen(true)}
+                <a
+                  href={FAMILY_LEGACY_OFFER_PATH}
                   className="px-4 py-2 text-sm font-medium text-[#d4af37] border border-[#d4af37]/40 rounded-lg hover:bg-[#d4af37]/10 transition-colors"
                 >
                   More Info
-                </button>
-                {legacyOfferRequested ? (
+                </a>
+                {!SHOW_LEGACY_OFFER_REQUEST ? null : legacyOfferRequested ? (
                   <p className="px-4 py-2 text-sm text-[#e8e0d5]/80">
                     We&apos;ve received your request. You&apos;ll hear from us typically within 72 hours.
                   </p>
