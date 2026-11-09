@@ -14,6 +14,8 @@ import { toDateOnlyStr } from "@/lib/reservation-dates";
 import { campTodayStr } from "@/lib/camp-time";
 import { FAMILY_LEGACY_PAYMENT_TYPE } from "@/lib/family-legacy-offer";
 import { fulfillFamilyLegacyCheckout } from "@/lib/family-legacy-orders";
+import { MEMBER_DUES_PAYMENT_TYPE } from "@/lib/member-dues";
+import { fulfillMemberDuesCheckout } from "@/lib/member-dues-payments";
 import { campDefaultBillingMode, reservationBillingMode } from "@/lib/camp-billing-mode";
 import { withReservationInvoice } from "@/lib/reservation-create-metadata";
 import {
@@ -78,6 +80,18 @@ export async function POST(request: NextRequest) {
     }
     // Retry (non-2xx) only when Member Services got neither the Salesforce task nor the email.
     if (!result.notified) {
+      return NextResponse.json({ error: "Member Services not notified", details: result.errors }, { status: 500 });
+    }
+    return NextResponse.json({ received: true, warnings: result.errors });
+  }
+
+  if (metadata?.payment_type === MEMBER_DUES_PAYMENT_TYPE) {
+    const result = await fulfillMemberDuesCheckout(session);
+    if (!result.found) {
+      console.error("[webhook] Dues payment not found:", result.errors.join(" | "));
+      return NextResponse.json({ error: "Dues payment not found" }, { status: 400 });
+    }
+    if (!result.staffNotified) {
       return NextResponse.json({ error: "Member Services not notified", details: result.errors }, { status: 500 });
     }
     return NextResponse.json({ received: true, warnings: result.errors });

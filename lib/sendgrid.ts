@@ -781,6 +781,143 @@ Lost Dutchman's Mining Association`;
   }
 }
 
+/** Asks Member Services (Gen and Nannette) to apply an online dues payment in Salesforce. */
+export async function sendMemberDuesStaffNotificationEmail(input: {
+  to: string[];
+  memberName: string;
+  memberNumber: string | null;
+  totalLabel: string;
+  notice: string;
+  onAutoPay: boolean;
+  salesforceUrl: string | null;
+  stripeUrl: string | null;
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV] Dues payment notice to ${input.to.join(", ")}:\n${input.notice}`);
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping dues payment notice");
+    return false;
+  }
+  sgMail.setApiKey(apiKey);
+
+  const who = `${input.memberName}${input.memberNumber ? ` (#${input.memberNumber})` : ""}`;
+  const intro = `${who} paid ${input.totalLabel} toward their dues on the member website. Please apply it in Salesforce.`;
+  const links = [
+    input.salesforceUrl ? `Salesforce contact: ${input.salesforceUrl}` : null,
+    input.stripeUrl ? `Stripe payment: ${input.stripeUrl}` : null,
+  ].filter(Boolean);
+
+  const text = `${intro}
+
+${input.notice}
+${links.length ? `\n${links.join("\n")}\n` : ""}
+Lost Dutchman's Mining Association website`;
+
+  const button = (href: string, label: string, primary: boolean) =>
+    `<a href="${escapeHtml(href)}" style="display:inline-block;margin:0 8px 8px 0;padding:12px 20px;${
+      primary ? "background:#d4af37;color:#1a120b;" : "border:1px solid #d4af37;color:#f0d48f;"
+    }text-decoration:none;border-radius:6px;font-weight:600;">${label}</a>`;
+
+  const html = familyLegacyEmailShell(
+    "Online dues payment: apply in Salesforce",
+    `<p style="margin:0 0 16px;"><strong>${escapeHtml(intro)}</strong></p>
+     <pre style="margin:0 0 20px;padding:14px 16px;background:#1a120b;border:1px solid #d4af3725;border-radius:6px;white-space:pre-wrap;font-family:inherit;font-size:14px;color:#e8e0d5;">${escapeHtml(input.notice)}</pre>
+     <p style="margin:0;">${input.salesforceUrl ? button(input.salesforceUrl, "Open contact in Salesforce", true) : ""}${
+       input.stripeUrl ? button(input.stripeUrl, "View payment in Stripe", false) : ""
+     }</p>`
+  );
+
+  try {
+    await sgMail.send({
+      to: input.to,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `${input.onAutoPay ? "[AutoPay] " : ""}Apply online dues payment: ${who}, ${input.totalLabel}`,
+      text,
+      html,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid dues payment notice error:", e);
+    return false;
+  }
+}
+
+/** Member receipt for an online dues payment. */
+export async function sendMemberDuesReceiptEmail(input: {
+  to: string;
+  memberName: string;
+  memberNumber: string | null;
+  totalLabel: string;
+  lines: { label: string; amount: string }[];
+  onAutoPay: boolean;
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV] Dues receipt to ${input.to}: ${input.totalLabel}`);
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping dues receipt");
+    return false;
+  }
+  sgMail.setApiKey(apiKey);
+
+  const firstName = input.memberName.split(" ")[0] || "there";
+  const applyNote =
+    "Member Services will apply this payment to your account. Your balance on the member website updates once it's applied.";
+  const autoPayNote = input.onAutoPay
+    ? "You're on AutoPay, and this payment doesn't change it. If you'd like an upcoming AutoPay charge adjusted, call (888) 465-3717."
+    : null;
+
+  const text = `Thank you, ${firstName}.
+
+We received your ${input.totalLabel} dues payment${input.memberNumber ? ` for membership #${input.memberNumber}` : ""}.
+
+${input.lines.map((l) => `${l.label}: ${l.amount}`).join("\n")}
+
+${applyNote}
+${autoPayNote ? `\n${autoPayNote}\n` : ""}
+Questions? Call (888) 465-3717.
+
+Lost Dutchman's Mining Association`;
+
+  const rows = input.lines
+    .map(
+      (l) =>
+        `<tr><td style="padding:6px 0;color:#e8e0d5;">${escapeHtml(l.label)}</td><td style="padding:6px 0;text-align:right;color:#e8e0d5;">${escapeHtml(l.amount)}</td></tr>`
+    )
+    .join("");
+
+  const html = familyLegacyEmailShell(
+    "Your dues payment was received",
+    `<p style="margin:0 0 16px;">Thank you, ${escapeHtml(firstName)}.</p>
+     <p style="margin:0 0 16px;">We received your <strong>${escapeHtml(input.totalLabel)}</strong> dues payment${
+       input.memberNumber ? ` for membership #${escapeHtml(input.memberNumber)}` : ""
+     }.</p>
+     <table role="presentation" width="100%" style="margin:0 0 16px;border-top:1px solid #d4af3725;border-bottom:1px solid #d4af3725;">${rows}</table>
+     <p style="margin:0 0 16px;">${escapeHtml(applyNote)}</p>
+     ${autoPayNote ? `<p style="margin:0 0 16px;">${escapeHtml(autoPayNote)}</p>` : ""}
+     <p style="margin:0;font-size:14px;color:#e8e0d5b3;">Questions? Call (888) 465-3717.</p>`
+  );
+
+  try {
+    await sgMail.send({
+      to: input.to,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `Receipt: your LDMA dues payment of ${input.totalLabel}`,
+      text,
+      html,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid dues receipt error:", e);
+    return false;
+  }
+}
+
 const RECEIPT_CC_EMAIL = "gricci@goldprospectors.org";
 
 export type PaymentReceiptLineItem = {

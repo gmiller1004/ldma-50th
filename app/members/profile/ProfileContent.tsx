@@ -8,6 +8,7 @@ import { getCompanionAddOnProduct } from "@/app/actions/membership";
 import { deriveLegacyOfferType, getLegacyOfferConfig, getLegacyOfferProductHandle } from "@/lib/legacy-offer";
 import { FAMILY_LEGACY_OFFER_PATH, isLegacyPaidPendingAddendum } from "@/lib/family-legacy-offer";
 import type { MembershipProductInfo } from "@/app/actions/membership";
+import { MemberDuesCard } from "./MemberDuesCard";
 
 function LegacyOfferModal({ onClose }: { onClose: () => void }) {
   return (
@@ -666,24 +667,6 @@ export function ProfileContent() {
               <dd className="font-medium text-[#e8e0d5]">{profile.maintenancePaidThru}</dd>
             </div>
           )}
-          {profile.showMaintenance && profile.duesOwed != null && profile.duesOwed > 0 && (
-            <div className="sm:col-span-2">
-              <dt className="text-sm text-[#e8e0d5]/60">Maintenance dues owed (current year)</dt>
-              <dd className="font-medium text-[#e8e0d5]">${profile.duesOwed.toFixed(2)}</dd>
-              <p className="mt-2 text-sm text-[#e8e0d5]/70">
-                The balance shown is what you owe for the current calendar year.
-              </p>
-              {profile.isOnAutoPay ? (
-                <p className="mt-1 text-sm text-[#e8e0d5]/60">
-                  You&apos;re currently set up on AutoPay. Call (888) 465-3717 if you have questions about your balance due.
-                </p>
-              ) : (
-                <p className="mt-1 text-sm text-[#e8e0d5]/60">
-                  Call (888) 465-3717 to set up autopay or make a payment.
-                </p>
-              )}
-            </div>
-          )}
           {showCompanionSection && (
             <div className="mt-4 pt-4 border-t border-[#d4af37]/20 sm:col-span-2">
               <dt className="text-sm text-[#e8e0d5]/60 flex items-center gap-1.5 mb-1">
@@ -800,6 +783,8 @@ export function ProfileContent() {
           Your contact info has been updated.
         </div>
       )}
+
+      {!isCompanionLogin && <MemberDuesCard />}
 
       <div className="p-4 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg">
         <h3 className="font-semibold text-[#f0d48f] flex items-center gap-2 mb-3">

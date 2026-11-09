@@ -59,6 +59,14 @@ export type MemberLookupResult = {
   membershipDuesOwed?: number | null;
   /** For caretaker lookup: membership balance (Membership_Balance__c). */
   membershipBalance?: number | null;
+  /** Maintenance due now plus the rest of next year (Maint_thru_next_year__c). */
+  maintenanceThruNextYear?: number | null;
+  /** Monthly maintenance rate (Maintenance_Fee__c). */
+  maintenanceMonthlyFee?: number | null;
+  nextMaintenanceDueDate?: string | null;
+  nextMembershipDueDate?: string | null;
+  autoPayNextTotal?: number | null;
+  autoPayNextDate?: string | null;
   /** True for active LDMA members and named companions of an active LDMA member. */
   hasMemberAccess?: boolean;
   accessRole?: "primary" | "companion";
@@ -82,7 +90,7 @@ export type CaretakerMemberSearchResult =
   | { status: "not_found"; error: string };
 
 const CONTACT_LOOKUP_SELECT =
-  "Id, Customer_Number__c, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c, Legacy_Offer_Request_Date__c, Legacy_Offer_Status__c, Is_Transferable__c, Is_Companion__c, Is_PrePay_Transfer__c, Companion_Transferable__c, Companion__c, Companion__r.Name, Is_LDMA_Admin__c, Is_LDMA_Caretaker__c, Caretaker_Admin__c, Caretaker_At_Camp__c, Membership_Dues_Owed_Contact__c, Membership_Balance__c";
+  "Id, Customer_Number__c, Email, Phone, FirstName, LastName, OtherStreet, OtherCity, OtherState, OtherPostalCode, Shipping_Same_As_Billing__c, Active_Membership_Type__c, Active_Membership_Type_Text_Copy__c, Is_New_LDMA_Member__c, Maintenance_Min_0_Email__c, Maintenance_Paid_Thru_Date__c, Maintenance_Exempt__c, Is_On_Auto_Pay__c, LDMA_Auto_Pay_Shopify__c, Legacy_Offer_Request_Date__c, Legacy_Offer_Status__c, Is_Transferable__c, Is_Companion__c, Is_PrePay_Transfer__c, Companion_Transferable__c, Companion__c, Companion__r.Name, Is_LDMA_Admin__c, Is_LDMA_Caretaker__c, Caretaker_Admin__c, Caretaker_At_Camp__c, Membership_Dues_Owed_Contact__c, Membership_Balance__c, Maint_thru_next_year__c, Maintenance_Fee__c, Next_Maintenance_Payment_Due_Date__c, Next_Membership_Payment_Due_Date__c, AutoPay_Next_Payment_Total__c, AutoPay_Next_Scheduled_Payment_Date__c";
 
 function escapeSoqlString(value: string): string {
   return String(value).replace(/'/g, "\\'");
@@ -111,6 +119,20 @@ function contactToMatch(c: Record<string, unknown>): MemberLookupMatch {
     email: typeof c.Email === "string" && c.Email.trim() ? c.Email.trim() : null,
     phone: typeof c.Phone === "string" && c.Phone.trim() ? c.Phone.trim() : null,
   };
+}
+
+function currencyField(value: unknown): number | null {
+  if (typeof value === "number" && !Number.isNaN(value)) return value;
+  if (typeof value === "string") {
+    const parsed = parseFloat(value.replace(/[^0-9.-]/g, ""));
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return null;
+}
+
+function dateField(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim().slice(0, 10);
+  return null;
 }
 
 function mapContactRecord(c: Record<string, unknown>): MemberLookupResult {
@@ -241,6 +263,12 @@ function mapContactRecord(c: Record<string, unknown>): MemberLookupResult {
     caretakerAtCamp,
     membershipDuesOwed: membershipDuesOwed ?? undefined,
     membershipBalance: membershipBalance ?? undefined,
+    maintenanceThruNextYear: currencyField(c.Maint_thru_next_year__c),
+    maintenanceMonthlyFee: currencyField(c.Maintenance_Fee__c),
+    nextMaintenanceDueDate: dateField(c.Next_Maintenance_Payment_Due_Date__c),
+    nextMembershipDueDate: dateField(c.Next_Membership_Payment_Due_Date__c),
+    autoPayNextTotal: currencyField(c.AutoPay_Next_Payment_Total__c),
+    autoPayNextDate: dateField(c.AutoPay_Next_Scheduled_Payment_Date__c),
   };
 }
 
