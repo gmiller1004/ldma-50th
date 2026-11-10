@@ -159,17 +159,20 @@ export const DETECTOR_ACADEMY_TRAINERS: AcademyTrainer[] = [
   {
     name: "Dominic Ricci",
     role: "Executive Director of Operations, GPAA & LDMA",
-    bio: "Has led GPAA and LDMA operations since 2010 and hosts LDMA's signature events at camps across the country. He'll host the academy and help lead field sessions on Stanton's claims.",
+    photo: "/images/trainers/dominic-ricci.jpg",
+    bio: "Has led GPAA and LDMA operations since 2010, designing and hosting LDMA's signature events nationwide, from Dirt Parties and the Digger's Gold Mining Academy to the Great Gold Dredge-Off and Battle Across the Desert. He's been prospecting since age 9, when he first panned a creek on his grandparents' Northern California ranch. He'll host the academy and help lead field sessions on Stanton's claims.",
   },
   {
     name: "Kevin Hoagland",
-    role: "LDMA Events",
-    bio: "Hosts LDMA field events, and will work alongside participants in the test garden and on the hunts.",
+    role: "Host, Gold Trails · GPAA & LDMA",
+    photo: "/images/trainers/kevin-hoagland.jpg",
+    bio: "A veteran prospector with 55 years in the field, Kevin built his first metal detector at age nine. He hosts GPAA's Gold Trails, appeared on HISTORY Channel's Lost Gold of the Aztecs, and has led Metal Detecting 101 training for years, turning complex detector settings into simple, repeatable field routines. He'll work alongside participants in the test garden and on the hunts.",
   },
   {
     name: "John Mathis",
     role: "Caretaker, LDMA Stanton Camp",
-    bio: "A gold prospector for more than 50 years and Stanton's caretaker since 2018. He knows the camp's claims firsthand and will lead the claim orientation and share local tips.",
+    photo: "/images/trainers/john-mathis.jpg",
+    bio: "An old-school prospector with more than 50 years in the field across six western states. He found a 2½-ounce nugget in the American River at age 10 and has been chasing gold ever since. Stanton's caretaker since 2018 and a Master Instructor for the Digger's Gold Mining Academy, he knows the camp's claims firsthand and will lead the claim orientation and share local tips.",
   },
 ];
 

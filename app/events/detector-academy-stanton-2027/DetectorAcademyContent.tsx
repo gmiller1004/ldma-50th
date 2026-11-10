@@ -314,8 +314,8 @@ export function DetectorAcademyContent() {
             {DETECTOR_ACADEMY_TRAINERS.map((t) => (
               <div key={t.name} className="rounded-2xl border border-[#d4af37]/20 bg-[#1a120b] p-6">
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="relative w-16 h-16 rounded-full overflow-hidden bg-[#0f3d1e] border-2 border-[#d4af37]/50 flex items-center justify-center font-serif text-xl text-[#f0d48f] shrink-0">
-                    {t.photo ? <Image src={t.photo} alt={t.name} fill className="object-cover" sizes="64px" /> : initials(t.name)}
+                  <div className="relative w-20 h-20 rounded-full overflow-hidden bg-[#0f3d1e] border-2 border-[#d4af37]/50 flex items-center justify-center font-serif text-xl text-[#f0d48f] shrink-0">
+                {t.photo ? <Image src={t.photo} alt={t.name} fill className="object-cover" sizes="80px" /> : initials(t.name)}
                   </div>
                   <div>
                     <h3 className="font-serif text-xl text-[#f0d48f] font-semibold">{t.name}</h3>
