@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { getProductByHandle, getRelatedProducts, SHOP_COLLECTION_HANDLE } from "@/lib/shopify";
 import { ProductPageTemplate } from "@/components/ProductPageTemplate";
 import { verifySessionToken } from "@/lib/session";
+import { DetectorAcademyPromo } from "@/components/DetectorAcademyPromo";
+import { AXIOM_LITE_BUNDLE_HANDLE, DETECTOR_ACADEMY_PATH, DETECTOR_ACADEMY_PRODUCT_HANDLE } from "@/lib/detector-academy";
 
 export const revalidate = 300;
 
@@ -42,8 +44,9 @@ function productInExclusiveOffers(product: { collections?: { edges: Array<{ node
 }
 
 export default async function ProductPage({ params }: Props) {
+  const { handle } = await params;
+  if (handle === DETECTOR_ACADEMY_PRODUCT_HANDLE) redirect(DETECTOR_ACADEMY_PATH);
   try {
-    const { handle } = await params;
     const product = await getProductByHandle(handle);
     if (!product) notFound();
 
@@ -92,6 +95,11 @@ export default async function ProductPage({ params }: Props) {
       <>
         <Navbar />
         <main className="pt-16 md:pt-20 min-h-screen bg-[#1a120b]">
+          {handle === AXIOM_LITE_BUNDLE_HANDLE && (
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6">
+              <DetectorAcademyPromo />
+            </div>
+          )}
           <ProductPageTemplate
             product={product}
             relatedProducts={relatedProducts}

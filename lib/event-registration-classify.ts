@@ -3,7 +3,7 @@
  * VIP-only products are excluded upstream by product handle / tags.
  */
 
-import { PRICE_LEVEL_METAFIELD } from "@/lib/events-config";
+import { eventVariantPricingType, PRICE_LEVEL_METAFIELD } from "@/lib/events-config";
 
 export type RegistrationKind = "LDMA" | "NON_LDMA";
 
@@ -14,13 +14,9 @@ export type ClassifyInput = {
 };
 
 export function classifyEventRegistration(input: ClassifyInput): RegistrationKind | null {
-  const level = input.priceLevelMetafield?.trim().toLowerCase();
-  if (level) {
-    if (level === "member") return "LDMA";
-    if (level === "non member" || level === "non-member" || level === "nonmember") {
-      return "NON_LDMA";
-    }
-  }
+  const level = eventVariantPricingType(input.priceLevelMetafield);
+  if (level === "member" || level === "deposit") return "LDMA";
+  if (level === "general") return "NON_LDMA";
 
   const t = input.variantTitle.toLowerCase();
 

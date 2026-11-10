@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { AddToCartButton } from "@/components/AddToCartButton";
-import { PRICE_LEVEL_METAFIELD } from "@/lib/events-config";
+import { eventVariantPricingType, PRICE_LEVEL_METAFIELD } from "@/lib/events-config";
 import { isVipUpsellEvent } from "@/lib/event-display";
 import type { EventProduct, EventVariant } from "@/lib/shopify";
 
@@ -10,16 +10,17 @@ export function getEventVariants(product: EventProduct): EventVariant[] {
   return (product.variants?.edges ?? []).map((e) => e.node).filter(Boolean);
 }
 
-function getVariantPricingType(variant: EventVariant): "member" | "general" | "unset" {
+function getVariantPricingType(variant: EventVariant) {
   const raw = (variant.metafields ?? []).find(
     (m) => m && m.key === PRICE_LEVEL_METAFIELD.key && m.value
   )?.value;
-  const v = (raw ?? "").trim().toLowerCase();
-  if (v === "member") return "member";
-  if (v === "non member" || v === "nonmember") return "general";
-  return "unset";
+  return eventVariantPricingType(raw);
 }
 
+/**
+ * Public event variants for the visitor: members see member variants, others see general (or unset).
+ * Reservation-deposit variants are never shown here.
+ */
 export function filterEventVariantsByMember(
   event: EventProduct,
   isMemberLoggedIn: boolean
@@ -27,7 +28,8 @@ export function filterEventVariantsByMember(
   const allVariants = getEventVariants(event);
   if (allVariants.length === 0) return event;
 
-  const types = allVariants.map((v) => getVariantPricingType(v));
+  const publicVariants = allVariants.filter((v) => getVariantPricingType(v) !== "deposit");
+  const types = publicVariants.map((v) => getVariantPricingType(v));
   const hasMember = types.some((t) => t === "member");
   const hasGeneral = types.some((t) => t === "general");
 
@@ -40,7 +42,7 @@ export function filterEventVariantsByMember(
     else keep = () => true;
   }
 
-  const filtered = allVariants.filter(keep);
+  const filtered = publicVariants.filter(keep);
   if (filtered.length === allVariants.length) return event;
 
   return {

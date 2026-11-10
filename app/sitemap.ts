@@ -6,6 +6,7 @@ import {
 } from "@/lib/collections-config";
 import { getValidCampSlugs } from "@/lib/directory-camps";
 import { getPosts } from "@/lib/blog";
+import { DETECTOR_ACADEMY_PRODUCT_HANDLE } from "@/lib/detector-academy";
 
 const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
 
@@ -70,7 +71,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
 
-    for (const handle of productHandles) {
+    for (const handle of productHandles.filter((h) => h !== DETECTOR_ACADEMY_PRODUCT_HANDLE)) {
       entries.push({
         url: `${BASE}/products/${handle}`,
         lastModified: now,

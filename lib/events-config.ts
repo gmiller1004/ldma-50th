@@ -44,6 +44,22 @@ export const PRICE_LEVEL_METAFIELD = {
   key: "price_level",
 } as const;
 
+/**
+ * price_level for gated reservation-deposit variants (e.g. Garrett Detector Academy for Axiom Lite bundle buyers).
+ * Never shown on public event pages; sold only through a members-only link. Counts as an LDMA registration.
+ */
+export const RESERVATION_DEPOSIT_PRICE_LEVEL = "deposit";
+
+export type EventVariantPricingType = "member" | "general" | "deposit" | "unset";
+
+export function eventVariantPricingType(priceLevel: string | null | undefined): EventVariantPricingType {
+  const v = (priceLevel ?? "").trim().toLowerCase();
+  if (v === "member") return "member";
+  if (v === "non member" || v === "nonmember" || v === "non-member") return "general";
+  if (v === RESERVATION_DEPOSIT_PRICE_LEVEL) return "deposit";
+  return "unset";
+}
+
 /** Handle for the event VIP Gold Package add-on. Shown when user adds a Gold Diggin's / Dirt Party event to cart. */
 export const VIP_UPSELL_PRODUCT_HANDLE = "2026-event-vip-gold-package";
 

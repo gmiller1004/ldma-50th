@@ -10,8 +10,9 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { EventsExitIntentSignup } from "@/components/EventsExitIntentSignup";
 import { AddToCartButton } from "@/components/AddToCartButton";
+import { filterEventVariantsByMember } from "@/components/EventPurchaseSection";
 import { FourWaysToLearn, ThrowdownSpotlight, THROWDOWN_HANDLE } from "./EventsLearningSections";
-import { EVENT_TYPES, CAMP_FILTERS, PRICE_LEVEL_METAFIELD } from "@/lib/events-config";
+import { EVENT_TYPES, CAMP_FILTERS } from "@/lib/events-config";
 import {
   getEventDates,
   getEventType,
@@ -34,52 +35,6 @@ function matchesCamp(product: EventWithVariant, campId: string): boolean {
 /** Get flat array of variants from product */
 function getVariants(product: EventProduct): EventVariant[] {
   return (product.variants?.edges ?? []).map((e) => e.node).filter(Boolean);
-}
-
-/** Classify variant as "member" or "general" from the price_level variant metafield; "unset" if missing or unknown. */
-function getVariantPricingType(variant: EventVariant): "member" | "general" | "unset" {
-  const raw = (variant.metafields ?? []).find(
-    (m) => m && m.key === PRICE_LEVEL_METAFIELD.key && m.value
-  )?.value;
-  const v = (raw ?? "").trim().toLowerCase();
-  if (v === "member") return "member";
-  if (v === "non member" || v === "nonmember") return "general";
-  return "unset";
-}
-
-/**
- * Return event with variants filtered by member login state:
- * - Not logged in: only "general" variants (general admission); "unset" included.
- * - Logged in: only "member" variants; if none, fall back to all so event stays registerable.
- */
-function filterEventVariantsByMember(
-  event: EventProduct,
-  isMemberLoggedIn: boolean
-): EventProduct {
-  const allVariants = getVariants(event);
-  if (allVariants.length === 0) return event;
-
-  const types = allVariants.map((v) => getVariantPricingType(v));
-  const hasMember = types.some((t) => t === "member");
-  const hasGeneral = types.some((t) => t === "general");
-
-  let keep: (v: EventVariant) => boolean;
-  if (isMemberLoggedIn) {
-    if (hasMember) keep = (v) => getVariantPricingType(v) === "member";
-    else keep = () => true;
-  } else {
-    if (hasGeneral) keep = (v) => getVariantPricingType(v) === "general" || getVariantPricingType(v) === "unset";
-    else keep = () => true;
-  }
-
-  const filtered = allVariants.filter(keep);
-  if (filtered.length === allVariants.length) return event;
-
-  const edges = filtered.map((node) => ({ node }));
-  return {
-    ...event,
-    variants: { edges },
-  } as EventProduct;
 }
 
 /** Get displayable options (exclude Title if only "Default Title") for variant selection */

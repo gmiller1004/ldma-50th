@@ -17,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { DetectorAcademyPromo } from "@/components/DetectorAcademyPromo";
 import { getBundleMembershipProducts, type MembershipBundleProductInfo } from "@/app/actions/membership-bundles";
 import { addMembershipToCart } from "@/app/actions/cart";
 import { useCart } from "@/context/CartContext";
@@ -319,6 +320,7 @@ export function BundleMembershipsPageContent() {
                 (GPAA) for life. You get 12 private campgrounds from $6 a night, a Garrett Axiom Lite gold detector,
                 and a bag of paydirt to pan, so your first trip is covered.
               </p>
+              <DetectorAcademyPromo className="mt-5 max-w-xl" />
             </div>
 
             {/* Price card */}
