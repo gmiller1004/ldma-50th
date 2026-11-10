@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { MembersNav } from "../MembersNav";
 import { verifySessionToken } from "@/lib/session";
 import { lookupMember } from "@/lib/salesforce";
-import { getEventProductByHandle } from "@/lib/shopify";
+import { getProductByHandle } from "@/lib/shopify";
 import {
   DETECTOR_ACADEMY_DEPOSIT_VARIANT_GID,
   DETECTOR_ACADEMY_PRODUCT_HANDLE,
@@ -31,11 +31,11 @@ export default async function DetectorAcademyReservationPage() {
   if (!member.valid || !member.email) {
     view = { state: "no_email" };
   } else {
-    const [status, event] = await Promise.all([
+    const [status, product] = await Promise.all([
       academyReservationStatusForEmail(member.email),
-      getEventProductByHandle(DETECTOR_ACADEMY_PRODUCT_HANDLE).catch(() => null),
+      getProductByHandle(DETECTOR_ACADEMY_PRODUCT_HANDLE).catch(() => null),
     ]);
-    const deposit = (event?.variants?.edges ?? [])
+    const deposit = (product?.variants?.edges ?? [])
       .map((e) => e.node)
       .find((v) => v.id === DETECTOR_ACADEMY_DEPOSIT_VARIANT_GID);
     if (!status) view = { state: "lookup_failed" };
