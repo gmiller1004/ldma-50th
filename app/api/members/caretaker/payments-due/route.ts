@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminViewCampSlug, getCaretakerAccess } from "@/lib/caretaker-auth";
 import { campUsesReservations } from "@/lib/reservation-camps";
-import { fetchPaymentsDueForCamp } from "@/lib/caretaker-site-ar";
+import { fetchPastStayBalancesForCamp, fetchPaymentsDueForCamp } from "@/lib/caretaker-site-ar";
 import { getValidCampSlugs } from "@/lib/directory-camps";
 
 /**
  * GET /api/members/caretaker/payments-due
- * Site fees due within 7 days or overdue.
+ * Site fees due within 7 days or overdue, plus ended stays that still show a balance (pastStays).
  * Camp caretakers: their camp. Directors: ?campSlug= required.
  */
 export async function GET(request: NextRequest) {
@@ -28,9 +28,12 @@ export async function GET(request: NextRequest) {
   }
 
   if (!campUsesReservations(campSlug)) {
-    return NextResponse.json({ items: [] });
+    return NextResponse.json({ items: [], pastStays: [] });
   }
 
-  const items = await fetchPaymentsDueForCamp(campSlug, 7);
-  return NextResponse.json({ items });
+  const [items, pastStays] = await Promise.all([
+    fetchPaymentsDueForCamp(campSlug, 7),
+    fetchPastStayBalancesForCamp(campSlug),
+  ]);
+  return NextResponse.json({ items, pastStays });
 }

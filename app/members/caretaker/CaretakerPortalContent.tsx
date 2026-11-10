@@ -555,6 +555,14 @@ export function CaretakerPortalContent({
   const [detailsGuestEmail, setDetailsGuestEmail] = useState("");
   const [detailsGuestPhone, setDetailsGuestPhone] = useState("");
   const [detailsGuestContactSaving, setDetailsGuestContactSaving] = useState(false);
+  const [pastStayBalances, setPastStayBalances] = useState<Array<{
+    reservationId: string;
+    siteName: string | null;
+    guestLabel: string;
+    balanceDueCents: number;
+    checkInDate: string;
+    checkOutDate: string;
+  }>>([]);
   const [paymentsDue, setPaymentsDue] = useState<Array<{
     reservationId: string;
     siteName: string | null;
@@ -624,9 +632,15 @@ export function CaretakerPortalContent({
       loadSites();
       loadReservations();
       fetch("/api/members/caretaker/payments-due")
-        .then((r) => (r.ok ? r.json() : { items: [] }))
-        .then((data) => setPaymentsDue(data.items ?? []))
-        .catch(() => setPaymentsDue([]));
+        .then((r) => (r.ok ? r.json() : { items: [], pastStays: [] }))
+        .then((data) => {
+          setPaymentsDue(data.items ?? []);
+          setPastStayBalances(data.pastStays ?? []);
+        })
+        .catch(() => {
+          setPaymentsDue([]);
+          setPastStayBalances([]);
+        });
     }
   }, [usesReservations]);
 
@@ -2390,6 +2404,36 @@ export function CaretakerPortalContent({
                     <span className={item.isOverdue ? "text-red-300 font-medium" : "text-amber-200"}>
                       {item.isOverdue ? "Overdue " : "Due "}{formatCentsAsCurrency(item.balanceDueCents)}
                     </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {pastStayBalances.length > 0 && (
+          <section className="p-4 bg-red-950/20 border border-red-500/30 rounded-lg">
+            <h2 className="font-semibold text-red-200 text-sm">Past stays with a balance</h2>
+            <p className="text-xs text-[#e8e0d5]/60 mb-2">
+              These guests have checked out but still show money owed. Collect it, or correct the stay if the balance is wrong.
+            </p>
+            <ul className="space-y-2">
+              {pastStayBalances.map((item) => (
+                <li key={item.reservationId}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const r =
+                        archivedReservations.find((x) => x.id === item.reservationId) ??
+                        activeReservations.find((x) => x.id === item.reservationId);
+                      if (r) openResDetailsModal(r, { focusPayment: true });
+                    }}
+                    className="w-full flex flex-wrap justify-between gap-2 text-sm text-[#e8e0d5] rounded-lg px-2 py-1.5 hover:bg-[#d4af37]/10 text-left"
+                  >
+                    <span>
+                      {item.siteName ?? "Site"} — {item.guestLabel} · stayed {item.checkInDate} to {item.checkOutDate}
+                    </span>
+                    <span className="text-red-300 font-medium">Owes {formatCentsAsCurrency(item.balanceDueCents)}</span>
                   </button>
                 </li>
               ))}

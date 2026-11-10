@@ -380,8 +380,15 @@ export async function applyPaymentsToExistingPeriods(
   };
 }
 
-/** Rebuild billing periods from the reservation's current site and dates in the database. */
-export async function resyncReservationBillingFromDb(reservationId: string): Promise<{
+/**
+ * Rebuild billing periods from the reservation's site and dates in the database. Keeps the total the
+ * stay was booked at (a special total, else calculated_total_cents) so rate-card changes don't reprice
+ * existing stays; pass repriceAtCurrentRates when the stay's pricing really changed (guest → member).
+ */
+export async function resyncReservationBillingFromDb(
+  reservationId: string,
+  opts: { repriceAtCurrentRates?: boolean } = {}
+): Promise<{
   totalDueCents: number;
   totalPaidCents: number;
   balanceDueCents: number;
@@ -392,7 +399,7 @@ export async function resyncReservationBillingFromDb(reservationId: string): Pro
 
   const rows = await sql`
     SELECT r.check_in_date, r.check_out_date, r.reservation_type, r.billing_mode,
-           r.amount_override_cents, r.price_override_flag,
+           r.amount_override_cents, r.price_override_flag, r.calculated_total_cents,
            s.member_rate_daily, s.member_rate_monthly, s.non_member_rate_daily
     FROM camp_reservations r
     JOIN camp_sites s ON s.id = r.site_id
@@ -407,6 +414,7 @@ export async function resyncReservationBillingFromDb(reservationId: string): Pro
         billing_mode: string | null;
         amount_override_cents: number | null;
         price_override_flag: boolean | null;
+        calculated_total_cents: number | null;
         member_rate_daily: number | string | null;
         member_rate_monthly: number | string | null;
         non_member_rate_daily: number | string | null;
@@ -420,11 +428,18 @@ export async function resyncReservationBillingFromDb(reservationId: string): Pro
   const checkOutDate = toDateOnlyStr(row.check_out_date);
   const isMember = row.reservation_type === "member";
   const rates = siteRatesFromRow(row);
+  const billingMode = reservationBillingMode(row.billing_mode);
 
-  const effectiveTotalCents =
-    row.price_override_flag && row.amount_override_cents != null
-      ? row.amount_override_cents
-      : undefined;
+  let effectiveTotalCents: number | undefined;
+  if (row.price_override_flag && row.amount_override_cents != null) {
+    effectiveTotalCents = row.amount_override_cents;
+  } else if (opts.repriceAtCurrentRates) {
+    const repriced = computeStayPricing({ checkInDate, checkOutDate, isMember, rates, billingMode }).totalCents;
+    await sql`UPDATE camp_reservations SET calculated_total_cents = ${repriced}, updated_at = NOW() WHERE id = ${reservationId}`;
+    effectiveTotalCents = repriced;
+  } else if (row.calculated_total_cents != null) {
+    effectiveTotalCents = row.calculated_total_cents;
+  }
 
   return syncBillingPeriodsForReservation({
     reservationId,
@@ -432,7 +447,7 @@ export async function resyncReservationBillingFromDb(reservationId: string): Pro
     checkOutDate,
     isMember,
     rates,
-    billingMode: reservationBillingMode(row.billing_mode),
+    billingMode,
     effectiveTotalCents,
   });
 }

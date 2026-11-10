@@ -16,11 +16,22 @@ export type PaymentDueItem = {
   isOverdue: boolean;
 };
 
+export type PastStayBalanceItem = {
+  reservationId: string;
+  siteName: string | null;
+  guestLabel: string;
+  balanceDueCents: number;
+  checkInDate: string;
+  checkOutDate: string;
+};
+
 export type CampSiteArSummary = {
   campSlug: string;
   campName: string;
   balanceDueCents: number;
   overdueCents: number;
+  /** Part of overdueCents from stays that have already ended. */
+  pastStayOverdueCents: number;
   reservationsWithBalance: number;
   overdueReservations: number;
 };
@@ -101,6 +112,50 @@ export async function fetchPaymentsDueForCamp(
   });
 }
 
+/** Stays that have ended but still show an unpaid site-fee balance. */
+export async function fetchPastStayBalancesForCamp(campSlug: string): Promise<PastStayBalanceItem[]> {
+  if (!hasDb() || !sql) return [];
+  const today = campTodayStr(campSlug);
+  const rows = await sql`
+    SELECT r.id AS reservation_id, s.name AS site_name, r.reservation_type,
+           r.member_display_name, r.member_number, r.guest_first_name, r.guest_last_name,
+           r.check_in_date::text AS check_in, r.check_out_date::text AS check_out,
+           COALESCE(SUM(bp.amount_due_cents - bp.amount_paid_cents), 0)::int AS balance_due
+    FROM camp_reservations r
+    JOIN camp_sites s ON s.id = r.site_id
+    JOIN camp_billing_periods bp ON bp.reservation_id = r.id AND bp.status IN ('unpaid', 'partial')
+    WHERE r.camp_slug = ${campSlug}
+      AND r.status != 'cancelled'
+      AND r.check_out_date < ${today}::date
+    GROUP BY r.id, s.name, r.reservation_type, r.member_display_name, r.member_number,
+             r.guest_first_name, r.guest_last_name, r.check_in_date, r.check_out_date
+    HAVING COALESCE(SUM(bp.amount_due_cents - bp.amount_paid_cents), 0) > 0
+    ORDER BY r.check_out_date DESC
+  `;
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const r = row as {
+      reservation_id: string;
+      site_name: string | null;
+      reservation_type: string;
+      member_display_name: string | null;
+      member_number: string | null;
+      guest_first_name: string | null;
+      guest_last_name: string | null;
+      check_in: string;
+      check_out: string;
+      balance_due: number;
+    };
+    return {
+      reservationId: r.reservation_id,
+      siteName: r.site_name,
+      guestLabel: guestLabel(r),
+      balanceDueCents: r.balance_due,
+      checkInDate: String(r.check_in).slice(0, 10),
+      checkOutDate: String(r.check_out).slice(0, 10),
+    };
+  });
+}
+
 export async function fetchSiteArByCamp(): Promise<CampSiteArSummary[]> {
   if (!hasDb() || !sql) {
     return directoryCamps.map((c) => ({
@@ -108,6 +163,7 @@ export async function fetchSiteArByCamp(): Promise<CampSiteArSummary[]> {
       campName: c.name,
       balanceDueCents: 0,
       overdueCents: 0,
+      pastStayOverdueCents: 0,
       reservationsWithBalance: 0,
       overdueReservations: 0,
     }));
@@ -120,6 +176,10 @@ export async function fetchSiteArByCamp(): Promise<CampSiteArSummary[]> {
            COALESCE(SUM(
              CASE WHEN bp.due_date < ${today}::date THEN bp.amount_due_cents - bp.amount_paid_cents ELSE 0 END
            ), 0)::int AS overdue_cents,
+           COALESCE(SUM(
+             CASE WHEN bp.due_date < ${today}::date AND r.check_out_date < ${today}::date
+                  THEN bp.amount_due_cents - bp.amount_paid_cents ELSE 0 END
+           ), 0)::int AS past_stay_overdue_cents,
            COUNT(DISTINCT r.id)::int AS res_count,
            COUNT(DISTINCT r.id) FILTER (
              WHERE EXISTS (
@@ -142,6 +202,7 @@ export async function fetchSiteArByCamp(): Promise<CampSiteArSummary[]> {
       campName: c.name,
       balanceDueCents: 0,
       overdueCents: 0,
+      pastStayOverdueCents: 0,
       reservationsWithBalance: 0,
       overdueReservations: 0,
     });
@@ -152,6 +213,7 @@ export async function fetchSiteArByCamp(): Promise<CampSiteArSummary[]> {
       camp_slug: string;
       balance_due: number;
       overdue_cents: number;
+      past_stay_overdue_cents: number;
       res_count: number;
       overdue_res_count: number;
     };
@@ -162,6 +224,7 @@ export async function fetchSiteArByCamp(): Promise<CampSiteArSummary[]> {
       campName: camp.name,
       balanceDueCents: r.balance_due,
       overdueCents: r.overdue_cents,
+      pastStayOverdueCents: r.past_stay_overdue_cents,
       reservationsWithBalance: r.res_count,
       overdueReservations: r.overdue_res_count,
     });

@@ -36,6 +36,8 @@ export type CampAdminMetrics = {
   /** Unpaid site-fee billing periods */
   balanceDueCents: number;
   overdueCents: number;
+  /** Part of overdueCents from stays that have already ended. */
+  pastStayOverdueCents: number;
   reservationsWithBalance: number;
   overdueReservations: number;
   assignedCaretakers: CaretakerRosterRow[];
@@ -56,6 +58,7 @@ export type CaretakerAdminGlobalMetrics = {
   totalReservationsCreated30d: number;
   totalBalanceDueCents: number;
   totalOverdueCents: number;
+  totalPastStayOverdueCents: number;
   totalReservationsWithBalance: number;
   stripeReservationCents: number;
   stripePastDueCents: number;
@@ -396,6 +399,7 @@ export async function buildCaretakerAdminSummary(
       ...metrics,
       balanceDueCents: ar?.balanceDueCents ?? 0,
       overdueCents: ar?.overdueCents ?? 0,
+      pastStayOverdueCents: ar?.pastStayOverdueCents ?? 0,
       reservationsWithBalance: ar?.reservationsWithBalance ?? 0,
       overdueReservations: ar?.overdueReservations ?? 0,
       stripeReservationCents: st.reservationCents,
@@ -416,6 +420,7 @@ export async function buildCaretakerAdminSummary(
       totalReservationsCreated30d: acc.totalReservationsCreated30d + c.reservationsCreatedLast30Days,
       totalBalanceDueCents: acc.totalBalanceDueCents + c.balanceDueCents,
       totalOverdueCents: acc.totalOverdueCents + c.overdueCents,
+      totalPastStayOverdueCents: acc.totalPastStayOverdueCents + c.pastStayOverdueCents,
       totalReservationsWithBalance: acc.totalReservationsWithBalance + c.reservationsWithBalance,
       stripeReservationCents: acc.stripeReservationCents + c.stripeReservationCents,
       stripePastDueCents: acc.stripePastDueCents + c.stripePastDueCents,
@@ -433,6 +438,7 @@ export async function buildCaretakerAdminSummary(
       totalReservationsCreated30d: 0,
       totalBalanceDueCents: 0,
       totalOverdueCents: 0,
+      totalPastStayOverdueCents: 0,
       totalReservationsWithBalance: 0,
       stripeReservationCents: 0,
       stripePastDueCents: 0,

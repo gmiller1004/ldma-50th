@@ -8,7 +8,9 @@ import { ViewAsCaretakerButton } from "./CaretakerAdminViewControls";
 import { ReservationBillingSection } from "./ReservationBillingSection";
 import { DirectorReportingSection } from "./DirectorReportingSection";
 import { formatCentsAsCurrency } from "@/lib/reservation-pricing";
-import type { PaymentDueItem } from "@/lib/caretaker-site-ar";
+import type { PastStayBalanceItem, PaymentDueItem } from "@/lib/caretaker-site-ar";
+
+type CampBalanceRow = PaymentDueItem & { stayedLabel?: string };
 import { ChevronDown, ChevronRight, Download, HelpCircle, Loader2, Tent } from "lucide-react";
 
 type RosterRow = {
@@ -32,6 +34,7 @@ type CampRow = {
   reservationsCreatedLast30Days: number;
   balanceDueCents: number;
   overdueCents: number;
+  pastStayOverdueCents: number;
   reservationsWithBalance: number;
   overdueReservations: number;
   assignedCaretakers: RosterRow[];
@@ -52,6 +55,7 @@ type GlobalMetrics = {
   totalReservationsCreated30d: number;
   totalBalanceDueCents: number;
   totalOverdueCents: number;
+  totalPastStayOverdueCents: number;
   totalReservationsWithBalance: number;
   stripeReservationCents: number;
   stripePastDueCents: number;
@@ -812,7 +816,9 @@ export function CaretakerAdminDashboard() {
             <KpiCard
               label="Site fees due"
               value={formatUsd(global.totalBalanceDueCents)}
-              sub={`${global.totalReservationsWithBalance} reservations · ${formatUsd(global.totalOverdueCents)} overdue`}
+              sub={`${global.totalReservationsWithBalance} reservations · ${formatUsd(global.totalOverdueCents)} overdue${
+                global.totalPastStayOverdueCents > 0 ? ` (${formatUsd(global.totalPastStayOverdueCents)} from past stays)` : ""
+              }`}
             />
             <KpiCard
               label="Reservations (30d)"
@@ -1102,6 +1108,11 @@ export function CaretakerAdminDashboard() {
                     </td>
                     <td className={`p-3 text-right tabular-nums font-medium ${row.overdueCents > 0 ? "ct-cell-overdue" : "ct-cell-muted"}`}>
                       {row.overdueCents > 0 ? formatUsd(row.overdueCents) : "—"}
+                      {row.pastStayOverdueCents > 0 ? (
+                        <span className="block text-xs font-normal ct-cell-muted">
+                          {formatUsd(row.pastStayOverdueCents)} past stays
+                        </span>
+                      ) : null}
                     </td>
                     <td className="p-3 text-right tabular-nums ct-cell-gold font-medium">
                       {formatUsd(row.stripeTotalCents)}
@@ -1304,7 +1315,7 @@ function CampBalancesTab({
   campSlug: string;
   onPaid: () => void;
 }) {
-  const [items, setItems] = useState<PaymentDueItem[]>([]);
+  const [items, setItems] = useState<CampBalanceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1340,11 +1351,20 @@ function CampBalancesTab({
           const j = await res.json().catch(() => ({}));
           throw new Error(typeof j.error === "string" ? j.error : res.statusText);
         }
-        return res.json() as Promise<{ items?: PaymentDueItem[] }>;
+        return res.json() as Promise<{ items?: PaymentDueItem[]; pastStays?: PastStayBalanceItem[] }>;
       })
       .then((data) => {
         if (cancelled) return;
-        setItems(data.items ?? []);
+        const past: CampBalanceRow[] = (data.pastStays ?? []).map((p) => ({
+          reservationId: p.reservationId,
+          siteName: p.siteName,
+          guestLabel: p.guestLabel,
+          balanceDueCents: p.balanceDueCents,
+          nextDueDate: null,
+          isOverdue: true,
+          stayedLabel: `past stay ${p.checkInDate} to ${p.checkOutDate}`,
+        }));
+        setItems([...(data.items ?? []), ...past]);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load balances");
@@ -1415,7 +1435,7 @@ function CampBalancesTab({
   if (items.length === 0) {
     return (
       <p className="py-2 text-sm ct-cell-muted">
-        No site-fee balances due in the next 7 days (and no overdue) for this camp.
+        No site-fee balances due in the next 7 days, overdue, or left on past stays for this camp.
       </p>
     );
   }
@@ -1423,7 +1443,7 @@ function CampBalancesTab({
   return (
     <div className="space-y-3">
       <p className="text-xs ct-cell-muted">
-        Due within 7 days or overdue. Select a row to record cash or card payment.
+        Due within 7 days, overdue, or left on past stays. Select a row to record cash or card payment.
       </p>
       <ul className="space-y-2">
         {items.map((item) => (
@@ -1440,6 +1460,7 @@ function CampBalancesTab({
                 {item.siteName ? (
                   <span className="ct-cell-muted text-sm"> · {item.siteName}</span>
                 ) : null}
+                {item.stayedLabel ? <span className="ct-cell-muted text-sm"> · {item.stayedLabel}</span> : null}
               </span>
               <span className={item.isOverdue ? "ct-cell-overdue font-medium" : "ct-cell-gold font-medium"}>
                 {item.isOverdue ? "Overdue " : "Due "}

@@ -116,7 +116,7 @@ export async function PATCH(
       null;
     if (convertingGuest) {
       try {
-        billing = await resyncReservationBillingFromDb(id);
+        billing = await resyncReservationBillingFromDb(id, { repriceAtCurrentRates: true });
       } catch (e) {
         console.error("[caretaker] billing resync after guest→member failed:", e);
         return NextResponse.json(
