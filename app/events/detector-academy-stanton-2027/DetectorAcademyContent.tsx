@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, Calendar, Check, ChevronDown, Clock, Loader2, MapPin, Tent, Users } from "lucide-react";
+import { Bell, Calendar, Check, ChevronDown, Clock, MapPin, Tent, Users } from "lucide-react";
 import {
   ACADEMY_PROMO_DEADLINE_LABEL,
   DETECTOR_ACADEMY_CAPACITY,
@@ -13,7 +13,6 @@ import {
   DETECTOR_ACADEMY_FAQ,
   DETECTOR_ACADEMY_GAINS,
   DETECTOR_ACADEMY_INCLUDED,
-  DETECTOR_ACADEMY_INTEREST_TAG,
   DETECTOR_ACADEMY_LEARNING,
   DETECTOR_ACADEMY_LOCATION,
   DETECTOR_ACADEMY_NAME,
@@ -24,6 +23,7 @@ import {
   GARRETT_TRADEMARK_NOTICE,
   isAcademyPromoOpen,
 } from "@/lib/detector-academy";
+import { InterestQuestionnaire } from "./InterestQuestionnaire";
 
 const BUNDLE_HREF = "/memberships#bundle-offer";
 
@@ -53,42 +53,7 @@ function SectionHeading({ eyebrow, title, intro }: { eyebrow: string; title: str
   );
 }
 
-function UpdatesCard() {
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "done">("idle");
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus("sending");
-    setError(null);
-    try {
-      const res = await fetch("/api/newsletter/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          first_name: firstName,
-          signup_source: "events",
-          event_type_interest: DETECTOR_ACADEMY_INTEREST_TAG,
-          interest_path: "detector-academy",
-          referrer_cta: "detector_academy_updates",
-        }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(body.error || "Something went wrong. Please try again.");
-        setStatus("idle");
-        return;
-      }
-      setStatus("done");
-    } catch {
-      setError("Something went wrong. Please try again.");
-      setStatus("idle");
-    }
-  }
-
+function RegistrationCard({ onInterested }: { onInterested: () => void }) {
   return (
     <div className="rounded-2xl border border-[#d4af37]/30 bg-[#0f0a06]/80 p-6 md:p-8 flex flex-col">
       <p className="text-xs uppercase tracking-[0.18em] text-[#d4af37] mb-2">Registration</p>
@@ -104,50 +69,18 @@ function UpdatesCard() {
           </li>
         ))}
       </ul>
-      <div className="mt-auto rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/10 p-5">
-        {status === "done" ? (
-          <div className="flex gap-3">
-            <Check className="w-5 h-5 text-[#d4af37] shrink-0 mt-0.5" />
-            <p className="text-sm text-[#e8e0d5]">
-              <span className="font-semibold text-[#f0d48f]">You&apos;re on the list.</span> We&apos;ll email you when
-              the dates are set and registration opens.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <p className="font-semibold text-[#f0d48f] flex items-center gap-2">
-              <Bell className="w-4 h-4" /> Get notified when registration opens
-            </p>
-            <div className="grid gap-2 sm:grid-cols-[2fr_3fr]">
-              <input
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="First name"
-                autoComplete="given-name"
-                className="px-3 py-2.5 rounded-lg bg-[#0f0a06] border border-[#d4af37]/30 text-[#e8e0d5] placeholder:text-[#e8e0d5]/40 text-sm"
-              />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email address"
-                autoComplete="email"
-                className="px-3 py-2.5 rounded-lg bg-[#0f0a06] border border-[#d4af37]/30 text-[#e8e0d5] placeholder:text-[#e8e0d5]/40 text-sm"
-              />
-            </div>
-            {error ? <p className="text-sm text-red-400">{error}</p> : null}
-            <button
-              type="submit"
-              disabled={status === "sending"}
-              className="w-full inline-flex justify-center items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors disabled:opacity-60"
-            >
-              {status === "sending" ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Send me the dates
-            </button>
-          </form>
-        )}
+      <div className="mt-auto rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/10 p-5 space-y-3">
+        <p className="text-sm text-[#e8e0d5]/85">
+          Tell us a little about yourself and a member of our team will reach out with the dates and answer your
+          questions.
+        </p>
+        <button
+          type="button"
+          onClick={onInterested}
+          className="w-full inline-flex justify-center items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+        >
+          <Bell className="w-4 h-4" /> I&apos;m interested in this event
+        </button>
       </div>
     </div>
   );
@@ -215,6 +148,7 @@ function BundleCard({ promoOpen }: { promoOpen: boolean }) {
 export function DetectorAcademyContent() {
   const promoOpen = isAcademyPromoOpen();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [interestOpen, setInterestOpen] = useState(false);
 
   return (
     <div className="text-[#e8e0d5]">
@@ -252,12 +186,13 @@ export function DetectorAcademyContent() {
             </span>
           </div>
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            <a
-              href="#register"
+            <button
+              type="button"
+              onClick={() => setInterestOpen(true)}
               className="inline-flex justify-center items-center gap-2 px-7 py-4 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors text-lg"
             >
-              <Bell className="w-5 h-5" /> Get the dates
-            </a>
+              <Bell className="w-5 h-5" /> I&apos;m interested
+            </button>
             {promoOpen && (
               <Link
                 href={BUNDLE_HREF}
@@ -438,11 +373,11 @@ export function DetectorAcademyContent() {
           <SectionHeading
             eyebrow="Save your spot"
             title="Two ways to get in"
-            intro={`New members can reserve a free spot now. Everyone else, get on the list and we'll email you the dates as soon as registration opens. The academy is limited to ${DETECTOR_ACADEMY_CAPACITY} participants.`}
+            intro={`New members can reserve a free spot now. Everyone else, let us know you're interested and we'll be in touch with the dates. The academy is limited to ${DETECTOR_ACADEMY_CAPACITY} participants.`}
           />
           <div className="grid gap-6 lg:grid-cols-2">
             <BundleCard promoOpen={promoOpen} />
-            <UpdatesCard />
+            <RegistrationCard onInterested={() => setInterestOpen(true)} />
           </div>
         </div>
       </section>
@@ -475,6 +410,8 @@ export function DetectorAcademyContent() {
         </p>
         <p className="mt-6 text-center text-xs text-[#e8e0d5]/45">{GARRETT_TRADEMARK_NOTICE}</p>
       </section>
+
+      <InterestQuestionnaire open={interestOpen} onClose={() => setInterestOpen(false)} />
     </div>
   );
 }

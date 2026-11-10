@@ -213,11 +213,11 @@ export const DETECTOR_ACADEMY_GAINS = [
 export const DETECTOR_ACADEMY_FAQ = [
   {
     q: "When is the academy?",
-    a: "Early March 2027 at LDMA's Stanton camp in Congress, Arizona. We're finalizing the exact dates now. Sign up for updates and we'll email you as soon as they're set.",
+    a: "Early March 2027 at LDMA's Stanton camp in Congress, Arizona. We're finalizing the exact dates now. Tap \"I'm interested\" and a member of our team will be in touch with the dates.",
   },
   {
     q: "How do I register?",
-    a: `Registration opens once the dates are set, and updates subscribers hear first. If you join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, you can reserve your free spot now.`,
+    a: `Registration opens once the dates are set, and everyone who's told us they're interested hears first. If you join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, you can reserve your free spot now.`,
   },
   {
     q: "How does free registration with the Axiom Lite bundle work?",

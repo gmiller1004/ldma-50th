@@ -781,6 +781,66 @@ Lost Dutchman's Mining Association`;
   }
 }
 
+/** New LDMA Detector Academy lead for Member Services to follow up on. */
+export async function sendDetectorAcademyLeadEmail(input: {
+  to: string[];
+  name: string;
+  contactPhrase: string;
+  summary: string;
+  salesforceUrl: string | null;
+  taskCreated: boolean;
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[DEV] Detector Academy lead to ${input.to.join(", ")}:\n${input.summary}`);
+      return true;
+    }
+    console.warn("SENDGRID_API_KEY not set; skipping Detector Academy lead email");
+    return false;
+  }
+  sgMail.setApiKey(apiKey);
+
+  const intro = `${input.name} is interested in the LDMA Detector Academy and would like to be contacted ${input.contactPhrase}.`;
+  const taskLine = input.taskCreated
+    ? "A follow-up task has been added in Salesforce."
+    : "The website couldn't create a Salesforce task for this lead, so please track it from this email.";
+
+  const text = `${intro}
+
+${input.summary}
+
+${taskLine}
+${input.salesforceUrl ? `\nSalesforce contact: ${input.salesforceUrl}\n` : ""}
+Lost Dutchman's Mining Association website`;
+
+  const html = familyLegacyEmailShell(
+    "New Detector Academy lead",
+    `<p style="margin:0 0 16px;"><strong>${escapeHtml(intro)}</strong></p>
+     <pre style="margin:0 0 16px;padding:14px 16px;background:#1a120b;border:1px solid #d4af3725;border-radius:6px;white-space:pre-wrap;font-family:inherit;font-size:14px;color:#e8e0d5;">${escapeHtml(input.summary)}</pre>
+     <p style="margin:0 0 20px;">${escapeHtml(taskLine)}</p>
+     ${
+       input.salesforceUrl
+         ? `<p style="margin:0;"><a href="${escapeHtml(input.salesforceUrl)}" style="display:inline-block;padding:12px 20px;background:#d4af37;color:#1a120b;text-decoration:none;border-radius:6px;font-weight:600;">Open contact in Salesforce</a></p>`
+         : ""
+     }`
+  );
+
+  try {
+    await sgMail.send({
+      to: input.to,
+      from: { email: SENDER_EMAIL, name: SENDER_NAME },
+      subject: `Detector Academy lead: ${input.name}, contact ${input.contactPhrase}`,
+      text,
+      html,
+    });
+    return true;
+  } catch (e) {
+    console.error("SendGrid Detector Academy lead error:", e);
+    return false;
+  }
+}
+
 /** Asks Member Services (Gen and Nannette) to apply an online dues payment in Salesforce. */
 export async function sendMemberDuesStaffNotificationEmail(input: {
   to: string[];
