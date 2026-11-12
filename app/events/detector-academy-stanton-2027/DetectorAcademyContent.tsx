@@ -23,6 +23,7 @@ import {
   GARRETT_TRADEMARK_NOTICE,
   isAcademyPromoOpen,
 } from "@/lib/detector-academy";
+import { HypeVideo } from "./HypeVideo";
 import { InterestQuestionnaire } from "./InterestQuestionnaire";
 
 const BUNDLE_HREF = "/memberships#bundle-offer";
@@ -152,8 +153,10 @@ export function DetectorAcademyContent() {
 
   return (
     <div className="text-[#e8e0d5]">
+      <HypeVideo />
+
       {/* Hero */}
-      <section className="relative min-h-[78vh] flex items-end overflow-hidden">
+      <section className="relative min-h-[60vh] flex items-end overflow-hidden">
         <Image
           src="/images/about-events/detector-events.jpg"
           alt="Detectorists at an LDMA desert detecting event"
@@ -163,7 +166,7 @@ export function DetectorAcademyContent() {
           sizes="100vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#1a120b] via-[#1a120b]/70 to-[#1a120b]/20" />
-        <div className="relative max-w-6xl mx-auto w-full px-4 sm:px-6 pb-14 md:pb-20 pt-32">
+        <div className="relative max-w-6xl mx-auto w-full px-4 sm:px-6 pb-14 md:pb-20 pt-16">
           <p className="inline-flex rounded-full border border-[#d4af37]/40 bg-[#0f0a06]/70 backdrop-blur px-4 py-2 mb-6 text-xs uppercase tracking-[0.18em] text-[#e8e0d5]/85">
             Hands-on Garrett detector training
           </p>

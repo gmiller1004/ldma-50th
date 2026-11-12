@@ -24,6 +24,10 @@ export const DETECTOR_ACADEMY_CAPACITY = 200;
 export const DETECTOR_ACADEMY_PRICE = 400;
 export const DETECTOR_ACADEMY_DEPOSIT = 100;
 export const DETECTOR_ACADEMY_LOCATION = "LDMA Stanton camp · 15650 Stanton Rd, Congress, AZ 85332";
+export const DETECTOR_ACADEMY_HYPE_VIDEO = {
+  src: "https://vuicppdtdiswkhul.public.blob.vercel-storage.com/events/detector-academy-hype-2027-fNud7KX63hfHJBk5v1kIQkjX36Ar2H.mp4",
+  poster: "/images/events/detector-academy-hype-poster.jpg",
+};
 /** Klaviyo profile property for the "get notified" list. */
 export const DETECTOR_ACADEMY_INTEREST_TAG = "detector_academy_2027";
 
