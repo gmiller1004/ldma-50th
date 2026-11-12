@@ -14,6 +14,7 @@ export type KlaviyoMarketingSignupSource =
   | "discover_events"
   | "chat"
   | "membership_quote"
+  | "membership_questions"
   | "camp_reservation";
 
 export function klaviyoListIdForSignupSource(

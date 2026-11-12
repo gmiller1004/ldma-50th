@@ -781,11 +781,12 @@ Lost Dutchman's Mining Association`;
   }
 }
 
-/** New LDMA Detector Academy lead for Member Services to follow up on. */
-export async function sendDetectorAcademyLeadEmail(input: {
+/** New website lead (Detector Academy interest, membership questions) for Member Services to follow up on. */
+export async function sendMemberServicesLeadEmail(input: {
   to: string[];
-  name: string;
-  contactPhrase: string;
+  heading: string;
+  subject: string;
+  intro: string;
   summary: string;
   salesforceUrl: string | null;
   taskCreated: boolean;
@@ -793,15 +794,15 @@ export async function sendDetectorAcademyLeadEmail(input: {
   const apiKey = process.env.SENDGRID_API_KEY;
   if (!apiKey) {
     if (process.env.NODE_ENV === "development") {
-      console.log(`[DEV] Detector Academy lead to ${input.to.join(", ")}:\n${input.summary}`);
+      console.log(`[DEV] ${input.heading} to ${input.to.join(", ")}:\n${input.summary}`);
       return true;
     }
-    console.warn("SENDGRID_API_KEY not set; skipping Detector Academy lead email");
+    console.warn(`SENDGRID_API_KEY not set; skipping lead email: ${input.heading}`);
     return false;
   }
   sgMail.setApiKey(apiKey);
 
-  const intro = `${input.name} is interested in the LDMA Detector Academy and would like to be contacted ${input.contactPhrase}.`;
+  const intro = input.intro;
   const taskLine = input.taskCreated
     ? "A follow-up task has been added in Salesforce."
     : "The website couldn't create a Salesforce task for this lead, so please track it from this email.";
@@ -815,7 +816,7 @@ ${input.salesforceUrl ? `\nSalesforce contact: ${input.salesforceUrl}\n` : ""}
 Lost Dutchman's Mining Association website`;
 
   const html = familyLegacyEmailShell(
-    "New Detector Academy lead",
+    input.heading,
     `<p style="margin:0 0 16px;"><strong>${escapeHtml(intro)}</strong></p>
      <pre style="margin:0 0 16px;padding:14px 16px;background:#1a120b;border:1px solid #d4af3725;border-radius:6px;white-space:pre-wrap;font-family:inherit;font-size:14px;color:#e8e0d5;">${escapeHtml(input.summary)}</pre>
      <p style="margin:0 0 20px;">${escapeHtml(taskLine)}</p>
@@ -830,13 +831,13 @@ Lost Dutchman's Mining Association website`;
     await sgMail.send({
       to: input.to,
       from: { email: SENDER_EMAIL, name: SENDER_NAME },
-      subject: `Detector Academy lead: ${input.name}, contact ${input.contactPhrase}`,
+      subject: input.subject,
       text,
       html,
     });
     return true;
   } catch (e) {
-    console.error("SendGrid Detector Academy lead error:", e);
+    console.error(`SendGrid lead email error (${input.heading}):`, e);
     return false;
   }
 }

@@ -10,6 +10,7 @@ import {
   FileText,
   Loader2,
   MapPin,
+  MessageCircleQuestion,
   Phone,
   Shield,
   Sparkles,
@@ -23,6 +24,7 @@ import { addMembershipToCart } from "@/app/actions/cart";
 import { useCart } from "@/context/CartContext";
 import { trackAddToCart } from "@/lib/analytics";
 import { MEMBERSHIP_METRICS, trackMembershipMetricOnsite } from "@/lib/klaviyo-membership-browser";
+import { MembershipQuestionModal } from "./MembershipQuestionModal";
 
 const HERO_PHOTO = {
   src: "/images/home/member-john-m.jpg",
@@ -128,6 +130,7 @@ export function BundleMembershipsPageContent() {
   const [adding, setAdding] = useState(false);
   const [heroCtaVisible, setHeroCtaVisible] = useState(true);
   const [closingVisible, setClosingVisible] = useState(false);
+  const [questionsOpen, setQuestionsOpen] = useState(false);
   const heroCtaRef = useRef<HTMLDivElement | null>(null);
   const closingRef = useRef<HTMLElement | null>(null);
   const { refreshCart, openDrawer } = useCart();
@@ -323,82 +326,92 @@ export function BundleMembershipsPageContent() {
               <DetectorAcademyPromo className="mt-5 max-w-xl" />
             </div>
 
-            {/* Price card */}
-            <div
-              id="bundle-offer"
-              className="lg:row-span-2 scroll-mt-24 rounded-2xl border border-[#d4af37]/40 bg-gradient-to-b from-[#1e1809] to-[#0d0a04] p-5 sm:p-7 shadow-[0_12px_34px_rgba(0,0,0,0.45)]"
-            >
-              <p className="text-center text-[#e8e0d5] text-xs font-semibold tracking-[0.16em] uppercase">
-                Lifetime membership + detector
-              </p>
-              {loading ? (
-                <div className="mt-6 mb-4 flex items-center justify-center gap-2 text-[#e8e0d5]/70">
-                  <Loader2 className="w-5 h-5 animate-spin text-[#d4af37]" />
-                  Loading price...
-                </div>
-              ) : product ? (
-                <>
-                  <p className="mt-2 text-center font-serif text-6xl sm:text-7xl font-bold leading-none text-[#d4af37]">
-                    {priceLabel}
-                  </p>
-                  {product.compareAtPrice && (
-                    <p className="mt-2 text-center text-sm text-[#cfc6b8]">
-                      Everything included, bought separately: <s>{formatMoney(product.compareAtPrice)}</s>
-                    </p>
-                  )}
-                  {savings != null && (
-                    <p className="mt-3 text-center">
-                      <span className="inline-block rounded-full bg-[#d4af37] px-4 py-1 text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#1a120b]">
-                        You save {formatMoney(String(savings))}
-                      </span>
-                    </p>
-                  )}
-                  <div ref={heroCtaRef} className="mt-5">
-                    {addToCartButton}
-                  </div>
-                </>
-              ) : (
-                <div ref={heroCtaRef} className="mt-5">
-                  <a
-                    href="tel:8884653717"
-                    className="inline-flex w-full items-center justify-center py-3.5 px-4 rounded-lg bg-[#d4af37] text-[#1a120b] font-semibold hover:bg-[#f0d48f] transition-colors"
-                  >
-                    Call {PHONE_DISPLAY} to join
-                  </a>
-                </div>
-              )}
-              {error && <p className="mt-3 text-center text-sm text-red-300">{error}</p>}
-
-              <div className="mt-4 rounded-lg border border-[#d4af37]/60 bg-[#2c210d] px-3 py-2 text-center text-sm text-[#f5efe4]">
-                <p className="flex items-center justify-center gap-2">
-                  <Tent className="w-4 h-4 shrink-0 text-[#d4af37]" />
-                  <span>
-                    Member camping: <strong className="text-[#d4af37]">$6</strong>/night dry ·{" "}
-                    <strong className="text-[#d4af37]">$12</strong>/night with RV hookups
-                  </span>
+            <div className="lg:row-span-2 space-y-3">
+              {/* Price card */}
+              <div
+                id="bundle-offer"
+                className="scroll-mt-24 rounded-2xl border border-[#d4af37]/40 bg-gradient-to-b from-[#1e1809] to-[#0d0a04] p-5 sm:p-7 shadow-[0_12px_34px_rgba(0,0,0,0.45)]"
+              >
+                <p className="text-center text-[#e8e0d5] text-xs font-semibold tracking-[0.16em] uppercase">
+                  Lifetime membership + detector
                 </p>
-                <p className="mt-0.5 text-[11px] text-[#e8e0d5]/65">Rates vary by camp; hookups at select camps.</p>
-              </div>
-
-              <ul className="mt-4 space-y-1.5 text-xs sm:text-sm text-[#e8e0d5]/80">
-                <li className="flex items-start gap-2">
-                  <Shield className="w-4 h-4 mt-0.5 text-[#6dd472] shrink-0" />
-                  30-day cancellation policy
-                </li>
-                <li className="flex items-start gap-2">
-                  <FileText className="w-4 h-4 mt-0.5 text-[#6dd472] shrink-0" />
-                  Contract emailed after purchase. Review and sign before activation.
-                </li>
-                <li className="flex items-start gap-2">
-                  <Phone className="w-4 h-4 mt-0.5 text-[#6dd472] shrink-0" />
-                  <span>
-                    Questions or payment plans?{" "}
-                    <a className="text-[#f0d48f] font-semibold whitespace-nowrap" href="tel:8884653717">
-                      {PHONE_DISPLAY}
+                {loading ? (
+                  <div className="mt-6 mb-4 flex items-center justify-center gap-2 text-[#e8e0d5]/70">
+                    <Loader2 className="w-5 h-5 animate-spin text-[#d4af37]" />
+                    Loading price...
+                  </div>
+                ) : product ? (
+                  <>
+                    <p className="mt-2 text-center font-serif text-6xl sm:text-7xl font-bold leading-none text-[#d4af37]">
+                      {priceLabel}
+                    </p>
+                    {product.compareAtPrice && (
+                      <p className="mt-2 text-center text-sm text-[#cfc6b8]">
+                        Everything included, bought separately: <s>{formatMoney(product.compareAtPrice)}</s>
+                      </p>
+                    )}
+                    {savings != null && (
+                      <p className="mt-3 text-center">
+                        <span className="inline-block rounded-full bg-[#d4af37] px-4 py-1 text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#1a120b]">
+                          You save {formatMoney(String(savings))}
+                        </span>
+                      </p>
+                    )}
+                    <div ref={heroCtaRef} className="mt-5">
+                      {addToCartButton}
+                    </div>
+                  </>
+                ) : (
+                  <div ref={heroCtaRef} className="mt-5">
+                    <a
+                      href="tel:8884653717"
+                      className="inline-flex w-full items-center justify-center py-3.5 px-4 rounded-lg bg-[#d4af37] text-[#1a120b] font-semibold hover:bg-[#f0d48f] transition-colors"
+                    >
+                      Call {PHONE_DISPLAY} to join
                     </a>
-                  </span>
-                </li>
-              </ul>
+                  </div>
+                )}
+                {error && <p className="mt-3 text-center text-sm text-red-300">{error}</p>}
+
+                <div className="mt-4 rounded-lg border border-[#d4af37]/60 bg-[#2c210d] px-3 py-2 text-center text-sm text-[#f5efe4]">
+                  <p className="flex items-center justify-center gap-2">
+                    <Tent className="w-4 h-4 shrink-0 text-[#d4af37]" />
+                    <span>
+                      Member camping: <strong className="text-[#d4af37]">$6</strong>/night dry ·{" "}
+                      <strong className="text-[#d4af37]">$12</strong>/night with RV hookups
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[#e8e0d5]/65">Rates vary by camp; hookups at select camps.</p>
+                </div>
+
+                <ul className="mt-4 space-y-1.5 text-xs sm:text-sm text-[#e8e0d5]/80">
+                  <li className="flex items-start gap-2">
+                    <Shield className="w-4 h-4 mt-0.5 text-[#6dd472] shrink-0" />
+                    30-day cancellation policy
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <FileText className="w-4 h-4 mt-0.5 text-[#6dd472] shrink-0" />
+                    Contract emailed after purchase. Review and sign before activation.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Phone className="w-4 h-4 mt-0.5 text-[#6dd472] shrink-0" />
+                    <span>
+                      Questions or payment plans?{" "}
+                      <a className="text-[#f0d48f] font-semibold whitespace-nowrap" href="tel:8884653717">
+                        {PHONE_DISPLAY}
+                      </a>
+                    </span>
+                  </li>
+                </ul>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuestionsOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl border-2 border-[#d4af37]/70 bg-[#0d0a04]/70 text-[#f0d48f] font-semibold hover:bg-[#d4af37]/10 hover:border-[#d4af37] transition-colors"
+              >
+                <MessageCircleQuestion className="w-5 h-5" />
+                Questions about LDMA Membership?
+              </button>
             </div>
 
             {/* Product visual */}
@@ -867,6 +880,8 @@ export function BundleMembershipsPageContent() {
           </div>
         </div>
       )}
+
+      <MembershipQuestionModal open={questionsOpen} onClose={() => setQuestionsOpen(false)} />
     </>
   );
 }
