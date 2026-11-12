@@ -20,7 +20,7 @@ export const DETECTOR_ACADEMY_DEPOSIT_VARIANT_ID = "49970472976455";
 
 export const DETECTOR_ACADEMY_DATES_LABEL = "Early March 2027";
 export const DETECTOR_ACADEMY_DATES_NOTE = "Exact dates coming soon";
-export const DETECTOR_ACADEMY_CAPACITY = 200;
+export const DETECTOR_ACADEMY_CAPACITY = 100;
 export const DETECTOR_ACADEMY_PRICE = 400;
 export const DETECTOR_ACADEMY_DEPOSIT = 100;
 export const DETECTOR_ACADEMY_LOCATION = "LDMA Stanton camp · 15650 Stanton Rd, Congress, AZ 85332";

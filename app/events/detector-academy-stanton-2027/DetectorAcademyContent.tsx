@@ -18,7 +18,6 @@ import {
   DETECTOR_ACADEMY_NAME,
   DETECTOR_ACADEMY_PRICE,
   DETECTOR_ACADEMY_RESERVATION_PATH,
-  DETECTOR_ACADEMY_SCHEDULE,
   DETECTOR_ACADEMY_TRAINERS,
   GARRETT_TRADEMARK_NOTICE,
   isAcademyPromoOpen,
@@ -276,32 +275,22 @@ export function DetectorAcademyContent() {
 
       {/* Schedule */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
-        <SectionHeading
-          eyebrow="Daily schedule"
-          title="The four-day schedule"
-          intro="All times are Arizona time. Early March mornings at Stanton are cool, so bring layers."
-        />
-        <div className="grid gap-6 lg:grid-cols-2">
-          {DETECTOR_ACADEMY_SCHEDULE.map((day) => (
-            <div key={day.day} className="rounded-2xl border border-[#d4af37]/20 bg-[#0f0a06]/60 p-6">
-              <p className="text-xs uppercase tracking-[0.18em] text-[#d4af37] mb-1">{day.day}</p>
-              <h3 className="font-serif text-xl text-[#f0d48f] font-semibold mb-4">{day.theme}</h3>
-              <ol className="space-y-3">
-                {day.sessions.map((s) => (
-                  <li key={`${s.time}-${s.title}`} className="grid gap-1 sm:grid-cols-[9rem_1fr] sm:gap-3 text-sm">
-                    <span className="inline-flex items-start gap-1.5 text-[#e8e0d5]/60">
-                      <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      {s.time}
-                    </span>
-                    <span>
-                      <span className="font-medium text-[#e8e0d5]">{s.title}</span>
-                      {s.detail ? <span className="block text-[#e8e0d5]/70 mt-0.5">{s.detail}</span> : null}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ))}
+        <SectionHeading eyebrow="Daily schedule" title="Schedule coming soon" />
+        <div className="rounded-2xl border border-[#d4af37]/20 bg-[#0f0a06]/60 p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6">
+          <div className="flex items-start gap-4 flex-1">
+            <Clock className="w-8 h-8 text-[#d4af37] shrink-0" />
+            <p className="text-[#e8e0d5]/85 leading-relaxed">
+              We&apos;re finalizing the four-day schedule along with the dates. Let us know you&apos;re interested and
+              you&apos;ll be among the first to hear when it&apos;s ready.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setInterestOpen(true)}
+            className="inline-flex justify-center items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors shrink-0"
+          >
+            <Bell className="w-4 h-4" /> I&apos;m interested
+          </button>
         </div>
       </section>
 

@@ -100,7 +100,7 @@ export function DetectorReservationContent({ firstName, view }: { firstName: str
               trackCategory="event"
             />
             <Link href={DETECTOR_ACADEMY_PATH} className="text-sm text-[#d4af37] underline">
-              See the schedule
+              See event details
             </Link>
           </div>
         </>
@@ -115,7 +115,7 @@ export function DetectorReservationContent({ firstName, view }: { firstName: str
           </p>
           <div className="flex flex-wrap items-center gap-4">
             <Link href={DETECTOR_ACADEMY_PATH} className="px-5 py-2.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f]">
-              See the schedule
+              See event details
             </Link>
             <Link href="/campgrounds/stanton-arizona" className="text-sm text-[#d4af37] underline">
               Reserve your Stanton campsite
