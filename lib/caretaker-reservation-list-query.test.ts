@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   filterAndSortReservations,
   reservationPartyLabel,
+  splitSettledInCamp,
   type ReservationListQueryRow,
 } from "./caretaker-reservation-list-query.ts";
 
@@ -77,5 +78,30 @@ describe("reservationListQuery", () => {
       filtered.map((r) => r.id),
       ["also", "due"]
     );
+  });
+
+  it("splits settled in-camp stays from ones that need action", () => {
+    const today = "2026-11-13";
+    const checkedInAt = "2026-11-01T16:00:00.000Z";
+    const rows = [
+      row({ id: "settled", checkedInAt, status: "checked_in", checkOutDate: "2026-12-01", dueNowCents: 0 }),
+      row({ id: "leaving", checkedInAt, status: "checked_in", checkOutDate: today, dueNowCents: 0 }),
+      row({
+        id: "futureInstallment",
+        checkedInAt,
+        status: "checked_in",
+        checkOutDate: "2027-04-01",
+        balanceDueCents: 36000,
+        dueNowCents: 0,
+      }),
+      row({ id: "owes", checkedInAt, status: "checked_in", checkOutDate: "2026-12-01", dueNowCents: 1200 }),
+      row({ id: "overdue", checkedInAt, status: "checked_in", checkOutDate: "2026-12-01", hasOverdueSiteFee: true }),
+      row({ id: "pastCheckout", checkedInAt, status: "checked_in", checkOutDate: "2026-11-10" }),
+      row({ id: "arriving", checkInDate: today, checkOutDate: "2026-11-20" }),
+    ];
+    const { inCamp, rest, departingToday } = splitSettledInCamp(rows, today);
+    assert.deepEqual(inCamp.map((r) => r.id), ["settled", "leaving", "futureInstallment"]);
+    assert.deepEqual(rest.map((r) => r.id), ["owes", "overdue", "pastCheckout", "arriving"]);
+    assert.equal(departingToday, 1);
   });
 });

@@ -31,6 +31,7 @@ export type ReservationListQueryRow = {
   checkedInAt?: string | null;
   invoiceNumber?: string | null;
   balanceDueCents?: number;
+  dueNowCents?: number;
   hasOverdueSiteFee?: boolean;
 };
 
@@ -126,6 +127,28 @@ function compareReservations(
   }
   if (cmp !== 0) return cmp * dir;
   return a.id.localeCompare(b.id) * dir;
+}
+
+/**
+ * Checked-in stays that need nothing from the caretaker today: nothing due now,
+ * no overdue site fee, and checkout is today or later.
+ */
+export function isSettledInCamp(r: ReservationListQueryRow, today: string): boolean {
+  if (!r.checkedInAt || r.status === "cancelled") return false;
+  if ((r.dueNowCents ?? r.balanceDueCents ?? 0) > 0) return false;
+  if (r.hasOverdueSiteFee) return false;
+  return toDateOnly(r.checkOutDate) >= today;
+}
+
+export function splitSettledInCamp<T extends ReservationListQueryRow>(
+  rows: T[],
+  today: string
+): { inCamp: T[]; rest: T[]; departingToday: number } {
+  const inCamp: T[] = [];
+  const rest: T[] = [];
+  for (const r of rows) (isSettledInCamp(r, today) ? inCamp : rest).push(r);
+  const departingToday = inCamp.filter((r) => toDateOnly(r.checkOutDate) === today).length;
+  return { inCamp, rest, departingToday };
 }
 
 export function filterAndSortReservations<T extends ReservationListQueryRow>(

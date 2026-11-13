@@ -35,6 +35,7 @@ import { printReservationReceipt } from "@/app/members/caretaker/printReservatio
 import { ReservationListToolbar } from "@/app/members/caretaker/ReservationListToolbar";
 import {
   filterAndSortReservations,
+  splitSettledInCamp,
   type ReservationListFilterKey,
   type ReservationListSortKey,
 } from "@/lib/caretaker-reservation-list-query";
@@ -575,6 +576,7 @@ export function CaretakerPortalContent({
   const [resCalendarStart, setResCalendarStart] = useState(() => todayDateOnlyLocal());
   const [resCalendarStartDraft, setResCalendarStartDraft] = useState(resCalendarStart);
   const [archivedReservationsExpanded, setArchivedReservationsExpanded] = useState(false);
+  const [inCampExpanded, setInCampExpanded] = useState(false);
   const [activeResSearch, setActiveResSearch] = useState("");
   const [activeResFilter, setActiveResFilter] = useState<ReservationListFilterKey>("all");
   const [activeResSortKey, setActiveResSortKey] = useState<ReservationListSortKey>("checkIn");
@@ -874,6 +876,13 @@ export function CaretakerPortalContent({
       }),
     [activeReservations, activeResSearch, activeResFilter, activeResSortKey, activeResSortDir]
   );
+
+  // Searching or filtering shows one flat list so no match is hidden in the collapsed group.
+  const activeListGroups = useMemo(() => {
+    if (activeResSearch.trim() || activeResFilter !== "all") return null;
+    const split = splitSettledInCamp(filteredActiveReservations, today);
+    return split.inCamp.length > 0 ? split : null;
+  }, [filteredActiveReservations, activeResSearch, activeResFilter, today]);
 
   const filteredArchivedReservations = useMemo(
     () =>
@@ -2522,8 +2531,8 @@ export function CaretakerPortalContent({
           ) : filteredActiveReservations.length === 0 ? (
             <p className="text-[#e8e0d5]/60">No reservations match your search or filters.</p>
           ) : (
-            <ul className="space-y-2">
-              {filteredActiveReservations.map((r) => (
+            (() => {
+              const renderRow = (r: (typeof filteredActiveReservations)[number]) => (
                 <li
                   key={r.id}
                   className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#0f0a06]/60 border border-[#d4af37]/20 rounded-lg"
@@ -2594,8 +2603,36 @@ export function CaretakerPortalContent({
                     </button>
                   </div>
                 </li>
-              ))}
-            </ul>
+              );
+              if (!activeListGroups) {
+                return <ul className="space-y-2">{filteredActiveReservations.map(renderRow)}</ul>;
+              }
+              const { inCamp, rest, departingToday } = activeListGroups;
+              return (
+                <div className="space-y-3">
+                  <section className="rounded-lg border border-[#6dd472]/25 bg-[#0f3d1e]/20">
+                    <button
+                      type="button"
+                      onClick={() => setInCampExpanded((v) => !v)}
+                      aria-expanded={inCampExpanded}
+                      className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2.5 text-left font-semibold text-[#e8e0d5]/90 hover:text-[#e8e0d5]"
+                    >
+                      {inCampExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      In camp ({inCamp.length})
+                      <span className="text-sm font-normal text-[#e8e0d5]/60">
+                        Checked in, nothing due{departingToday > 0 ? ` · ${departingToday} leaving today` : ""}
+                      </span>
+                    </button>
+                    {inCampExpanded ? <ul className="space-y-2 px-3 pb-3">{inCamp.map(renderRow)}</ul> : null}
+                  </section>
+                  {rest.length > 0 ? (
+                    <ul className="space-y-2">{rest.map(renderRow)}</ul>
+                  ) : (
+                    <p className="text-[#e8e0d5]/60">No arrivals or balances to handle.</p>
+                  )}
+                </div>
+              );
+            })()
           )}
             </>
           )}
