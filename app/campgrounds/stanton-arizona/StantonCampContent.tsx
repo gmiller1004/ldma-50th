@@ -20,11 +20,23 @@ import {
   X,
   ChevronRight,
   Navigation,
+  Theater,
+  Scissors,
+  Dog,
+  CalendarDays,
+  UtensilsCrossed,
+  GraduationCap,
 } from "lucide-react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ShareButton } from "@/components/ShareButton";
 import { FacebookGroupCTA } from "@/components/FacebookGroupCTA";
 import { CampHeroReserveCta } from "@/components/CampHeroReserveCta";
+import {
+  DETECTOR_ACADEMY_DATES_LABEL,
+  DETECTOR_ACADEMY_NAME,
+  DETECTOR_ACADEMY_PATH,
+  isAcademyPromoOpen,
+} from "@/lib/detector-academy";
 
 const amenities = [
   {
@@ -34,11 +46,22 @@ const amenities = [
   },
   { icon: Tent, text: "65 dry camping sites" },
   {
+    icon: Theater,
+    text: "Historic Opera House for bingo, potlucks & events",
+    highlight: true,
+  },
+  {
+    icon: Home,
+    text: "Clubhouse, card room & craft room",
+    highlight: true,
+  },
+  {
     icon: Landmark,
     text: "Museum with mining artifacts",
     highlight: true,
   },
-  { icon: Home, text: "Clubhouse & card room" },
+  { icon: Scissors, text: "Craft classes — leather, woodburning & more" },
+  { icon: Dog, text: "Dog park" },
   { icon: Trophy, text: "Horseshoe pits & recreation areas" },
   { icon: Shirt, text: "Laundry facilities" },
   { icon: ShowerHead, text: "Showers & restrooms" },
@@ -46,13 +69,66 @@ const amenities = [
   { icon: UserRound, text: "Caretaker on-site" },
 ];
 
+const campLifeHighlights = [
+  {
+    icon: Theater,
+    title: "Bingo in the Opera House",
+    body: "Monday nights fill the historic Opera House — bingo cards, prizes, and neighbors who know your name.",
+  },
+  {
+    icon: UtensilsCrossed,
+    title: "Potlucks & cookouts",
+    body: "Community meals, holiday gatherings, and weekend cookouts keep the camp fed and friendly all season.",
+  },
+  {
+    icon: Scissors,
+    title: "Craft room classes",
+    body: "Leatherwork, woodburning, gingerbread, cookie baking — the craft calendar stays busy October through May.",
+  },
+  {
+    icon: CalendarDays,
+    title: "A full winter season",
+    body: "Holiday buggy parade, Christmas Eve potluck, New Year's Eve games, poker nights, and Bible study — week after week.",
+  },
+];
+
 const galleryImages: { src: string; caption?: string }[] = [
-  { src: "/images/campgrounds/stanton-arizona/stanton-1.jpg", caption: "Holiday gathering at Stanton" },
-  { src: "/images/campgrounds/stanton-arizona/stanton-2.jpg", caption: "Mining headframe demonstration" },
-  { src: "/images/campgrounds/stanton-arizona/stanton-3.jpg", caption: "Member work day — utility upgrades" },
-  { src: "/images/campgrounds/stanton-arizona/stanton-4.jpg", caption: "Gold finds at Hotel Stanton" },
-  { src: "/images/campgrounds/stanton-arizona/stanton-5.jpg", caption: "RV campground & historic buildings" },
-  { src: "/images/campgrounds/stanton-arizona/stanton-6.jpg", caption: "Gold from Stanton claims" },
+  {
+    src: "/images/campgrounds/stanton-arizona/life/bingo-1.jpg",
+    caption: "Bingo night winners in the Opera House",
+  },
+  {
+    src: "/images/campgrounds/stanton-arizona/life/dining-1.jpg",
+    caption: "Community breakfast in camp",
+  },
+  {
+    src: "/images/campgrounds/stanton-arizona/life/dining-2.jpg",
+    caption: "Bacon, pancakes, and neighbors",
+  },
+  {
+    src: "/images/campgrounds/stanton-arizona/life/bingo-3.jpg",
+    caption: "Monday bingo at Stanton",
+  },
+  {
+    src: "/images/campgrounds/stanton-arizona/life/prospecting-drywash.jpg",
+    caption: "Dry washing on Stanton claims",
+  },
+  {
+    src: "/images/campgrounds/stanton-arizona/stanton-5.jpg",
+    caption: "RV campground & historic buildings",
+  },
+  {
+    src: "/images/campgrounds/stanton-arizona/stanton-4.jpg",
+    caption: "Gold finds at Hotel Stanton",
+  },
+  {
+    src: "/images/campgrounds/stanton-arizona/stanton-1.jpg",
+    caption: "Holiday gathering at Stanton",
+  },
+  {
+    src: "/images/campgrounds/stanton-arizona/stanton-6.jpg",
+    caption: "Gold from Stanton claims",
+  },
 ];
 
 const nearbyAttractions = [
@@ -65,7 +141,7 @@ const stats = [
   { value: "50", label: "Years of LDMA History" },
   { value: "120", label: "Patented Acres" },
   { value: "197", label: "RV & Dry Sites" },
-  { value: "Oct–May", label: "Open Season" },
+  { value: "6 mo", label: "Max Stay per Season" },
 ];
 
 const MAPS_URL =
@@ -107,6 +183,7 @@ function StantonCampContentInner() {
   const reservationNotice = searchParams.get("reservation");
   const [heroError, setHeroError] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const academyOpen = isAcademyPromoOpen();
 
   const { scrollY } = useScroll();
   const heroY = useTransform(scrollY, [0, 600], [0, 75]);
@@ -147,7 +224,7 @@ function StantonCampContentInner() {
           {!heroError ? (
             <Image
               src="/images/campgrounds/stanton-arizona/camp-stanton-hero.jpg"
-              alt="Stanton Camp"
+              alt="Hotel Stanton at sunset with Rich Hill behind it"
               fill
               className="object-cover scale-105"
               sizes="100vw"
@@ -157,7 +234,7 @@ function StantonCampContentInner() {
           ) : (
             <Image
               src="/images/campgrounds/stanton-arizona/camp-stanton.jpg"
-              alt="Stanton Camp"
+              alt="Hotel Stanton at sunset with Rich Hill behind it"
               fill
               className="object-cover scale-105"
               sizes="100vw"
@@ -202,7 +279,7 @@ function StantonCampContentInner() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            Arizona
+            Arizona · Oct–May
           </motion.span>
           <motion.h1
             className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-[#f0d48f] tracking-tight mb-4"
@@ -218,7 +295,7 @@ function StantonCampContentInner() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            Flagship Camp • Restored 1870s Ghost Town & Gold Prospecting Haven
+            Flagship Camp · Ghost town living, gold claims, and stays up to six months
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -279,19 +356,113 @@ function StantonCampContentInner() {
             <h2 className="font-serif text-2xl md:text-3xl font-bold text-[#f0d48f] mb-6">
               Overview
             </h2>
-            <p className="text-[#e8e0d5]/90 text-lg leading-relaxed mb-8">
+            <p className="text-[#e8e0d5]/90 text-lg leading-relaxed mb-6">
               LDMA&apos;s most popular destination on 120 patented acres. Once the
               hideout of outlaw Charlie Stanton, this historic site has been
               lovingly restored into one of America&apos;s best-preserved ghost
-              towns. Owned by LDMA (Lost Dutchman&apos;s Mining Association).
-              Exclusive access to gold-bearing claims, seasonal camping
-              (October–May), and a true sense of mining history.
+              towns. Members dig exclusive gold-bearing claims by day and gather
+              in the Opera House by night — with stays of up to six months during
+              the October–May season.
             </p>
             <p className="text-[#d4af37]/90 text-base italic border-l-4 border-[#d4af37]/40 pl-4">
               One of LDMA&apos;s original camps — a cornerstone of our 50-year legacy
               of gold, discovery, and adventure.
             </p>
           </motion.div>
+        </div>
+      </section>
+
+      <SectionDivider />
+
+      {/* Camp Life */}
+      <section className="py-16 md:py-24 bg-[#0f3d1e]/30">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <motion.div
+            className="text-center mb-10"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="font-serif text-2xl md:text-3xl font-bold text-[#f0d48f] mb-3">
+              Life at Stanton
+            </h2>
+            <p className="text-[#e8e0d5]/80 max-w-2xl mx-auto">
+              Bingo, bacon, and gold — a winter community that fills the Opera House,
+              the craft room, and the claims.
+            </p>
+          </motion.div>
+
+          <motion.div
+            className="grid md:grid-cols-2 gap-4 mb-10"
+            variants={container}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-30px" }}
+          >
+            {campLifeHighlights.map(({ icon: Icon, title, body }) => (
+              <motion.div
+                key={title}
+                variants={item}
+                className="flex gap-4 p-5 rounded-xl bg-[#1a120b]/70 border border-[#d4af37]/20"
+              >
+                <span className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#d4af37]/20 flex items-center justify-center text-[#d4af37]">
+                  <Icon className="w-5 h-5" strokeWidth={2} />
+                </span>
+                <div>
+                  <h3 className="font-serif text-lg font-semibold text-[#f0d48f] mb-1">
+                    {title}
+                  </h3>
+                  <p className="text-[#e8e0d5]/80 text-sm leading-relaxed">{body}</p>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            {[
+              {
+                src: "/images/campgrounds/stanton-arizona/life/bingo-1.jpg",
+                alt: "Bingo winner in the Opera House",
+              },
+              {
+                src: "/images/campgrounds/stanton-arizona/life/dining-1.jpg",
+                alt: "Community breakfast at Stanton",
+              },
+              {
+                src: "/images/campgrounds/stanton-arizona/life/dining-2.jpg",
+                alt: "Camp breakfast — bacon and pancakes",
+              },
+              {
+                src: "/images/campgrounds/stanton-arizona/life/bingo-3.jpg",
+                alt: "Monday bingo at Stanton",
+              },
+            ].map(({ src, alt }) => (
+              <div
+                key={src}
+                className="relative aspect-[4/5] rounded-xl overflow-hidden border border-[#d4af37]/15"
+              >
+                <Image
+                  src={src}
+                  alt={alt}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 50vw, 25vw"
+                />
+              </div>
+            ))}
+          </motion.div>
+
+          <FacebookGroupCTA
+            url="https://www.facebook.com/groups/521036414939133"
+            campName="Stanton"
+            membersLabel="4,000+ members"
+            blurb="See this week’s calendar, bingo winners, cookouts, and claim finds — straight from camp."
+          />
         </div>
       </section>
 
@@ -320,9 +491,9 @@ function StantonCampContentInner() {
                 Now — LDMA Era
               </h3>
               <p className="text-[#e8e0d5]/85 text-sm leading-relaxed">
-                A thriving LDMA camp with full hookups, museum, clubhouse, and
-                exclusive gold-bearing claims — one of America&apos;s best-preserved
-                ghost towns.
+                A thriving LDMA camp with full hookups, museum, Opera House,
+                craft room, dog park, and exclusive gold-bearing claims — one of
+                America&apos;s best-preserved ghost towns.
               </p>
             </div>
           </motion.div>
@@ -378,35 +549,89 @@ function StantonCampContentInner() {
               </motion.li>
             ))}
           </motion.ul>
+          <motion.p
+            className="text-center text-[#e8e0d5]/70 text-sm mt-8 max-w-xl mx-auto"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Members may stay up to six months per open season. Sites are reserved for
+            LDMA members — guests are welcome in your rig.
+          </motion.p>
         </div>
       </section>
 
       <SectionDivider />
 
-      {/* Gold Prospecting + Seasonal Note */}
+      {/* Gold Prospecting + Detector Academy */}
       <section className="py-16 md:py-24">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-6">
           <motion.div
-            className="flex gap-4 p-6 md:p-8 rounded-2xl bg-[#0f3d1e]/40 border border-[#d4af37]/20"
+            className="rounded-2xl overflow-hidden border border-[#d4af37]/20"
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <Sparkles className="w-10 h-10 text-[#d4af37] flex-shrink-0 mt-1" />
-            <div>
-              <h2 className="font-serif text-xl md:text-2xl font-bold text-[#f0d48f] mb-3">
-                Gold Prospecting
-              </h2>
-              <p className="text-[#e8e0d5]/90 leading-relaxed mb-4">
-                Rich placer gold in the area. Members find nuggets and fines on
-                nearby LDMA claims — primarily metal detecting and dry washing,
-                with mostly dry terrain.
-              </p>
-              <p className="text-[#e8e0d5]/70 text-sm italic">
-                Open October through May. Closed in summer due to desert heat.
-              </p>
+            <div className="relative aspect-[16/10]">
+              <Image
+                src="/images/campgrounds/stanton-arizona/life/prospecting-drywash.jpg"
+                alt="Dry washing for gold on Stanton claims"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 768px"
+              />
+              <div
+                className="absolute inset-0 bg-gradient-to-t from-[#1a120b] via-[#1a120b]/30 to-transparent"
+                aria-hidden
+              />
+            </div>
+            <div className="flex gap-4 p-6 md:p-8 bg-[#0f3d1e]/40">
+              <Sparkles className="w-10 h-10 text-[#d4af37] flex-shrink-0 mt-1" />
+              <div>
+                <h2 className="font-serif text-xl md:text-2xl font-bold text-[#f0d48f] mb-3">
+                  Gold Prospecting
+                </h2>
+                <p className="text-[#e8e0d5]/90 leading-relaxed mb-4">
+                  Rich Hill country. Members work placer ground on nearby LDMA
+                  claims — metal detecting and dry washing on mostly dry desert
+                  terrain. Nuggets and fines still come out of these washes every
+                  season.
+                </p>
+                <p className="text-[#e8e0d5]/70 text-sm italic">
+                  Open October through May. Closed in summer due to desert heat.
+                </p>
+              </div>
             </div>
           </motion.div>
+
+          {academyOpen ? (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+            >
+              <Link
+                href={DETECTOR_ACADEMY_PATH}
+                className="group flex items-start gap-4 p-5 md:p-6 rounded-2xl border border-[#d4af37]/40 bg-[#0f3d1e]/50 hover:border-[#d4af37] hover:bg-[#0f3d1e]/70 transition-colors"
+              >
+                <GraduationCap className="w-8 h-8 text-[#d4af37] flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-serif text-lg font-semibold text-[#f0d48f] mb-1 group-hover:text-[#d4af37] transition-colors">
+                    {DETECTOR_ACADEMY_NAME}
+                  </h3>
+                  <p className="text-[#e8e0d5]/85 text-sm leading-relaxed mb-2">
+                    Four days of Garrett detector training right here at Stanton —
+                    classroom, test garden, and guided hunts on camp claims.{" "}
+                    {DETECTOR_ACADEMY_DATES_LABEL}. Bundle members can attend free
+                    with a deposit that comes back as camp credit.
+                  </p>
+                  <span className="text-[#d4af37] text-sm font-medium underline underline-offset-4">
+                    See the academy
+                  </span>
+                </div>
+              </Link>
+            </motion.div>
+          ) : null}
         </div>
       </section>
 
@@ -502,7 +727,7 @@ function StantonCampContentInner() {
 
       <SectionDivider />
 
-      {/* Stanton Through the Years - Gallery with Lightbox */}
+      {/* Gallery with Lightbox */}
       <section className="py-16 md:py-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <motion.h2
@@ -511,7 +736,7 @@ function StantonCampContentInner() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            Stanton Through the Years
+            Camp & Claims
           </motion.h2>
           <motion.p
             className="text-center text-[#e8e0d5]/70 text-sm mb-12 max-w-xl mx-auto"
@@ -519,7 +744,7 @@ function StantonCampContentInner() {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
           >
-            Click any image to view full size
+            Opera House nights, desert claims, and ghost-town living — click any image
           </motion.p>
           <motion.div
             className="grid grid-cols-2 md:grid-cols-3 gap-4"
@@ -539,11 +764,6 @@ function StantonCampContentInner() {
               />
             ))}
           </motion.div>
-          <SectionDivider />
-          <FacebookGroupCTA
-            url="https://www.facebook.com/groups/521036414939133"
-            campName="Stanton"
-          />
         </div>
       </section>
 
@@ -577,7 +797,8 @@ function StantonCampContentInner() {
               >
                 <Image
                   src={
-                    galleryImages[lightboxIndex]?.src || "/images/campgrounds/stanton-arizona/camp-stanton.jpg"
+                    galleryImages[lightboxIndex]?.src ||
+                    "/images/campgrounds/stanton-arizona/camp-stanton.jpg"
                   }
                   alt={galleryImages[lightboxIndex]?.caption || "Stanton camp"}
                   fill
@@ -611,7 +832,9 @@ function StantonCampContentInner() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setLightboxIndex((i) =>
-                      i === null ? null : Math.min(i + 1, galleryImages.length - 1)
+                      i === null
+                        ? null
+                        : Math.min(i + 1, galleryImages.length - 1)
                     );
                   }}
                   disabled={lightboxIndex === galleryImages.length - 1}
@@ -632,13 +855,22 @@ function StantonCampContentInner() {
       <section className="py-20 md:py-28 bg-gradient-to-b from-[#0f3d1e]/50 to-[#1a120b]">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
           <motion.h2
-            className="font-serif text-3xl md:text-4xl font-bold text-[#f0d48f] mb-8"
+            className="font-serif text-3xl md:text-4xl font-bold text-[#f0d48f] mb-4"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
             Ready to Visit Stanton?
           </motion.h2>
+          <motion.p
+            className="text-[#e8e0d5]/80 mb-8 max-w-xl mx-auto"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Full hookups, stays up to six months, Opera House nights, and gold
+            claims in Rich Hill country.
+          </motion.p>
           <motion.div
             className="flex flex-col sm:flex-row gap-4 justify-center"
             initial={{ opacity: 0, y: 16 }}

@@ -7,9 +7,18 @@ import { Facebook } from "lucide-react";
 type Props = {
   url: string;
   campName: string;
+  /** Optional member count line, e.g. "4,000+ members" */
+  membersLabel?: string;
+  /** Override the default connect blurb */
+  blurb?: string;
 };
 
-export function FacebookGroupCTA({ url, campName }: Props) {
+export function FacebookGroupCTA({
+  url,
+  campName,
+  membersLabel,
+  blurb,
+}: Props) {
   return (
     <motion.section
       className="py-12 md:py-16"
@@ -19,9 +28,12 @@ export function FacebookGroupCTA({ url, campName }: Props) {
     >
       <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
         <div className="p-6 md:p-8 rounded-2xl bg-[#0f3d1e]/40 border border-[#d4af37]/20">
+          {membersLabel ? (
+            <p className="text-[#d4af37] text-sm font-medium mb-2">{membersLabel}</p>
+          ) : null}
           <p className="text-[#e8e0d5]/90 mb-4">
-            Connect with {campName} members, share finds, and stay in the loop on
-            camp events.
+            {blurb ??
+              `Connect with ${campName} members, share finds, and stay in the loop on camp events.`}
           </p>
           <Link
             href={url}
@@ -30,7 +42,7 @@ export function FacebookGroupCTA({ url, campName }: Props) {
             className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#1877f2] text-white font-semibold rounded-lg hover:bg-[#166fe5] transition-colors"
           >
             <Facebook className="w-5 h-5" />
-            Follow {campName} on Facebook
+            Join the {campName} Facebook Group
           </Link>
         </div>
       </div>
