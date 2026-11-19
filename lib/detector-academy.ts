@@ -12,7 +12,7 @@ export const DETECTOR_ACADEMY_PATH = "/events/detector-academy-stanton-2027";
 export const DETECTOR_ACADEMY_RESERVATION_PATH = "/members/detector-academy-reservation";
 export const DETECTOR_ACADEMY_NAME = "LDMA Detector Academy";
 
-/** Shopify product: deposit variant for bundle buyers; $400 variants held at zero until dates are set. */
+/** Shopify product: deposit variant for bundle buyers; $800 variants held at zero until dates are set. */
 export const DETECTOR_ACADEMY_PRODUCT_HANDLE = "detector-academy-stanton-2027";
 export const DETECTOR_ACADEMY_PRODUCT_GID = "gid://shopify/Product/9142497706055";
 export const DETECTOR_ACADEMY_DEPOSIT_VARIANT_GID = "gid://shopify/ProductVariant/49970472976455";
@@ -21,7 +21,7 @@ export const DETECTOR_ACADEMY_DEPOSIT_VARIANT_ID = "49970472976455";
 export const DETECTOR_ACADEMY_DATES_LABEL = "Early March 2027";
 export const DETECTOR_ACADEMY_DATES_NOTE = "Exact dates coming soon";
 export const DETECTOR_ACADEMY_CAPACITY = 100;
-export const DETECTOR_ACADEMY_PRICE = 400;
+export const DETECTOR_ACADEMY_PRICE = 800;
 export const DETECTOR_ACADEMY_DEPOSIT = 100;
 export const DETECTOR_ACADEMY_LOCATION = "LDMA Stanton camp · 15650 Stanton Rd, Congress, AZ 85332";
 export const DETECTOR_ACADEMY_HYPE_VIDEO = {

@@ -20,7 +20,7 @@ export function DetectorAcademyPromo({ className = "" }: { className?: string })
       <span className="text-sm text-[#e8e0d5]/90 leading-relaxed">
         <strong className="text-[#f0d48f]">Bonus: attend the {DETECTOR_ACADEMY_NAME} free.</strong> Join with the Axiom
         Lite bundle by {ACADEMY_PROMO_DEADLINE_LABEL}, and your spot at our four-day Garrett detector training in Stanton,
-        AZ ({DETECTOR_ACADEMY_DATES_LABEL.toLowerCase()}) is free, a $400 value. Reserve it with a $100 deposit that comes
+        AZ ({DETECTOR_ACADEMY_DATES_LABEL.toLowerCase()}) is free, an $800 value. Reserve it with a $100 deposit that comes
         back as camp credit when you attend.{" "}
         <span className="text-[#d4af37] underline underline-offset-4 group-hover:text-[#f0d48f]">See the academy</span>
       </span>
