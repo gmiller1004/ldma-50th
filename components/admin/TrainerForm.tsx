@@ -278,7 +278,8 @@ export function TrainerForm({ mode, trainer }: TrainerFormProps) {
               className="text-sm text-[#e8e0d5]/80 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#d4af37] file:text-[#1a120b] file:font-medium"
             />
             <input
-              type="url"
+              type="text"
+              inputMode="url"
               placeholder="Or paste image URL"
               value={photoUrl}
               onChange={(e) => setPhotoUrl(e.target.value)}
