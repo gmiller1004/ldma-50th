@@ -6,6 +6,7 @@ import {
 } from "@/lib/collections-config";
 import { getValidCampSlugs } from "@/lib/directory-camps";
 import { getPosts } from "@/lib/blog";
+import { getPublishedTrainers } from "@/lib/trainers";
 import { DETECTOR_ACADEMY_PRODUCT_HANDLE } from "@/lib/detector-academy";
 
 const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://ldma-50th.vercel.app";
@@ -27,6 +28,7 @@ const STATIC_PATHS = [
   "/maintenance",
   "/50-years",
   "/directory",
+  "/trainers",
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -91,6 +93,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch {
     // Shopify/env may be missing at build; static + campgrounds still included
+  }
+
+  const trainers = await getPublishedTrainers();
+  for (const trainer of trainers) {
+    entries.push({
+      url: `${BASE}/trainers/${trainer.slug}`,
+      lastModified: trainer.updatedAt,
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
+    });
   }
 
   return entries;

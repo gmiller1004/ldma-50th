@@ -33,6 +33,7 @@ const LEGACY_REDIRECTS: Array<{ source: string; destination: string }> = [
 ];
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["sanitize-html"],
   async redirects() {
     // Load blog redirects from .js so compiled config can resolve it (Node does not load .ts)
     const { BLOG_REDIRECTS } = require("./lib/blog-redirects.generated.js");

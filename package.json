@@ -10,6 +10,8 @@
     "lint": "eslint",
     "db:init": "node --env-file=.env.local scripts/init-community-db.mjs",
     "db:blog:init": "node --env-file=.env.local scripts/init-blog-db.mjs",
+    "db:trainers:init": "node --env-file=.env.local scripts/init-trainers-db.mjs",
+    "db:trainers:seed": "node --env-file=.env.local scripts/seed-trainers.mjs",
     "db:blog:seed-myldma": "node --env-file=.env.local scripts/seed-blog-from-myldma-sitemap.mjs",
     "generate:blog-redirects": "node scripts/generate-blog-redirects.mjs",
     "db:migrate": "node --env-file=.env.local scripts/migrate-community.mjs",
@@ -50,6 +52,10 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
     "@sendgrid/mail": "^8.1.6",
+    "@tiptap/extension-link": "^3.34.0",
+    "@tiptap/extension-underline": "^3.34.0",
+    "@tiptap/react": "^3.34.0",
+    "@tiptap/starter-kit": "^3.34.0",
     "@upstash/redis": "^1.36.3",
     "@vercel/blob": "^2.3.0",
     "date-fns": "^4.1.0",
@@ -62,6 +68,7 @@
     "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "sanitize-html": "^2.18.2",
     "stripe": "^20.4.1"
   },
   "devDependencies": {
@@ -69,6 +76,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sanitize-html": "^2.16.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "pg": "^8.19.0",
