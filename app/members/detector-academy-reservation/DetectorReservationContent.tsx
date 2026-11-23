@@ -70,7 +70,7 @@ export function DetectorReservationContent({ firstName, view }: { firstName: str
           <ul className="space-y-2 text-sm text-[#e8e0d5]/85 mb-6">
             <li className="flex gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-              We&apos;re finalizing the early March dates and will email you as soon as they&apos;re set.
+              The academy runs {DETECTOR_ACADEMY_DATES_LABEL} at Stanton.
             </li>
             <li className="flex gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
@@ -79,8 +79,7 @@ export function DetectorReservationContent({ firstName, view }: { firstName: str
             </li>
             <li className="flex gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-              If you can&apos;t make the dates once they&apos;re announced, your ${DETECTOR_ACADEMY_DEPOSIT} becomes Stanton
-              camp credit instead.
+              If you can&apos;t make these dates, your ${DETECTOR_ACADEMY_DEPOSIT} becomes Stanton camp credit instead.
             </li>
             <li className="flex gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />

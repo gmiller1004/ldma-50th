@@ -59,7 +59,7 @@ function RegistrationCard({ onInterested }: { onInterested: () => void }) {
       <p className="text-xs uppercase tracking-[0.18em] text-[#d4af37] mb-2">Registration</p>
       <h3 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-2">${DETECTOR_ACADEMY_PRICE} per participant</h3>
       <p className="text-sm text-[#e8e0d5]/75 mb-4">
-        Open to LDMA members and the public. Registration opens once the dates are set. Camping is booked separately.
+        Open to LDMA members and the public. Registration opens soon. Camping is booked separately.
       </p>
       <ul className="grid gap-2 sm:grid-cols-2 text-sm text-[#e8e0d5]/85 mb-6">
         {DETECTOR_ACADEMY_INCLUDED.map((item) => (
@@ -71,8 +71,8 @@ function RegistrationCard({ onInterested }: { onInterested: () => void }) {
       </ul>
       <div className="mt-auto rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/10 p-5 space-y-3">
         <p className="text-sm text-[#e8e0d5]/85">
-          Tell us a little about yourself and a member of our team will reach out with the dates and answer your
-          questions.
+          Tell us a little about yourself and a member of our team will reach out when registration opens and answer
+          your questions.
         </p>
         <button
           type="button"
@@ -111,8 +111,7 @@ function BundleCard({ promoOpen }: { promoOpen: boolean }) {
         </li>
         <li className="flex gap-2">
           <Check className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-          Can&apos;t make the dates once they&apos;re announced? Your ${DETECTOR_ACADEMY_DEPOSIT} becomes Stanton camp
-          credit instead
+          Can&apos;t make these dates? Your ${DETECTOR_ACADEMY_DEPOSIT} becomes Stanton camp credit instead
         </li>
       </ul>
       <div className="mt-auto flex flex-col gap-3">
@@ -178,7 +177,10 @@ export function DetectorAcademyContent() {
           </p>
           <div className="mt-7 flex flex-wrap gap-3 text-sm">
             <span className="inline-flex items-center gap-2 rounded-lg bg-[#0f0a06]/70 border border-[#d4af37]/25 px-3 py-2">
-              <Calendar className="w-4 h-4 text-[#d4af37]" /> {DETECTOR_ACADEMY_DATES_LABEL} · {DETECTOR_ACADEMY_DATES_NOTE.toLowerCase()}
+              <Calendar className="w-4 h-4 text-[#d4af37]" />{" "}
+              {DETECTOR_ACADEMY_DATES_NOTE
+                ? `${DETECTOR_ACADEMY_DATES_LABEL} · ${DETECTOR_ACADEMY_DATES_NOTE.toLowerCase()}`
+                : DETECTOR_ACADEMY_DATES_LABEL}
             </span>
             <span className="inline-flex items-center gap-2 rounded-lg bg-[#0f0a06]/70 border border-[#d4af37]/25 px-3 py-2">
               <MapPin className="w-4 h-4 text-[#d4af37]" /> Stanton, Arizona
@@ -280,8 +282,8 @@ export function DetectorAcademyContent() {
           <div className="flex items-start gap-4 flex-1">
             <Clock className="w-8 h-8 text-[#d4af37] shrink-0" />
             <p className="text-[#e8e0d5]/85 leading-relaxed">
-              We&apos;re finalizing the four-day schedule along with the dates. Let us know you&apos;re interested and
-              you&apos;ll be among the first to hear when it&apos;s ready.
+              We&apos;re finalizing the four-day schedule overview. Let us know you&apos;re interested and you&apos;ll be
+              among the first to see it.
             </p>
           </div>
           <button
@@ -335,8 +337,10 @@ export function DetectorAcademyContent() {
           <h2 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-3">Good to know</h2>
           <ul className="space-y-3 text-sm text-[#e8e0d5]/85">
             <li className="flex gap-3">
-              <Calendar className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" /> {DETECTOR_ACADEMY_DATES_LABEL}.{" "}
-              {DETECTOR_ACADEMY_DATES_NOTE}.
+              <Calendar className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
+              {DETECTOR_ACADEMY_DATES_NOTE
+                ? `${DETECTOR_ACADEMY_DATES_LABEL}. ${DETECTOR_ACADEMY_DATES_NOTE}.`
+                : DETECTOR_ACADEMY_DATES_LABEL}
             </li>
             <li className="flex gap-3">
               <MapPin className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" /> {DETECTOR_ACADEMY_LOCATION}
@@ -365,7 +369,7 @@ export function DetectorAcademyContent() {
           <SectionHeading
             eyebrow="Save your spot"
             title="Two ways to get in"
-            intro={`New members can reserve a free spot now. Everyone else, let us know you're interested and we'll be in touch with the dates. The academy is limited to ${DETECTOR_ACADEMY_CAPACITY} participants.`}
+            intro={`New members can reserve a free spot now. Everyone else, let us know you're interested and we'll reach out when registration opens. The academy is limited to ${DETECTOR_ACADEMY_CAPACITY} participants.`}
           />
           <div className="grid gap-6 lg:grid-cols-2">
             <BundleCard promoOpen={promoOpen} />

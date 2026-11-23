@@ -1,10 +1,10 @@
 /**
- * LDMA Detector Academy at Stanton (early March 2027, exact dates TBD): event content, Shopify IDs,
+ * LDMA Detector Academy at Stanton (March 11–14, 2027): event content, Shopify IDs,
  * and the Axiom Lite bundle reservation rule. Client-safe: no server imports.
  *
  * New members who buy the LDMA Lifetime Bundle — Garrett Axiom Lite inside the promo window attend
  * free with a $100 non-refundable deposit, returned as Stanton camp credit when they attend, or as camp
- * credit if they can't make the dates once they're announced.
+ * credit if they can't make these dates.
  * Everyone else joins the updates list until registration opens.
  */
 
@@ -12,14 +12,15 @@ export const DETECTOR_ACADEMY_PATH = "/events/detector-academy-stanton-2027";
 export const DETECTOR_ACADEMY_RESERVATION_PATH = "/members/detector-academy-reservation";
 export const DETECTOR_ACADEMY_NAME = "LDMA Detector Academy";
 
-/** Shopify product: deposit variant for bundle buyers; $800 variants held at zero until dates are set. */
+/** Shopify product: deposit variant for bundle buyers; $800 variants held at zero until registration opens. */
 export const DETECTOR_ACADEMY_PRODUCT_HANDLE = "detector-academy-stanton-2027";
 export const DETECTOR_ACADEMY_PRODUCT_GID = "gid://shopify/Product/9142497706055";
 export const DETECTOR_ACADEMY_DEPOSIT_VARIANT_GID = "gid://shopify/ProductVariant/49970472976455";
 export const DETECTOR_ACADEMY_DEPOSIT_VARIANT_ID = "49970472976455";
 
-export const DETECTOR_ACADEMY_DATES_LABEL = "Early March 2027";
-export const DETECTOR_ACADEMY_DATES_NOTE = "Exact dates coming soon";
+export const DETECTOR_ACADEMY_DATES_LABEL = "March 11–14, 2027";
+/** Optional secondary date line (empty once exact dates are published). */
+export const DETECTOR_ACADEMY_DATES_NOTE = "";
 export const DETECTOR_ACADEMY_CAPACITY = 100;
 export const DETECTOR_ACADEMY_PRICE = 800;
 export const DETECTOR_ACADEMY_DEPOSIT = 100;
@@ -220,15 +221,15 @@ export const DETECTOR_ACADEMY_GAINS = [
 export const DETECTOR_ACADEMY_FAQ = [
   {
     q: "When is the academy?",
-    a: "Early March 2027 at LDMA's Stanton camp in Congress, Arizona. We're finalizing the exact dates now. Tap \"I'm interested\" and a member of our team will be in touch with the dates.",
+    a: `${DETECTOR_ACADEMY_DATES_LABEL} at LDMA's Stanton camp in Congress, Arizona.`,
   },
   {
     q: "How do I register?",
-    a: `Registration opens once the dates are set, and everyone who's told us they're interested hears first. If you join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, you can reserve your free spot now.`,
+    a: `Registration opens soon, and everyone who's told us they're interested hears first. If you join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, you can reserve your free spot now.`,
   },
   {
     q: "How does free registration with the Axiom Lite bundle work?",
-    a: `Join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, then reserve your spot with a $${DETECTOR_ACADEMY_DEPOSIT} non-refundable deposit. When you attend, the $${DETECTOR_ACADEMY_DEPOSIT} comes back to you as Stanton camp credit for site fees or other camp purchases. If you can't make the dates once they're announced, it becomes Stanton camp credit instead.`,
+    a: `Join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, then reserve your spot with a $${DETECTOR_ACADEMY_DEPOSIT} non-refundable deposit. When you attend, the $${DETECTOR_ACADEMY_DEPOSIT} comes back to you as Stanton camp credit for site fees or other camp purchases. If you can't make these dates, it becomes Stanton camp credit instead.`,
   },
   {
     q: "Do I need my own detector?",
