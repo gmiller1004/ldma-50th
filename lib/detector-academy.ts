@@ -189,6 +189,24 @@ export const DETECTOR_ACADEMY_TRAINERS: AcademyTrainer[] = [
     photo: "/images/trainers/john-mathis.jpg",
     bio: "An old-school prospector with more than 50 years in the field across six western states. He found a 2½-ounce nugget in the American River at age 10 and has been chasing gold ever since. Stanton's caretaker since 2018 and a Master Instructor for the Digger's Gold Mining Academy, he knows the camp's claims firsthand and will lead the claim orientation and share local tips.",
   },
+  {
+    name: "Heath Jones",
+    role: "Founder, History Seekers",
+    photo: "/images/trainers/heath-jones.jpg",
+    bio: "Founder of History Seekers and a detectorist since the early 1990s. After a career in law enforcement he spent nearly nine years managing a major metal-detecting retailer, working with manufacturers and testing prototypes before launching History Seekers' YouTube and Facebook channels in 2019. Best known for Civil War relic hunting, he also hunts gold on LDMA ground and at AKAU near Nome. He'll bring field settings and real-machine coaching from someone who sells—and digs—the gear.",
+  },
+  {
+    name: "Amber Evans",
+    role: "History Seekers",
+    photo: "/images/trainers/amber-evans.jpg",
+    bio: "Part of the History Seekers team and a regular on hunts alongside Heath Jones. She caught gold fever at AKAU Gold Camp near Nome—after a ten-minute lesson she recovered nine pieces in her first hour and 118 by the end of the trip—and has since found gold on LDMA ground at Stanton. She knows what it feels like to start from zero on mineralized dirt, and she's a natural fit for coaching newcomers through their first real signals.",
+  },
+  {
+    name: "Dylan Pritchard",
+    role: "B-Kings Outdoors · Stanton / Rich Hill",
+    photo: "/images/trainers/dylan-pritchard.jpg",
+    bio: "An Arizona nugget hunter based near Congress who works the Stanton / Rich Hill country under B-Kings Outdoors. He's known for big Garrett Axiom finds—including multi-ounce and specimen gold from Rich Hill—and teaches detector classes for prospectors learning hot desert ground. When he's not filming hunts, he's in the same hills academy participants will walk: local knowledge, coil choice, and how to turn a whisper into a dig.",
+  },
 ];
 
 export const DETECTOR_ACADEMY_INCLUDED = [
