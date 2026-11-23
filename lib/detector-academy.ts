@@ -5,14 +5,14 @@
  * New members who buy the LDMA Lifetime Bundle — Garrett Axiom Lite inside the promo window attend
  * free with a $100 non-refundable deposit, returned as Stanton camp credit when they attend, or as camp
  * credit if they can't make these dates.
- * Everyone else joins the updates list until registration opens.
+ * General and member registration are $800 on the Shopify event product; bundle buyers use the $100 deposit path.
  */
 
 export const DETECTOR_ACADEMY_PATH = "/events/detector-academy-stanton-2027";
 export const DETECTOR_ACADEMY_RESERVATION_PATH = "/members/detector-academy-reservation";
 export const DETECTOR_ACADEMY_NAME = "LDMA Detector Academy";
 
-/** Shopify product: deposit variant for bundle buyers; $800 variants held at zero until registration opens. */
+/** Shopify product: general/member $800 registration + $100 deposit variant for Axiom Lite bundle buyers. */
 export const DETECTOR_ACADEMY_PRODUCT_HANDLE = "detector-academy-stanton-2027";
 export const DETECTOR_ACADEMY_PRODUCT_GID = "gid://shopify/Product/9142497706055";
 export const DETECTOR_ACADEMY_DEPOSIT_VARIANT_GID = "gid://shopify/ProductVariant/49970472976455";
@@ -235,7 +235,7 @@ export const DETECTOR_ACADEMY_FAQ = [
   },
   {
     q: "How do I register?",
-    a: `Registration opens soon, and everyone who's told us they're interested hears first. If you join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, you can reserve your free spot now.`,
+    a: `Register on this page for $${DETECTOR_ACADEMY_PRICE}. If you join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, you can reserve your free spot with a $${DETECTOR_ACADEMY_DEPOSIT} deposit instead.`,
   },
   {
     q: "How does free registration with the Axiom Lite bundle work?",

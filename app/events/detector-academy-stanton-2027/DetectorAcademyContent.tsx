@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Bell, Calendar, Check, ChevronDown, Clock, MapPin, Tent, Users } from "lucide-react";
+import {
+  EventPurchaseSection,
+  filterEventVariantsByMember,
+  getEventVariants,
+} from "@/components/EventPurchaseSection";
 import {
   ACADEMY_PROMO_DEADLINE_LABEL,
   DETECTOR_ACADEMY_CAPACITY,
@@ -16,6 +21,7 @@ import {
   DETECTOR_ACADEMY_LEARNING,
   DETECTOR_ACADEMY_LOCATION,
   DETECTOR_ACADEMY_NAME,
+  DETECTOR_ACADEMY_PATH,
   DETECTOR_ACADEMY_PRICE,
   DETECTOR_ACADEMY_RESERVATION_PATH,
   DETECTOR_ACADEMY_TRAINERS,
@@ -24,6 +30,7 @@ import {
   GARRETT_TRADEMARK_NOTICE,
   isAcademyPromoOpen,
 } from "@/lib/detector-academy";
+import type { EventProduct } from "@/lib/shopify";
 import { HypeVideo } from "./HypeVideo";
 import { InterestQuestionnaire } from "./InterestQuestionnaire";
 
@@ -55,13 +62,29 @@ function SectionHeading({ eyebrow, title, intro }: { eyebrow: string; title: str
   );
 }
 
-function RegistrationCard({ onInterested }: { onInterested: () => void }) {
+function RegistrationCard({
+  event,
+  isMemberLoggedIn,
+  onInterested,
+}: {
+  event: EventProduct | null;
+  isMemberLoggedIn: boolean;
+  onInterested: () => void;
+}) {
+  const filtered = useMemo(
+    () => (event ? filterEventVariantsByMember(event, isMemberLoggedIn) : null),
+    [event, isMemberLoggedIn]
+  );
+  const variants = filtered ? getEventVariants(filtered) : [];
+  const defaultVariant = variants.find((v) => v.availableForSale !== false) ?? variants[0];
+  const [selectedVariantId, setSelectedVariantId] = useState(defaultVariant?.id ?? "");
+
   return (
     <div className="rounded-2xl border border-[#d4af37]/30 bg-[#0f0a06]/80 p-6 md:p-8 flex flex-col">
       <p className="text-xs uppercase tracking-[0.18em] text-[#d4af37] mb-2">Registration</p>
       <h3 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-2">${DETECTOR_ACADEMY_PRICE} per participant</h3>
       <p className="text-sm text-[#e8e0d5]/75 mb-4">
-        Open to LDMA members and the public. Registration opens soon. Camping is booked separately.
+        Open to LDMA members and the public. Registration is open now. Camping is booked separately.
       </p>
       <ul className="grid gap-2 sm:grid-cols-2 text-sm text-[#e8e0d5]/85 mb-6">
         {DETECTOR_ACADEMY_INCLUDED.map((item) => (
@@ -71,17 +94,36 @@ function RegistrationCard({ onInterested }: { onInterested: () => void }) {
           </li>
         ))}
       </ul>
-      <div className="mt-auto rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/10 p-5 space-y-3">
-        <p className="text-sm text-[#e8e0d5]/85">
-          Tell us a little about yourself and a member of our team will reach out when registration opens and answer
-          your questions.
-        </p>
+      <div className="mt-auto space-y-4">
+        {filtered && variants.length > 0 ? (
+          <EventPurchaseSection
+            event={filtered}
+            isMemberLoggedIn={isMemberLoggedIn}
+            selectedVariantId={selectedVariantId || defaultVariant?.id || ""}
+            onSelectVariant={setSelectedVariantId}
+            loginRedirectPath={DETECTOR_ACADEMY_PATH}
+            compact
+          />
+        ) : (
+          <div className="rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/10 p-5 space-y-3">
+            <p className="text-sm text-[#e8e0d5]/85">
+              Registration is opening now. Tell us you&apos;re interested and we&apos;ll help you get registered.
+            </p>
+            <button
+              type="button"
+              onClick={onInterested}
+              className="w-full inline-flex justify-center items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+            >
+              <Bell className="w-4 h-4" /> I&apos;m interested in this event
+            </button>
+          </div>
+        )}
         <button
           type="button"
           onClick={onInterested}
-          className="w-full inline-flex justify-center items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+          className="w-full text-center text-sm text-[#d4af37] hover:text-[#f0d48f] underline underline-offset-4"
         >
-          <Bell className="w-4 h-4" /> I&apos;m interested in this event
+          Questions? Tell us you&apos;re interested
         </button>
       </div>
     </div>
@@ -104,7 +146,7 @@ function BundleCard({ promoOpen }: { promoOpen: boolean }) {
       <ul className="space-y-2 text-sm text-[#e8e0d5]/85 mb-6">
         <li className="flex gap-2">
           <Check className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-          Reserve your spot now with a ${DETECTOR_ACADEMY_DEPOSIT} non-refundable deposit, before registration opens
+          Reserve your spot now with a ${DETECTOR_ACADEMY_DEPOSIT} non-refundable deposit
         </li>
         <li className="flex gap-2">
           <Check className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
@@ -146,7 +188,13 @@ function BundleCard({ promoOpen }: { promoOpen: boolean }) {
   );
 }
 
-export function DetectorAcademyContent() {
+export function DetectorAcademyContent({
+  event,
+  isMemberLoggedIn,
+}: {
+  event: EventProduct | null;
+  isMemberLoggedIn: boolean;
+}) {
   const promoOpen = isAcademyPromoOpen();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [interestOpen, setInterestOpen] = useState(false);
@@ -174,8 +222,8 @@ export function DetectorAcademyContent() {
             {DETECTOR_ACADEMY_NAME}
           </h1>
           <p className="mt-5 text-lg md:text-2xl text-[#e8e0d5]/90 max-w-3xl leading-relaxed">
-            Four days of metal detecting training on Arizona gold ground, built around the Garrett Axiom, Axiom Lite, and
-            GoldMaster 24k and taught by LDMA&apos;s field team.
+            Four days of metal detecting training on Arizona gold ground, built around the Garrett Axiom / Axiom Lite,
+            GoldMaster 24k, and Pro-Pointer II and taught by LDMA&apos;s field team.
           </p>
           <div className="mt-7 flex flex-wrap gap-3 text-sm">
             <span className="inline-flex items-center gap-2 rounded-lg bg-[#0f0a06]/70 border border-[#d4af37]/25 px-3 py-2">
@@ -192,13 +240,12 @@ export function DetectorAcademyContent() {
             </span>
           </div>
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            <button
-              type="button"
-              onClick={() => setInterestOpen(true)}
+            <a
+              href="#register"
               className="inline-flex justify-center items-center gap-2 px-7 py-4 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors text-lg"
             >
-              <Bell className="w-5 h-5" /> I&apos;m interested
-            </button>
+              Register now · ${DETECTOR_ACADEMY_PRICE}
+            </a>
             {promoOpen && (
               <Link
                 href={BUNDLE_HREF}
@@ -391,11 +438,15 @@ export function DetectorAcademyContent() {
           <SectionHeading
             eyebrow="Save your spot"
             title="Two ways to get in"
-            intro={`New members can reserve a free spot now. Everyone else, let us know you're interested and we'll reach out when registration opens. The academy is limited to ${DETECTOR_ACADEMY_CAPACITY} participants.`}
+            intro={`Register for $${DETECTOR_ACADEMY_PRICE}, or join with the Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL} and attend free with a $${DETECTOR_ACADEMY_DEPOSIT} deposit. Limited to ${DETECTOR_ACADEMY_CAPACITY} participants.`}
           />
           <div className="grid gap-6 lg:grid-cols-2">
             <BundleCard promoOpen={promoOpen} />
-            <RegistrationCard onInterested={() => setInterestOpen(true)} />
+            <RegistrationCard
+              event={event}
+              isMemberLoggedIn={isMemberLoggedIn}
+              onInterested={() => setInterestOpen(true)}
+            />
           </div>
         </div>
       </section>
