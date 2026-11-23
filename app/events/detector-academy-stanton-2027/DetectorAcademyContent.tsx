@@ -104,7 +104,7 @@ function RegistrationCard({
       <h3 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-2">${DETECTOR_ACADEMY_PRICE} per participant</h3>
       <p className="text-sm text-[#e8e0d5]/75 mb-2">{DETECTOR_ACADEMY_PRICE_FRAME}</p>
       <p className="text-sm text-[#e8e0d5]/65 mb-4">
-        Open to LDMA members and the public. Limited to {DETECTOR_ACADEMY_CAPACITY} participants.
+        Open to LDMA members and the public. {DETECTOR_ACADEMY_CAPACITY} spots total.
       </p>
       <ul className="grid gap-2 sm:grid-cols-2 text-sm text-[#e8e0d5]/85 mb-6">
         {DETECTOR_ACADEMY_INCLUDED.map((item) => (
@@ -127,15 +127,14 @@ function RegistrationCard({
         ) : (
           <div className="rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/10 p-5 space-y-3">
             <p className="text-sm text-[#e8e0d5]/85">
-              Checkout is temporarily unavailable. Tell us you&apos;re interested and Member Services will get you
-              registered.
+              Online checkout is briefly unavailable. Leave your info and Member Services will get you registered.
             </p>
             <button
               type="button"
               onClick={onInterested}
               className="w-full inline-flex justify-center items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
             >
-              <Bell className="w-4 h-4" /> I&apos;m interested — help me register
+              <Bell className="w-4 h-4" /> I&apos;m interested. Help me register.
             </button>
           </div>
         )}
@@ -166,10 +165,10 @@ function BundleCard({ promoOpen }: { promoOpen: boolean }) {
     <div className="relative rounded-2xl border border-[#d4af37]/35 bg-gradient-to-br from-[#0f3d1e]/50 via-[#1a120b] to-[#1a120b] p-6 md:p-8 flex flex-col overflow-hidden">
       <p className="text-xs uppercase tracking-[0.18em] text-[#d4af37] mb-2">Optional for new members</p>
       <h3 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-2">
-        Join with the Axiom Lite bundle — academy free
+        Join with the Axiom Lite bundle. Academy free.
       </h3>
       <p className="text-sm text-[#e8e0d5]/80 mb-4">
-        Prefer lifetime LDMA + GPAA membership and your own Garrett Axiom Lite? Join with the bundle by{" "}
+        Want lifetime LDMA + GPAA membership and your own Garrett Axiom Lite? Join with the bundle by{" "}
         {ACADEMY_PROMO_DEADLINE_LABEL} and academy registration is included. You still put down a $
         {DETECTOR_ACADEMY_DEPOSIT} deposit to hold your seat.
       </p>
@@ -233,7 +232,7 @@ export function DetectorAcademyContent({
     <div className="text-[#e8e0d5]">
       <HypeVideo />
 
-      {/* Hero — outcome first, one primary CTA */}
+      {/* Hero: outcome first, one primary CTA */}
       <section className="relative min-h-[60vh] flex items-end overflow-hidden">
         <Image
           src="/images/about-events/detector-events.jpg"
@@ -250,8 +249,8 @@ export function DetectorAcademyContent({
             Leave Stanton knowing how gold sounds on your detector
           </h1>
           <p className="mt-5 text-lg md:text-xl text-[#e8e0d5]/90 max-w-2xl leading-relaxed">
-            Four days on Arizona claim ground: test gardens, small-group coaching, and your machine dialed in for
-            mineralized desert dirt—with LDMA trainers and guest instructors beside you.
+            Four days on Arizona claim ground. Test gardens, small-group coaching, and your machine dialed in for
+            mineralized desert dirt, with LDMA trainers and guest instructors right beside you.
           </p>
           <div className="mt-7 flex flex-wrap gap-3 text-sm">
             <span className="inline-flex items-center gap-2 rounded-lg bg-[#0f0a06]/70 border border-[#d4af37]/25 px-3 py-2">
@@ -284,7 +283,7 @@ export function DetectorAcademyContent({
             New to LDMA? The Axiom Lite lifetime bundle includes free academy registration through{" "}
             {ACADEMY_PROMO_DEADLINE_LABEL}.{" "}
             <a href="#register" className="text-[#d4af37] underline underline-offset-4 hover:text-[#f0d48f]">
-              See both ways in
+              See both options
             </a>
             {" · "}
             <Link href={BUNDLE_HREF} className="text-[#d4af37] underline underline-offset-4 hover:text-[#f0d48f]">
@@ -298,8 +297,8 @@ export function DetectorAcademyContent({
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
         <SectionHeading
           eyebrow="Who it's for"
-          title="Built for first digs and sharper seasons"
-          intro="Bring any detector—you'll train hardest on Garrett Axiom / Axiom Lite and GoldMaster 24k platforms, with fundamentals that travel home with you."
+          title="Whether you're new to the coil or sharpening an old habit"
+          intro="Bring any detector. You'll train hardest on Garrett Axiom / Axiom Lite and GoldMaster 24k platforms, and the fundamentals come home with you."
         />
         <div className="grid gap-6 md:grid-cols-3">
           {DETECTOR_ACADEMY_WHO_FOR.map((item) => (
@@ -317,7 +316,7 @@ export function DetectorAcademyContent({
           <div>
             <SectionHeading
               eyebrow="Why this week"
-              title="Claim ground, not a parking-lot demo"
+              title="Real claim ground. Not a parking-lot demo."
             />
             <ul className="space-y-5">
               {DETECTOR_ACADEMY_PROOF.map((item) => (
@@ -344,8 +343,8 @@ export function DetectorAcademyContent({
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
         <SectionHeading
           eyebrow="The training"
-          title="PI and VLF on real dirt—then recover what you hear"
-          intro="Mornings: classroom and test garden. Afternoons: Stanton claims with a coach in your group."
+          title="PI and VLF on real dirt. Then dig what you hear."
+          intro="Mornings in the classroom and test garden. Afternoons on Stanton claims with a coach in your group."
         />
         <div className="grid gap-6 md:grid-cols-3">
           {DETECTOR_ACADEMY_LEARNING.map((item, i) => (
@@ -421,7 +420,7 @@ export function DetectorAcademyContent({
 
       {/* Trainers */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
-        <SectionHeading eyebrow="Your trainers" title="Meet your coaches" intro={DETECTOR_ACADEMY_TRAINERS_INTRO} />
+        <SectionHeading eyebrow="Your trainers" title="The people beside you this week" intro={DETECTOR_ACADEMY_TRAINERS_INTRO} />
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {DETECTOR_ACADEMY_TRAINERS.map((t) => (
             <div key={t.name} className="border border-[#d4af37]/20 bg-[#0f0a06]/60 p-6">
@@ -451,7 +450,7 @@ export function DetectorAcademyContent({
             <h2 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-3">Bring your detector</h2>
             <p className="text-[#e8e0d5]/85 leading-relaxed">
               Bring your own machine so you go home with it dialed in. Sessions center on the Garrett Axiom, Axiom Lite,
-              and GoldMaster 24k; the same habits apply to any detector. Pack headphones, a pinpointer, a digging tool,
+              and GoldMaster 24k. The same habits apply to any detector. Pack headphones, a pinpointer, a digging tool,
               and layers for cool mornings.
             </p>
           </div>
@@ -486,13 +485,13 @@ export function DetectorAcademyContent({
         </div>
       </section>
 
-      {/* Register — $800 primary, bundle secondary */}
+      {/* Register: $800 primary, bundle secondary */}
       <section id="register" className="scroll-mt-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
           <SectionHeading
             eyebrow="Save your spot"
             title="Register for the academy"
-            intro={`${DETECTOR_ACADEMY_PRICE_FRAME} Limited to ${DETECTOR_ACADEMY_CAPACITY} participants.`}
+            intro={`${DETECTOR_ACADEMY_PRICE_FRAME} Only ${DETECTOR_ACADEMY_CAPACITY} seats.`}
           />
           <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
             <RegistrationCard

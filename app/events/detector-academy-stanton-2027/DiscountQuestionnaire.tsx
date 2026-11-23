@@ -190,7 +190,8 @@ export function DiscountQuestionnaire({ open, onClose }: { open: boolean; onClos
                 What&apos;s your name and email?
               </h2>
               <p className="text-sm text-[#e8e0d5]/70 leading-relaxed -mt-1">
-                25% off for GPAA or LDMA members, military (active or veteran), first responders, and teachers.
+                25% off for GPAA or LDMA members, military (active or veteran), first responders, and teachers. If you
+                qualify, we&apos;ll email your discount code.
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <input
@@ -355,7 +356,7 @@ export function DiscountQuestionnaire({ open, onClose }: { open: boolean; onClos
                 Thank you, {submitted.firstName}!
               </h2>
               <p className="text-[#e8e0d5]/85 leading-relaxed">
-                Your discount application is under review. Watch {submitted.email} — we&apos;ll follow up shortly
+                Your discount application is under review. Watch {submitted.email}. We&apos;ll follow up shortly
                 {qualifies ? " with next steps" : ""}.
               </p>
               <button

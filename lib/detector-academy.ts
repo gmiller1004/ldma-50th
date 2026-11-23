@@ -2,7 +2,7 @@
  * LDMA Detector Academy at Stanton (March 11–14, 2027): event content, Shopify IDs,
  * and the Axiom Lite bundle reservation rule. Client-safe: no server imports.
  *
- * New members who buy the LDMA Lifetime Bundle — Garrett Axiom Lite inside the promo window attend
+ * New members who buy the LDMA Lifetime Bundle (Garrett Axiom Lite) inside the promo window attend
  * free with a $100 non-refundable deposit, returned as Stanton camp credit when they attend, or as camp
  * credit if they can't make these dates.
  * General and member registration are $800 on the Shopify event product; bundle buyers use the $100 deposit path.
@@ -102,34 +102,34 @@ export type AcademyOverviewBlock = {
  * (four core stations over Days 1–2, two advanced half-days on Day 3), then open hunt on Day 4.
  */
 export const DETECTOR_ACADEMY_WEEK_INTRO =
-  "You'll work in groups of about 25. Over the first three days you rotate through six breakout sessions—everyone completes all six. Morning and afternoon run in parallel stations at camp and on the claims so groups stay small. Day 4 is open hunting with trainers available for coaching.";
+  "You'll work in groups of about 25. Over the first three days you rotate through six breakouts. Everyone completes all six. Mornings and afternoons run as parallel stations at camp and on the claims, so groups stay small. Day 4 is open hunting, with trainers around for coaching.";
 
 export const DETECTOR_ACADEMY_WEEK_OVERVIEW: AcademyOverviewBlock[] = [
   {
     label: "Days 1–2",
     title: "Four core stations",
     summary:
-      "Four stations run each half-day. Your group rotates so that by the end of Day 2 you've done classroom basics, the test garden, a PI hunt, and VLF / GoldMaster time in the field.",
+      "Four stations run each half-day. Your group rotates so that by the end of Day 2 you've hit classroom basics, the test garden, a PI hunt, and VLF / GoldMaster time in the field.",
     sessions: [
       {
         title: "Classroom basics",
         where: "Camp",
-        detail: "Setup, controls, air tests, and detector fundamentals before you hit the ground.",
+        detail: "Setup, controls, air tests, and the fundamentals before you hit the ground.",
       },
       {
         title: "Test garden",
         where: "Controlled ground",
-        detail: "Gold at known sizes and depths so you learn what real targets sound like.",
+        detail: "Gold at known sizes and depths so you learn what a real target sounds like.",
       },
       {
         title: "PI hunt",
         where: "Claims",
-        detail: "Pulse induction in real Stanton ground with trainers in your group.",
+        detail: "Pulse induction on Stanton ground, with trainers in your group.",
       },
       {
         title: "VLF / GoldMaster",
         where: "Claims",
-        detail: "Smaller gold, different ground response, and coil work with a VLF detector.",
+        detail: "Smaller gold, a different ground response, and coil work on a VLF.",
       },
     ],
   },
@@ -137,19 +137,19 @@ export const DETECTOR_ACADEMY_WEEK_OVERVIEW: AcademyOverviewBlock[] = [
     label: "Day 3",
     title: "Two advanced sessions",
     summary:
-      "Two half-day advanced breakouts. Groups swap at midday so everyone gets both. Mentored coaching is built into the practice time; longer one-on-ones continue on Day 4.",
+      "Two half-day advanced breakouts. Groups swap at midday so everyone gets both. Coaching is built into the practice time. Longer one-on-ones continue on Day 4.",
     sessions: [
       {
         title: "Ground & gear",
         where: "Camp and claims",
         detail:
-          "Hot ground and EMI, plus coil selection—short teach, then hands-on comparing coils on the same patch while instructors rotate for quick mentored check-ins.",
+          "Hot ground, EMI, and coil selection. Short teach, then hands-on comparing coils on the same patch while instructors rotate for quick check-ins.",
       },
       {
         title: "Working a claim",
         where: "Claims",
         detail:
-          "Mapping and walking a claim, then spread out to practice with trainers floating for mentored coaching blocks.",
+          "How to map and walk a claim, then spread out to practice while trainers float for coaching.",
       },
     ],
   },
@@ -162,7 +162,7 @@ export const DETECTOR_ACADEMY_WEEK_OVERVIEW: AcademyOverviewBlock[] = [
       {
         title: "Open hunting",
         where: "Claims",
-        detail: "Put the week into practice. Ask for coaching whenever you want a second set of ears on your machine.",
+        detail: "Put the week into practice. Ask for a second set of ears whenever you want one.",
       },
     ],
   },
@@ -175,37 +175,37 @@ export const DETECTOR_ACADEMY_TRAINERS: AcademyTrainer[] = [
     name: "Dominic Ricci",
     role: "Executive Director of Operations, GPAA & LDMA",
     photo: "/images/trainers/dominic-ricci.jpg",
-    bio: "Has led GPAA and LDMA operations since 2010, designing and hosting LDMA's signature events nationwide, from Dirt Parties and the Digger's Gold Mining Academy to the Great Gold Dredge-Off and Battle Across the Desert. He's been prospecting since age 9, when he first panned a creek on his grandparents' Northern California ranch. He'll host the academy and help lead field sessions on Stanton's claims.",
+    bio: "Dominic has led GPAA and LDMA operations since 2010 and built the events people show up for: Dirt Parties, Diggers Gold Mining Academy, the Great Gold Dredge-Off, Battle Across the Desert. He started prospecting at 9 on his grandparents' ranch in Northern California. He'll host the academy and help run field sessions on Stanton's claims.",
   },
   {
     name: "Kevin Hoagland",
     role: "Host, Gold Trails · GPAA & LDMA",
     photo: "/images/trainers/kevin-hoagland.jpg",
-    bio: "A veteran prospector with 55 years in the field, Kevin built his first metal detector at age nine. He hosts GPAA's Gold Trails, appeared on HISTORY Channel's Lost Gold of the Aztecs, and has led Metal Detecting 101 training for years, turning complex detector settings into simple, repeatable field routines. He'll work alongside participants in the test garden and on the hunts.",
+    bio: "Kevin has 55 years in the field and built his first detector at nine. He hosts GPAA's Gold Trails, appeared on HISTORY's Lost Gold of the Aztecs, and has taught Metal Detecting 101 for years. He turns complicated settings into habits you can repeat. You'll see him in the test garden and out on the hunts.",
   },
   {
     name: "John Mathis",
     role: "Caretaker, LDMA Stanton Camp",
     photo: "/images/trainers/john-mathis.jpg",
-    bio: "An old-school prospector with more than 50 years in the field across six western states. He found a 2½-ounce nugget in the American River at age 10 and has been chasing gold ever since. Stanton's caretaker since 2018 and a Master Instructor for the Digger's Gold Mining Academy, he knows the camp's claims firsthand and will lead the claim orientation and share local tips.",
+    bio: "John is an old-school prospector with more than 50 years across six western states. He found a 2½-ounce nugget in the American River at age 10 and never really stopped. Stanton's caretaker since 2018 and a Diggers Gold Mining Academy Master Instructor, he knows these claims cold. He'll run claim orientation and share the local tips.",
   },
   {
     name: "Heath Jones",
     role: "Founder, History Seekers",
     photo: "/images/trainers/heath-jones.jpg",
-    bio: "Founder of History Seekers and a detectorist since the early 1990s. After a career in law enforcement he spent nearly nine years managing a major metal-detecting retailer, working with manufacturers and testing prototypes before launching History Seekers' YouTube and Facebook channels in 2019. Best known for Civil War relic hunting, he also hunts gold on LDMA ground and at AKAU near Nome. He'll bring field settings and real-machine coaching from someone who sells—and digs—the gear.",
+    bio: "Heath founded History Seekers after nearly nine years running a major detecting retailer, where he worked with manufacturers and tested prototypes. He's been detecting since the early '90s, built a following for Civil War relic hunting, and also hunts gold on LDMA ground and at AKAU near Nome. He coaches settings and machines from both sides of the counter.",
   },
   {
     name: "Amber Evans",
     role: "History Seekers · Newcomer coaching",
     photo: "/images/trainers/amber-evans.jpg",
-    bio: "History Seekers instructor who coaches first-timers on mineralized ground. After learning gold detecting at AKAU near Nome—nine pieces in her first hour, 118 by trip's end—she's hunted LDMA claims at Stanton and helps newcomers turn confusing signals into confident digs alongside Heath Jones.",
+    bio: "Amber coaches first-timers on mineralized ground for History Seekers. She learned gold detecting at AKAU near Nome: nine pieces in her first hour, 118 by the end of the trip. She's hunted LDMA claims at Stanton and helps newcomers turn messy signals into digs they trust, alongside Heath Jones.",
   },
   {
     name: "Dylan Pritchard",
     role: "B-Kings Outdoors · Stanton / Rich Hill",
     photo: "/images/trainers/dylan-pritchard.jpg",
-    bio: "An Arizona nugget hunter based near Congress who works the Stanton / Rich Hill country under B-Kings Outdoors. He's known for big Garrett Axiom finds—including multi-ounce and specimen gold from Rich Hill—and teaches detector classes for prospectors learning hot desert ground. When he's not filming hunts, he's in the same hills academy participants will walk: local knowledge, coil choice, and how to turn a whisper into a dig.",
+    bio: "Dylan is an Arizona nugget hunter based near Congress. He works Stanton and Rich Hill country with B-Kings Outdoors and is known for big Garrett Axiom finds, including multi-ounce and specimen gold from Rich Hill. He teaches detector classes for hot desert ground. When he's not filming, he's in the same hills you'll walk.",
   },
 ];
 
@@ -219,23 +219,23 @@ export const DETECTOR_ACADEMY_INCLUDED = [
   "Certificate of completion",
 ];
 
-/** Core skills — PI and VLF detectors first; pinpointer folded into field recovery. */
+/** Core skills: PI and VLF first; pinpointer folded into field recovery. */
 export const DETECTOR_ACADEMY_LEARNING = [
   {
     title: "Pulse induction: Axiom & Axiom Lite",
-    body: "Ground balance, soil settings, sensitivity, and coil choice on the same PI platform—so you can hear deep gold in mineralized desert dirt and trust what the machine is telling you.",
+    body: "Ground balance, soil settings, sensitivity, and coil choice on the same PI platform. Learn to hear deep gold in mineralized desert dirt and trust what the machine is saying.",
   },
   {
     title: "VLF: GoldMaster 24k",
-    body: "Small, shallow gold, iron discrimination, hot rocks, and when a VLF outperforms pulse induction—so you know which tool to swing on which patch.",
+    body: "Small, shallow gold. Iron discrimination. Hot rocks. When a VLF beats pulse induction, and which tool to swing on which patch.",
   },
   {
     title: "Field recovery & claim craft",
-    body: "Pinpointer habits that keep gold in the scoop, faster digs, and how to walk a claim with trainers nearby—test gardens first, then real Stanton ground.",
+    body: "Pinpointer habits that keep gold in the scoop, faster digs, and how to walk a claim with trainers nearby. Test garden first, then real Stanton ground.",
   },
 ];
 
-/** Outcomes only — no overlap with the included checklist. */
+/** Outcomes only; no overlap with the included checklist. */
 export const DETECTOR_ACADEMY_GAINS = [
   "Settings you trust on mineralized desert ground",
   "How gold sounds at different sizes and depths",
@@ -246,40 +246,40 @@ export const DETECTOR_ACADEMY_GAINS = [
 export const DETECTOR_ACADEMY_WHO_FOR = [
   {
     title: "New detectorists",
-    body: "You've got a machine (or a new Axiom Lite) and want real ground, not another YouTube rabbit hole—small groups and coaches who start where you are.",
+    body: "You've got a machine (or a new Axiom Lite) and want real ground, not another YouTube rabbit hole. Small groups. Coaches who meet you where you are.",
   },
   {
     title: "Experienced hunters",
-    body: "You already dig gold and want sharper settings, coil choice, and claim craft on Stanton / Rich Hill dirt with people who hunt it year-round.",
+    body: "You already dig gold. Come sharpen settings, coil choice, and claim craft on Stanton / Rich Hill dirt with people who hunt it year-round.",
   },
   {
     title: "Members and the public",
-    body: "LDMA members and non-members both register. Every participant hunts Stanton's claims during scheduled sessions; camping is separate either way.",
+    body: "LDMA members and non-members both register. Every participant hunts Stanton's claims during scheduled sessions. Camping is separate either way.",
   },
 ];
 
 export const DETECTOR_ACADEMY_PROOF = [
   {
     title: "Real gold ground",
-    body: "Stanton sits in Arizona's Rich Hill country—LDMA claims you hunt with trainers, not a parking-lot demo.",
+    body: "Stanton sits in Arizona's Rich Hill country. You'll hunt LDMA claims with trainers, not a parking-lot demo.",
   },
   {
     title: "Built from Diggers Academy",
-    body: "Same LDMA education line that produced Diggers Gold Mining Academy masters—now focused on detectors, with guest coaches from History Seekers and B-Kings Outdoors.",
+    body: "Same LDMA education line that produced Diggers Gold Mining Academy masters, now focused on detectors, with guest coaches from History Seekers and B-Kings Outdoors.",
   },
   {
     title: "Coaches who dig it",
-    body: "From Kevin Hoagland's Metal Detecting 101 and Gold Trails to Dylan Pritchard's Rich Hill nuggets and Heath Jones in the field—instruction from people who swing coils for a living.",
+    body: "Kevin Hoagland's Metal Detecting 101 and Gold Trails. Dylan Pritchard's Rich Hill nuggets. Heath Jones in the field. Instruction from people who swing coils for a living.",
   },
 ];
 
 export const DETECTOR_ACADEMY_TRAINERS_INTRO =
-  "LDMA's operations and Stanton team host the week, joined by guest instructors from History Seekers and B-Kings Outdoors—classroom to one-on-one tuning on the claims.";
+  "LDMA's operations and Stanton team host the week, with guest instructors from History Seekers and B-Kings Outdoors. Classroom work, then one-on-one tuning out on the claims.";
 
 export const DETECTOR_ACADEMY_DISCOUNT_ELIGIBILITY =
-  "25% off for GPAA or LDMA members, military (active or veteran), first responders, and teachers. Apply on this page; qualified applicants get code ACADEMY25 by email.";
+  "25% off for GPAA or LDMA members, military (active or veteran), first responders, and teachers. Apply on this page. If you qualify, we'll email your discount code.";
 
-export const DETECTOR_ACADEMY_PRICE_FRAME = `$${DETECTOR_ACADEMY_PRICE} for four days—about $${DETECTOR_ACADEMY_PRICE / 4}/day of training, claim access, and coaches. Camping and meals are separate.`;
+export const DETECTOR_ACADEMY_PRICE_FRAME = `$${DETECTOR_ACADEMY_PRICE} for four days (about $${DETECTOR_ACADEMY_PRICE / 4}/day) of training, claim access, and coaches. Camping and meals are separate.`;
 
 export const DETECTOR_ACADEMY_FAQ = [
   {
@@ -296,15 +296,15 @@ export const DETECTOR_ACADEMY_FAQ = [
   },
   {
     q: "How does free registration with the Axiom Lite bundle work?",
-    a: `Join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, then reserve your spot with a $${DETECTOR_ACADEMY_DEPOSIT} non-refundable deposit. When you attend, the $${DETECTOR_ACADEMY_DEPOSIT} comes back to you as Stanton camp credit for site fees or other camp purchases. If you can't make these dates, it becomes Stanton camp credit instead.`,
+    a: `Join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, then reserve your spot with a $${DETECTOR_ACADEMY_DEPOSIT} non-refundable deposit. When you attend, that $${DETECTOR_ACADEMY_DEPOSIT} comes back as Stanton camp credit for site fees or other camp purchases. If you can't make these dates, it becomes Stanton camp credit instead.`,
   },
   {
     q: "Do I need my own detector?",
-    a: "Yes—bring your own so you leave with it dialed in. Training centers on the Garrett Axiom / Axiom Lite and GoldMaster 24k; fundamentals apply to any detector. Bundle buyers train on their new Axiom Lite.",
+    a: "Yes. Bring your own so you leave with it dialed in. Training centers on the Garrett Axiom / Axiom Lite and GoldMaster 24k; the fundamentals apply to any detector. Bundle buyers train on their new Axiom Lite.",
   },
   {
     q: "Are camping and meals included?",
-    a: "No. Book your Stanton campsite separately (LDMA members use the member nightly rate). Plan your own meals—camp kitchens and nearby options in Congress / Wickenburg.",
+    a: "No. Book your Stanton campsite separately (LDMA members use the member nightly rate). Plan your own meals. Camp kitchens and nearby options in Congress / Wickenburg work well.",
   },
   {
     q: "Can non-members hunt the claims?",

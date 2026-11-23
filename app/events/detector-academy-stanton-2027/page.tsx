@@ -12,7 +12,7 @@ import { verifySessionToken } from "@/lib/session";
 import { DetectorAcademyContent } from "./DetectorAcademyContent";
 
 const description =
-  "Leave Stanton knowing how gold sounds on your detector. Four days of small-group coaching on LDMA claim ground—test gardens, guided hunts, and your machine dialed in for mineralized desert dirt. March 11–14, 2027.";
+  "Leave Stanton knowing how gold sounds on your detector. Four days of small-group coaching on LDMA claim ground: test gardens, guided hunts, and your machine dialed in for mineralized desert dirt. March 11–14, 2027.";
 
 export const metadata: Metadata = {
   title: `${DETECTOR_ACADEMY_NAME} at Stanton, AZ | ${DETECTOR_ACADEMY_DATES_LABEL}`,

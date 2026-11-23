@@ -620,7 +620,7 @@ function StantonCampContentInner() {
                     {DETECTOR_ACADEMY_NAME}
                   </h3>
                   <p className="text-[#e8e0d5]/85 text-sm leading-relaxed mb-2">
-                    Four days of Garrett detector training right here at Stanton —
+                    Four days of Garrett detector training right here at Stanton:
                     classroom, test garden, and guided hunts on camp claims.{" "}
                     {DETECTOR_ACADEMY_DATES_LABEL}. Bundle members can attend free
                     with a deposit that comes back as camp credit.
