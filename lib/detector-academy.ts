@@ -37,7 +37,7 @@ export const AXIOM_LITE_BUNDLE_PRODUCT_GID = `gid://shopify/Product/${AXIOM_LITE
 export const AXIOM_LITE_BUNDLE_HANDLE = "ldma-lifetime-bundle-garrett-axiom-lite";
 
 export const GARRETT_TRADEMARK_NOTICE =
-  "Garrett, Axiom, and GoldMaster are trademarks of Garrett Electronics, Inc. The LDMA Detector Academy is run by the Lost Dutchman's Mining Association and isn't sponsored by Garrett.";
+  "Garrett, Axiom, GoldMaster, and Pro-Pointer are trademarks of Garrett Electronics, Inc. The LDMA Detector Academy is run by the Lost Dutchman's Mining Association and isn't sponsored by Garrett.";
 
 /** Bundle purchases in this window qualify (Pacific time). */
 export const ACADEMY_PROMO_WINDOW_START = "2026-11-02T00:00:00-08:00";
@@ -203,15 +203,15 @@ export const DETECTOR_ACADEMY_INCLUDED = [
 export const DETECTOR_ACADEMY_LEARNING = [
   {
     title: "Garrett Axiom & Axiom Lite",
-    body: "How to set up these pulse induction detectors for deep gold in mineralized ground, including ground balance, soil settings, sensitivity, and coil choice, and how to read what you're hearing.",
+    body: "The Axiom and Axiom Lite are the same pulse induction platform. Learn ground balance, soil settings, sensitivity, coil choice, and how to read what you're hearing for deep gold in mineralized ground.",
   },
   {
     title: "Garrett GoldMaster 24k",
     body: "How to use the 24k for small, shallow gold, including iron discrimination, working around hot rocks, and when it outperforms a pulse induction detector.",
   },
   {
-    title: "Detecting fundamentals",
-    body: "Pinpointing, digging targets efficiently, caring for your detector, and the accessories worth having in the field.",
+    title: "Garrett Pro-Pointer II",
+    body: "Recover targets faster with Garrett's pinpointer—proportional audio and vibration, 360° side-scan, and field habits that keep gold in the scoop instead of the spoil pile.",
   },
   {
     title: "Time in the field",
@@ -243,7 +243,7 @@ export const DETECTOR_ACADEMY_FAQ = [
   },
   {
     q: "Do I need my own detector?",
-    a: "Yes, please bring your own. Sessions center on the Garrett Axiom, Axiom Lite, and GoldMaster 24k, and the fundamentals apply to any detector. New members who join with the Axiom Lite bundle train on their new detector.",
+    a: "Yes, please bring your own. Sessions center on the Garrett Axiom / Axiom Lite, GoldMaster 24k, and Pro-Pointer II, and the fundamentals apply to any detector. New members who join with the Axiom Lite bundle train on their new detector.",
   },
   {
     q: "Is camping included?",

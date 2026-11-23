@@ -32,7 +32,7 @@ const BUNDLE_HREF = "/memberships#bundle-offer";
 const LEARNING_IMAGES = [
   { src: "/images/memberships/axiom-lite-bundle-hero.jpg", alt: "Garrett Axiom Lite from the LDMA Lifetime Bundle", fit: "object-cover object-[35%_center]" },
   { src: "/images/flyers/goldmaster24k-img1.png", alt: "Garrett GoldMaster 24k detector", fit: "object-contain bg-white p-3" },
-  { src: "/images/email/events-education/nugget-in-hand.jpg", alt: "Gold nugget found on desert ground", fit: "object-cover" },
+  { src: "/images/events/garrett-pro-pointer-ii.png", alt: "Garrett Pro-Pointer II pinpointer", fit: "object-contain bg-white p-3" },
   { src: "/images/email/events-education/real-gold.jpg", alt: "Gold recovered at an LDMA camp", fit: "object-cover" },
 ];
 
