@@ -227,7 +227,7 @@ export function TrainerForm({ mode, trainer }: TrainerFormProps) {
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Caretaker, LDMA Stanton Camp"
+          placeholder="Former caretaker · Stanton operations"
           className={fieldClass}
         />
       </div>

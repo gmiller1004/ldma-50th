@@ -185,9 +185,9 @@ export const DETECTOR_ACADEMY_TRAINERS: AcademyTrainer[] = [
   },
   {
     name: "John Mathis",
-    role: "Caretaker, LDMA Stanton Camp",
+    role: "Former caretaker · Stanton operations",
     photo: "/images/trainers/john-mathis.jpg",
-    bio: "John is an old-school prospector with more than 50 years across six western states. He found a 2½-ounce nugget in the American River at age 10 and never really stopped. Stanton's caretaker since 2018 and a Diggers Gold Mining Academy Master Instructor, he knows these claims cold. He'll run claim orientation and share the local tips.",
+    bio: "John is an old-school prospector with more than 50 years across six western states. He found a 2½-ounce nugget in the American River at age 10 and never really stopped. He was Stanton's caretaker starting in 2018, now assists with Stanton operations, and is a Diggers Gold Mining Academy Master Instructor. He knows these claims cold and will run claim orientation and share the local tips.",
   },
   {
     name: "Heath Jones",
@@ -215,7 +215,7 @@ export const DETECTOR_ACADEMY_INCLUDED = [
   "Test gardens with gold at known depths",
   "Guided hunts on Stanton's claims",
   "One-on-one tuning on your own detector",
-  "Claim orientation with Stanton's caretaker",
+  "Claim orientation with John Mathis",
   "Certificate of completion",
 ];
 
