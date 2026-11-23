@@ -189,6 +189,9 @@ export function DiscountQuestionnaire({ open, onClose }: { open: boolean; onClos
               <h2 id="academy-discount-title" className="font-serif text-2xl font-semibold text-[#f0d48f]">
                 What&apos;s your name and email?
               </h2>
+              <p className="text-sm text-[#e8e0d5]/70 leading-relaxed -mt-1">
+                25% off for GPAA or LDMA members, military (active or veteran), first responders, and teachers.
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <input
                   ref={firstFieldRef}

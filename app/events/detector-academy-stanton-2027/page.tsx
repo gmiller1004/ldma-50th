@@ -12,7 +12,7 @@ import { verifySessionToken } from "@/lib/session";
 import { DetectorAcademyContent } from "./DetectorAcademyContent";
 
 const description =
-  "Four days of hands-on detector training at LDMA's Stanton, Arizona camp, built around the Garrett Axiom / Axiom Lite, GoldMaster 24k, and Pro-Pointer II: test gardens, guided hunts on real gold claims, and one-on-one tuning.";
+  "Leave Stanton knowing how gold sounds on your detector. Four days of small-group coaching on LDMA claim ground—test gardens, guided hunts, and your machine dialed in for mineralized desert dirt. March 11–14, 2027.";
 
 export const metadata: Metadata = {
   title: `${DETECTOR_ACADEMY_NAME} at Stanton, AZ | ${DETECTOR_ACADEMY_DATES_LABEL}`,

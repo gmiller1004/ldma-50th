@@ -15,6 +15,7 @@ import {
   DETECTOR_ACADEMY_DATES_LABEL,
   DETECTOR_ACADEMY_DATES_NOTE,
   DETECTOR_ACADEMY_DEPOSIT,
+  DETECTOR_ACADEMY_DISCOUNT_ELIGIBILITY,
   DETECTOR_ACADEMY_FAQ,
   DETECTOR_ACADEMY_GAINS,
   DETECTOR_ACADEMY_INCLUDED,
@@ -23,10 +24,14 @@ import {
   DETECTOR_ACADEMY_NAME,
   DETECTOR_ACADEMY_PATH,
   DETECTOR_ACADEMY_PRICE,
+  DETECTOR_ACADEMY_PRICE_FRAME,
+  DETECTOR_ACADEMY_PROOF,
   DETECTOR_ACADEMY_RESERVATION_PATH,
   DETECTOR_ACADEMY_TRAINERS,
+  DETECTOR_ACADEMY_TRAINERS_INTRO,
   DETECTOR_ACADEMY_WEEK_INTRO,
   DETECTOR_ACADEMY_WEEK_OVERVIEW,
+  DETECTOR_ACADEMY_WHO_FOR,
   GARRETT_TRADEMARK_NOTICE,
   isAcademyPromoOpen,
 } from "@/lib/detector-academy";
@@ -38,10 +43,21 @@ import { InterestQuestionnaire } from "./InterestQuestionnaire";
 const BUNDLE_HREF = "/memberships#bundle-offer";
 
 const LEARNING_IMAGES = [
-  { src: "/images/memberships/axiom-lite-bundle-hero.jpg", alt: "Garrett Axiom Lite from the LDMA Lifetime Bundle", fit: "object-cover object-[35%_center]" },
-  { src: "/images/flyers/goldmaster24k-img1.png", alt: "Garrett GoldMaster 24k detector", fit: "object-contain bg-white p-3" },
-  { src: "/images/events/garrett-pro-pointer-ii.png", alt: "Garrett Pro-Pointer II pinpointer", fit: "object-contain bg-white p-3" },
-  { src: "/images/email/events-education/real-gold.jpg", alt: "Gold recovered at an LDMA camp", fit: "object-cover" },
+  {
+    src: "/images/memberships/axiom-lite-bundle-hero.jpg",
+    alt: "Garrett Axiom Lite pulse induction detector",
+    fit: "object-cover object-[35%_center]",
+  },
+  {
+    src: "/images/flyers/goldmaster24k-img1.png",
+    alt: "Garrett GoldMaster 24k detector",
+    fit: "object-contain bg-white p-3",
+  },
+  {
+    src: "/images/email/events-education/real-gold.jpg",
+    alt: "Gold recovered at an LDMA camp",
+    fit: "object-cover",
+  },
 ];
 
 function initials(name: string): string {
@@ -83,11 +99,12 @@ function RegistrationCard({
   const [selectedVariantId, setSelectedVariantId] = useState(defaultVariant?.id ?? "");
 
   return (
-    <div className="rounded-2xl border border-[#d4af37]/30 bg-[#0f0a06]/80 p-6 md:p-8 flex flex-col">
-      <p className="text-xs uppercase tracking-[0.18em] text-[#d4af37] mb-2">Registration</p>
+    <div className="rounded-2xl border-2 border-[#d4af37] bg-[#0f0a06]/80 p-6 md:p-8 flex flex-col">
+      <p className="text-xs uppercase tracking-[0.18em] text-[#d4af37] mb-2">Academy registration</p>
       <h3 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-2">${DETECTOR_ACADEMY_PRICE} per participant</h3>
-      <p className="text-sm text-[#e8e0d5]/75 mb-4">
-        Open to LDMA members and the public. Registration is open now. Camping is booked separately.
+      <p className="text-sm text-[#e8e0d5]/75 mb-2">{DETECTOR_ACADEMY_PRICE_FRAME}</p>
+      <p className="text-sm text-[#e8e0d5]/65 mb-4">
+        Open to LDMA members and the public. Limited to {DETECTOR_ACADEMY_CAPACITY} participants.
       </p>
       <ul className="grid gap-2 sm:grid-cols-2 text-sm text-[#e8e0d5]/85 mb-6">
         {DETECTOR_ACADEMY_INCLUDED.map((item) => (
@@ -110,33 +127,35 @@ function RegistrationCard({
         ) : (
           <div className="rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/10 p-5 space-y-3">
             <p className="text-sm text-[#e8e0d5]/85">
-              Registration is opening now. Tell us you&apos;re interested and we&apos;ll help you get registered.
+              Checkout is temporarily unavailable. Tell us you&apos;re interested and Member Services will get you
+              registered.
             </p>
             <button
               type="button"
               onClick={onInterested}
               className="w-full inline-flex justify-center items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
             >
-              <Bell className="w-4 h-4" /> I&apos;m interested in this event
+              <Bell className="w-4 h-4" /> I&apos;m interested — help me register
             </button>
           </div>
         )}
-        <div className="flex flex-col sm:flex-row gap-3 sm:justify-center text-sm">
+        <div className="rounded-xl border border-[#d4af37]/20 bg-[#1a120b]/80 p-4 space-y-2">
           <button
             type="button"
             onClick={onApplyDiscount}
-            className="text-center text-[#d4af37] hover:text-[#f0d48f] underline underline-offset-4"
+            className="text-[#d4af37] hover:text-[#f0d48f] underline underline-offset-4 text-sm font-medium"
           >
-            Apply for a discount
+            Apply for 25% off
           </button>
-          <button
-            type="button"
-            onClick={onInterested}
-            className="text-center text-[#e8e0d5]/60 hover:text-[#f0d48f] underline underline-offset-4"
-          >
-            Questions? Tell us you&apos;re interested
-          </button>
+          <p className="text-xs text-[#e8e0d5]/65 leading-relaxed">{DETECTOR_ACADEMY_DISCOUNT_ELIGIBILITY}</p>
         </div>
+        <button
+          type="button"
+          onClick={onInterested}
+          className="w-full text-center text-sm text-[#e8e0d5]/55 hover:text-[#f0d48f] underline underline-offset-4"
+        >
+          Questions? Tell us you&apos;re interested
+        </button>
       </div>
     </div>
   );
@@ -144,30 +163,28 @@ function RegistrationCard({
 
 function BundleCard({ promoOpen }: { promoOpen: boolean }) {
   return (
-    <div className="relative rounded-2xl border-2 border-[#d4af37] bg-gradient-to-br from-[#0f3d1e]/70 via-[#1a120b] to-[#1a120b] p-6 md:p-8 flex flex-col overflow-hidden">
-      <span className="self-start mb-3 sm:mb-0 sm:absolute sm:top-4 sm:right-4 rounded-full bg-[#d4af37] text-[#1a120b] text-xs font-bold px-3 py-1">
-        Best value
-      </span>
-      <p className="text-xs uppercase tracking-[0.18em] text-[#d4af37] mb-2">New members</p>
-      <h3 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-2 sm:pr-24">Join with the Axiom Lite bundle and attend free</h3>
+    <div className="relative rounded-2xl border border-[#d4af37]/35 bg-gradient-to-br from-[#0f3d1e]/50 via-[#1a120b] to-[#1a120b] p-6 md:p-8 flex flex-col overflow-hidden">
+      <p className="text-xs uppercase tracking-[0.18em] text-[#d4af37] mb-2">Optional for new members</p>
+      <h3 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-2">
+        Join with the Axiom Lite bundle — academy free
+      </h3>
       <p className="text-sm text-[#e8e0d5]/80 mb-4">
-        Join LDMA with the Garrett Axiom Lite bundle by {ACADEMY_PROMO_DEADLINE_LABEL}, and your academy registration is
-        free. The bundle includes lifetime LDMA and GPAA membership, the Family Legacy benefits, and your own Garrett
-        Axiom Lite to train on.
+        Prefer lifetime LDMA + GPAA membership and your own Garrett Axiom Lite? Join with the bundle by{" "}
+        {ACADEMY_PROMO_DEADLINE_LABEL} and academy registration is included. You still put down a $
+        {DETECTOR_ACADEMY_DEPOSIT} deposit to hold your seat.
       </p>
       <ul className="space-y-2 text-sm text-[#e8e0d5]/85 mb-6">
         <li className="flex gap-2">
           <Check className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-          Reserve your spot now with a ${DETECTOR_ACADEMY_DEPOSIT} non-refundable deposit
+          Lifetime membership + Family Legacy benefits + Axiom Lite to train on
         </li>
         <li className="flex gap-2">
           <Check className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-          When you attend, the ${DETECTOR_ACADEMY_DEPOSIT} comes back to you as Stanton camp credit for site fees or other
-          camp purchases
+          ${DETECTOR_ACADEMY_DEPOSIT} deposit holds your academy seat; returns as Stanton camp credit when you attend
         </li>
         <li className="flex gap-2">
           <Check className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-          Can&apos;t make these dates? Your ${DETECTOR_ACADEMY_DEPOSIT} becomes Stanton camp credit instead
+          Can&apos;t make these dates? The ${DETECTOR_ACADEMY_DEPOSIT} becomes Stanton camp credit instead
         </li>
       </ul>
       <div className="mt-auto flex flex-col gap-3">
@@ -175,7 +192,7 @@ function BundleCard({ promoOpen }: { promoOpen: boolean }) {
           <>
             <Link
               href={BUNDLE_HREF}
-              className="inline-flex justify-center items-center px-6 py-3.5 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors"
+              className="inline-flex justify-center items-center px-6 py-3.5 border-2 border-[#d4af37] text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 transition-colors"
             >
               See the Axiom Lite bundle
             </Link>
@@ -216,7 +233,7 @@ export function DetectorAcademyContent({
     <div className="text-[#e8e0d5]">
       <HypeVideo />
 
-      {/* Hero */}
+      {/* Hero — outcome first, one primary CTA */}
       <section className="relative min-h-[60vh] flex items-end overflow-hidden">
         <Image
           src="/images/about-events/detector-events.jpg"
@@ -228,15 +245,13 @@ export function DetectorAcademyContent({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#1a120b] via-[#1a120b]/70 to-[#1a120b]/20" />
         <div className="relative max-w-6xl mx-auto w-full px-4 sm:px-6 pb-14 md:pb-20 pt-16">
-          <p className="inline-flex rounded-full border border-[#d4af37]/40 bg-[#0f0a06]/70 backdrop-blur px-4 py-2 mb-6 text-xs uppercase tracking-[0.18em] text-[#e8e0d5]/85">
-            Hands-on Garrett detector training
-          </p>
-          <h1 className="font-serif text-5xl md:text-7xl font-bold text-[#f0d48f] leading-[1.05] max-w-4xl">
-            {DETECTOR_ACADEMY_NAME}
+          <p className="text-xs uppercase tracking-[0.2em] text-[#d4af37] mb-4">{DETECTOR_ACADEMY_NAME}</p>
+          <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-bold text-[#f0d48f] leading-[1.08] max-w-4xl">
+            Leave Stanton knowing how gold sounds on your detector
           </h1>
-          <p className="mt-5 text-lg md:text-2xl text-[#e8e0d5]/90 max-w-3xl leading-relaxed">
-            Four days of metal detecting training on Arizona gold ground, built around the Garrett Axiom / Axiom Lite,
-            GoldMaster 24k, and Pro-Pointer II and taught by LDMA&apos;s field team.
+          <p className="mt-5 text-lg md:text-xl text-[#e8e0d5]/90 max-w-2xl leading-relaxed">
+            Four days on Arizona claim ground: test gardens, small-group coaching, and your machine dialed in for
+            mineralized desert dirt—with LDMA trainers and guest instructors beside you.
           </p>
           <div className="mt-7 flex flex-wrap gap-3 text-sm">
             <span className="inline-flex items-center gap-2 rounded-lg bg-[#0f0a06]/70 border border-[#d4af37]/25 px-3 py-2">
@@ -249,90 +264,71 @@ export function DetectorAcademyContent({
               <MapPin className="w-4 h-4 text-[#d4af37]" /> Stanton, Arizona
             </span>
             <span className="inline-flex items-center gap-2 rounded-lg bg-[#0f0a06]/70 border border-[#d4af37]/25 px-3 py-2">
-              <Users className="w-4 h-4 text-[#d4af37]" /> Limited to {DETECTOR_ACADEMY_CAPACITY} participants
+              <Users className="w-4 h-4 text-[#d4af37]" /> Limited to {DETECTOR_ACADEMY_CAPACITY}
             </span>
           </div>
-          <div className="mt-8 flex flex-col sm:flex-row gap-3">
+          <div className="mt-8">
             <a
               href="#register"
-              className="inline-flex justify-center items-center gap-2 px-7 py-4 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors text-lg"
+              className="inline-flex justify-center items-center gap-2 px-8 py-4 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors text-lg"
             >
-              Register now · ${DETECTOR_ACADEMY_PRICE}
+              Register · ${DETECTOR_ACADEMY_PRICE}
             </a>
-            <button
-              type="button"
-              onClick={() => setDiscountOpen(true)}
-              className="inline-flex justify-center items-center px-7 py-4 border-2 border-[#d4af37] text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 transition-colors text-lg"
-            >
-              Apply for a discount
-            </button>
-            {promoOpen && (
-              <Link
-                href={BUNDLE_HREF}
-                className="inline-flex justify-center items-center px-7 py-4 border border-[#d4af37]/40 text-[#e8e0d5] font-semibold rounded-lg hover:bg-[#d4af37]/10 transition-colors text-lg"
-              >
-                Attend free with the Axiom Lite bundle
-              </Link>
-            )}
           </div>
         </div>
       </section>
 
       {promoOpen && (
-        <section className="border-y border-[#d4af37]/30 bg-[#d4af37]/10">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-center text-sm md:text-base">
-            <strong className="text-[#f0d48f]">New members:</strong> join LDMA with the Garrett Axiom Lite bundle by{" "}
-            {ACADEMY_PROMO_DEADLINE_LABEL}, and your academy registration is free.{" "}
+        <section className="border-y border-[#d4af37]/25 bg-[#0f0a06]/80">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 text-center text-sm text-[#e8e0d5]/80">
+            New to LDMA? The Axiom Lite lifetime bundle includes free academy registration through{" "}
+            {ACADEMY_PROMO_DEADLINE_LABEL}.{" "}
+            <a href="#register" className="text-[#d4af37] underline underline-offset-4 hover:text-[#f0d48f]">
+              See both ways in
+            </a>
+            {" · "}
             <Link href={BUNDLE_HREF} className="text-[#d4af37] underline underline-offset-4 hover:text-[#f0d48f]">
-              See the bundle
+              Bundle details
             </Link>
           </div>
         </section>
       )}
 
-      {/* What you'll learn */}
+      {/* Who it's for */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
         <SectionHeading
-          eyebrow="The training"
-          title="Learn three Garrett gold detectors, then put them to work"
-          intro="Mornings are for the classroom and the test garden. Afternoons are for hunting Stanton's claims with a trainer nearby."
+          eyebrow="Who it's for"
+          title="Built for first digs and sharper seasons"
+          intro="Bring any detector—you'll train hardest on Garrett Axiom / Axiom Lite and GoldMaster 24k platforms, with fundamentals that travel home with you."
         />
-        <div className="grid gap-6 md:grid-cols-2">
-          {DETECTOR_ACADEMY_LEARNING.map((item, i) => (
-            <div key={item.title} className="rounded-2xl overflow-hidden border border-[#d4af37]/20 bg-[#0f0a06]/60 flex flex-col sm:flex-row">
-              <div className="relative sm:w-44 h-44 sm:h-auto shrink-0 bg-[#0f3d1e]/30">
-                <Image
-                  src={LEARNING_IMAGES[i].src}
-                  alt={LEARNING_IMAGES[i].alt}
-                  fill
-                  className={LEARNING_IMAGES[i].fit}
-                  sizes="(max-width: 640px) 100vw, 176px"
-                />
-              </div>
-              <div className="p-6">
-                <h3 className="font-serif text-xl text-[#f0d48f] font-semibold mb-2">{item.title}</h3>
-                <p className="text-sm text-[#e8e0d5]/80 leading-relaxed">{item.body}</p>
-              </div>
+        <div className="grid gap-6 md:grid-cols-3">
+          {DETECTOR_ACADEMY_WHO_FOR.map((item) => (
+            <div key={item.title} className="border-t border-[#d4af37]/35 pt-5">
+              <h3 className="font-serif text-xl text-[#f0d48f] font-semibold mb-2">{item.title}</h3>
+              <p className="text-sm text-[#e8e0d5]/80 leading-relaxed">{item.body}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* What you'll gain */}
+      {/* Proof */}
       <section className="bg-[#0f3d1e]/25 border-y border-[#d4af37]/15">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 grid gap-10 lg:grid-cols-2 items-center">
           <div>
-            <SectionHeading eyebrow="What you'll take home" title="Go home knowing your detector" />
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {DETECTOR_ACADEMY_GAINS.map((g) => (
-                <li key={g} className="flex gap-3 rounded-xl bg-[#0f0a06]/60 border border-[#d4af37]/15 p-4 text-sm">
-                  <Check className="w-5 h-5 text-[#d4af37] shrink-0" />
-                  <span>{g}</span>
+            <SectionHeading
+              eyebrow="Why this week"
+              title="Claim ground, not a parking-lot demo"
+            />
+            <ul className="space-y-5">
+              {DETECTOR_ACADEMY_PROOF.map((item) => (
+                <li key={item.title}>
+                  <p className="font-semibold text-[#f0d48f] mb-1">{item.title}</p>
+                  <p className="text-sm text-[#e8e0d5]/80 leading-relaxed">{item.body}</p>
                 </li>
               ))}
             </ul>
           </div>
-          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-[#d4af37]/25">
+          <div className="relative aspect-[4/3] overflow-hidden border border-[#d4af37]/25">
             <Image
               src="/images/campgrounds/stanton-arizona/stanton-4.jpg"
               alt="LDMA members showing their gold outside Hotel Stanton"
@@ -344,130 +340,168 @@ export function DetectorAcademyContent({
         </div>
       </section>
 
-      {/* How the week works */}
+      {/* What you'll learn */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
         <SectionHeading
-          eyebrow="How the week works"
-          title="Six breakouts, groups of 25"
-          intro={DETECTOR_ACADEMY_WEEK_INTRO}
+          eyebrow="The training"
+          title="PI and VLF on real dirt—then recover what you hear"
+          intro="Mornings: classroom and test garden. Afternoons: Stanton claims with a coach in your group."
         />
-        <div className="grid gap-8">
-          {DETECTOR_ACADEMY_WEEK_OVERVIEW.map((block) => (
-            <div key={block.label} className="rounded-2xl border border-[#d4af37]/20 bg-[#0f0a06]/60 p-6 md:p-8">
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
-                <p className="text-xs uppercase tracking-[0.2em] text-[#d4af37]">{block.label}</p>
-                <h3 className="font-serif text-2xl text-[#f0d48f] font-semibold">{block.title}</h3>
+        <div className="grid gap-6 md:grid-cols-3">
+          {DETECTOR_ACADEMY_LEARNING.map((item, i) => (
+            <div key={item.title} className="overflow-hidden border border-[#d4af37]/20 bg-[#0f0a06]/60 flex flex-col">
+              <div className="relative h-44 shrink-0 bg-[#0f3d1e]/30">
+                <Image
+                  src={LEARNING_IMAGES[i].src}
+                  alt={LEARNING_IMAGES[i].alt}
+                  fill
+                  className={LEARNING_IMAGES[i].fit}
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                />
               </div>
-              <p className="text-[#e8e0d5]/85 leading-relaxed mb-6 max-w-3xl">{block.summary}</p>
-              <ul
-                className={`grid gap-4 ${
-                  block.sessions.length >= 4
-                    ? "sm:grid-cols-2 lg:grid-cols-4"
-                    : block.sessions.length === 2
-                      ? "sm:grid-cols-2"
-                      : "sm:grid-cols-1 max-w-xl"
-                }`}
-              >
-                {block.sessions.map((session) => (
-                  <li key={session.title} className="rounded-xl border border-[#d4af37]/15 bg-[#1a120b]/80 p-4">
-                    <p className="font-semibold text-[#f0d48f] mb-1">{session.title}</p>
-                    <p className="text-xs uppercase tracking-[0.15em] text-[#d4af37]/90 mb-2">{session.where}</p>
-                    <p className="text-sm text-[#e8e0d5]/75 leading-relaxed">{session.detail}</p>
-                  </li>
-                ))}
-              </ul>
+              <div className="p-6">
+                <h3 className="font-serif text-xl text-[#f0d48f] font-semibold mb-2">{item.title}</h3>
+                <p className="text-sm text-[#e8e0d5]/80 leading-relaxed">{item.body}</p>
+              </div>
             </div>
           ))}
         </div>
-        <p className="mt-6 text-sm text-[#e8e0d5]/55 flex items-start gap-2">
-          <Clock className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-          Exact session times will be in your welcome packet at check-in. This overview is the shape of the week.
-        </p>
+        <ul className="mt-10 grid gap-3 sm:grid-cols-2 max-w-3xl">
+          {DETECTOR_ACADEMY_GAINS.map((g) => (
+            <li key={g} className="flex gap-3 text-sm text-[#e8e0d5]/85">
+              <Check className="w-5 h-5 text-[#d4af37] shrink-0" />
+              <span>{g}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
-      {/* Trainers */}
+      {/* How the week works */}
       <section className="bg-[#0f0a06]/60 border-y border-[#d4af37]/15">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
           <SectionHeading
-            eyebrow="Your trainers"
-            title="Meet your trainers"
-            intro="LDMA's field team leads every session, from the classroom to one-on-one tuning out on the claims."
+            eyebrow="How the week works"
+            title="Six breakouts, groups of about 25"
+            intro={DETECTOR_ACADEMY_WEEK_INTRO}
           />
-          <div className="grid gap-6 md:grid-cols-3">
-            {DETECTOR_ACADEMY_TRAINERS.map((t) => (
-              <div key={t.name} className="rounded-2xl border border-[#d4af37]/20 bg-[#1a120b] p-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="relative w-20 h-20 rounded-full overflow-hidden bg-[#0f3d1e] border-2 border-[#d4af37]/50 flex items-center justify-center font-serif text-xl text-[#f0d48f] shrink-0">
-                {t.photo ? <Image src={t.photo} alt={t.name} fill className="object-cover" sizes="80px" /> : initials(t.name)}
-                  </div>
-                  <div>
-                    <h3 className="font-serif text-xl text-[#f0d48f] font-semibold">{t.name}</h3>
-                    <p className="text-xs uppercase tracking-[0.15em] text-[#d4af37] mt-1">{t.role}</p>
-                  </div>
+          <div className="grid gap-8">
+            {DETECTOR_ACADEMY_WEEK_OVERVIEW.map((block) => (
+              <div key={block.label} className="border border-[#d4af37]/20 bg-[#1a120b]/80 p-6 md:p-8">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#d4af37]">{block.label}</p>
+                  <h3 className="font-serif text-2xl text-[#f0d48f] font-semibold">{block.title}</h3>
                 </div>
-                <p className="text-sm text-[#e8e0d5]/80 leading-relaxed">{t.bio}</p>
+                <p className="text-[#e8e0d5]/85 leading-relaxed mb-6 max-w-3xl">{block.summary}</p>
+                <ul
+                  className={`grid gap-4 ${
+                    block.sessions.length >= 4
+                      ? "sm:grid-cols-2 lg:grid-cols-4"
+                      : block.sessions.length === 2
+                        ? "sm:grid-cols-2"
+                        : "sm:grid-cols-1 max-w-xl"
+                  }`}
+                >
+                  {block.sessions.map((session) => (
+                    <li key={session.title} className="border border-[#d4af37]/15 bg-[#0f0a06]/60 p-4">
+                      <p className="font-semibold text-[#f0d48f] mb-1">{session.title}</p>
+                      <p className="text-xs uppercase tracking-[0.15em] text-[#d4af37]/90 mb-2">{session.where}</p>
+                      <p className="text-sm text-[#e8e0d5]/75 leading-relaxed">{session.detail}</p>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
+          <p className="mt-6 text-sm text-[#e8e0d5]/55 flex items-start gap-2">
+            <Clock className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
+            Exact session times are in your welcome packet at check-in.
+          </p>
+        </div>
+      </section>
+
+      {/* Trainers */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
+        <SectionHeading eyebrow="Your trainers" title="Meet your coaches" intro={DETECTOR_ACADEMY_TRAINERS_INTRO} />
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {DETECTOR_ACADEMY_TRAINERS.map((t) => (
+            <div key={t.name} className="border border-[#d4af37]/20 bg-[#0f0a06]/60 p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="relative w-20 h-20 rounded-full overflow-hidden bg-[#0f3d1e] border-2 border-[#d4af37]/50 flex items-center justify-center font-serif text-xl text-[#f0d48f] shrink-0">
+                  {t.photo ? (
+                    <Image src={t.photo} alt={t.name} fill className="object-cover" sizes="80px" />
+                  ) : (
+                    initials(t.name)
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl text-[#f0d48f] font-semibold">{t.name}</h3>
+                  <p className="text-xs uppercase tracking-[0.15em] text-[#d4af37] mt-1">{t.role}</p>
+                </div>
+              </div>
+              <p className="text-sm text-[#e8e0d5]/80 leading-relaxed">{t.bio}</p>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* Bring your detector + good to know */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20 grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-[#d4af37]/25 bg-[#0f3d1e]/30 p-7">
-          <h2 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-3">Bring your detector</h2>
-          <p className="text-[#e8e0d5]/85 leading-relaxed">
-            Bring your own detector so you go home with it dialed in for your ground. Sessions center on the Garrett
-            Axiom, Axiom Lite, and GoldMaster 24k, and the fundamentals apply to any detector. Also pack headphones, a
-            pinpointer, a digging tool, and layers for cool mornings.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-[#d4af37]/25 bg-[#0f0a06]/60 p-7">
-          <h2 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-3">Good to know</h2>
-          <ul className="space-y-3 text-sm text-[#e8e0d5]/85">
-            <li className="flex gap-3">
-              <Calendar className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-              {DETECTOR_ACADEMY_DATES_NOTE
-                ? `${DETECTOR_ACADEMY_DATES_LABEL}. ${DETECTOR_ACADEMY_DATES_NOTE}.`
-                : DETECTOR_ACADEMY_DATES_LABEL}
-            </li>
-            <li className="flex gap-3">
-              <MapPin className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" /> {DETECTOR_ACADEMY_LOCATION}
-            </li>
-            <li className="flex gap-3">
-              <Tent className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
-              <span>
-                Camping isn&apos;t included.{" "}
-                <Link href="/campgrounds/stanton-arizona" className="text-[#d4af37] underline">
-                  Reserve your Stanton campsite
-                </Link>{" "}
-                separately.
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <Users className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" /> Every participant, member or not, hunts Stanton
-              claims with trainers during scheduled sessions.
-            </li>
-          </ul>
+      <section className="bg-[#0f0a06]/60 border-y border-[#d4af37]/15">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 grid gap-6 lg:grid-cols-2">
+          <div className="border border-[#d4af37]/25 bg-[#0f3d1e]/30 p-7">
+            <h2 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-3">Bring your detector</h2>
+            <p className="text-[#e8e0d5]/85 leading-relaxed">
+              Bring your own machine so you go home with it dialed in. Sessions center on the Garrett Axiom, Axiom Lite,
+              and GoldMaster 24k; the same habits apply to any detector. Pack headphones, a pinpointer, a digging tool,
+              and layers for cool mornings.
+            </p>
+          </div>
+          <div className="border border-[#d4af37]/25 bg-[#1a120b]/80 p-7">
+            <h2 className="font-serif text-2xl text-[#f0d48f] font-semibold mb-3">Good to know</h2>
+            <ul className="space-y-3 text-sm text-[#e8e0d5]/85">
+              <li className="flex gap-3">
+                <Calendar className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
+                {DETECTOR_ACADEMY_DATES_NOTE
+                  ? `${DETECTOR_ACADEMY_DATES_LABEL}. ${DETECTOR_ACADEMY_DATES_NOTE}.`
+                  : DETECTOR_ACADEMY_DATES_LABEL}
+              </li>
+              <li className="flex gap-3">
+                <MapPin className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" /> {DETECTOR_ACADEMY_LOCATION}
+              </li>
+              <li className="flex gap-3">
+                <Tent className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
+                <span>
+                  Camping and meals aren&apos;t included.{" "}
+                  <Link href="/campgrounds/stanton-arizona" className="text-[#d4af37] underline">
+                    Reserve your Stanton campsite
+                  </Link>{" "}
+                  separately.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <Users className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" /> Every participant, member or not, hunts
+                Stanton claims with trainers during scheduled sessions.
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
 
-      {/* Register */}
-      <section id="register" className="scroll-mt-24 bg-[#0f0a06]/70 border-y border-[#d4af37]/20">
+      {/* Register — $800 primary, bundle secondary */}
+      <section id="register" className="scroll-mt-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
           <SectionHeading
             eyebrow="Save your spot"
-            title="Two ways to get in"
-            intro={`Register for $${DETECTOR_ACADEMY_PRICE}, or join with the Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL} and attend free with a $${DETECTOR_ACADEMY_DEPOSIT} deposit. Limited to ${DETECTOR_ACADEMY_CAPACITY} participants.`}
+            title="Register for the academy"
+            intro={`${DETECTOR_ACADEMY_PRICE_FRAME} Limited to ${DETECTOR_ACADEMY_CAPACITY} participants.`}
           />
-          <div className="grid gap-6 lg:grid-cols-2">
-            <BundleCard promoOpen={promoOpen} />
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
             <RegistrationCard
               event={event}
               isMemberLoggedIn={isMemberLoggedIn}
               onInterested={() => setInterestOpen(true)}
               onApplyDiscount={() => setDiscountOpen(true)}
             />
+            <BundleCard promoOpen={promoOpen} />
           </div>
         </div>
       </section>
@@ -477,7 +511,7 @@ export function DetectorAcademyContent({
         <SectionHeading eyebrow="Questions" title="Frequently asked" />
         <div className="space-y-3">
           {DETECTOR_ACADEMY_FAQ.map((f, i) => (
-            <div key={f.q} className="rounded-xl border border-[#d4af37]/20 bg-[#0f0a06]/60">
+            <div key={f.q} className="border border-[#d4af37]/20 bg-[#0f0a06]/60">
               <button
                 type="button"
                 onClick={() => setOpenFaq(openFaq === i ? null : i)}
@@ -485,7 +519,9 @@ export function DetectorAcademyContent({
                 aria-expanded={openFaq === i}
               >
                 <span className="font-medium text-[#f0d48f]">{f.q}</span>
-                <ChevronDown className={`w-5 h-5 text-[#d4af37] transition-transform ${openFaq === i ? "rotate-180" : ""}`} />
+                <ChevronDown
+                  className={`w-5 h-5 text-[#d4af37] transition-transform ${openFaq === i ? "rotate-180" : ""}`}
+                />
               </button>
               {openFaq === i && <p className="px-5 pb-5 -mt-1 text-sm text-[#e8e0d5]/80 leading-relaxed">{f.a}</p>}
             </div>

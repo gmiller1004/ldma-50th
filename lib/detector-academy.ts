@@ -197,9 +197,9 @@ export const DETECTOR_ACADEMY_TRAINERS: AcademyTrainer[] = [
   },
   {
     name: "Amber Evans",
-    role: "History Seekers",
+    role: "History Seekers · Newcomer coaching",
     photo: "/images/trainers/amber-evans.jpg",
-    bio: "Part of the History Seekers team and a regular on hunts alongside Heath Jones. She caught gold fever at AKAU Gold Camp near Nome—after a ten-minute lesson she recovered nine pieces in her first hour and 118 by the end of the trip—and has since found gold on LDMA ground at Stanton. She knows what it feels like to start from zero on mineralized dirt, and she's a natural fit for coaching newcomers through their first real signals.",
+    bio: "History Seekers instructor who coaches first-timers on mineralized ground. After learning gold detecting at AKAU near Nome—nine pieces in her first hour, 118 by trip's end—she's hunted LDMA claims at Stanton and helps newcomers turn confusing signals into confident digs alongside Heath Jones.",
   },
   {
     name: "Dylan Pritchard",
@@ -209,8 +209,9 @@ export const DETECTOR_ACADEMY_TRAINERS: AcademyTrainer[] = [
   },
 ];
 
+/** What's in the $800 registration (not camping or meals). */
 export const DETECTOR_ACADEMY_INCLUDED = [
-  "All four days of classroom and field training",
+  "Four days of classroom and field training",
   "Test gardens with gold at known depths",
   "Guided hunts on Stanton's claims",
   "One-on-one tuning on your own detector",
@@ -218,33 +219,67 @@ export const DETECTOR_ACADEMY_INCLUDED = [
   "Certificate of completion",
 ];
 
+/** Core skills — PI and VLF detectors first; pinpointer folded into field recovery. */
 export const DETECTOR_ACADEMY_LEARNING = [
   {
-    title: "Garrett Axiom & Axiom Lite",
-    body: "The Axiom and Axiom Lite are the same pulse induction platform. Learn ground balance, soil settings, sensitivity, coil choice, and how to read what you're hearing for deep gold in mineralized ground.",
+    title: "Pulse induction: Axiom & Axiom Lite",
+    body: "Ground balance, soil settings, sensitivity, and coil choice on the same PI platform—so you can hear deep gold in mineralized desert dirt and trust what the machine is telling you.",
   },
   {
-    title: "Garrett GoldMaster 24k",
-    body: "How to use the 24k for small, shallow gold, including iron discrimination, working around hot rocks, and when it outperforms a pulse induction detector.",
+    title: "VLF: GoldMaster 24k",
+    body: "Small, shallow gold, iron discrimination, hot rocks, and when a VLF outperforms pulse induction—so you know which tool to swing on which patch.",
   },
   {
-    title: "Garrett Pro-Pointer II",
-    body: "Recover targets faster with Garrett's pinpointer—proportional audio and vibration, 360° side-scan, and field habits that keep gold in the scoop instead of the spoil pile.",
-  },
-  {
-    title: "Time in the field",
-    body: "Test gardens with gold buried at known depths, guided hunts on Stanton's claims, and one-on-one tuning on your own detector.",
+    title: "Field recovery & claim craft",
+    body: "Pinpointer habits that keep gold in the scoop, faster digs, and how to walk a claim with trainers nearby—test gardens first, then real Stanton ground.",
   },
 ];
 
+/** Outcomes only — no overlap with the included checklist. */
 export const DETECTOR_ACADEMY_GAINS = [
-  "Settings you understand and trust on mineralized desert ground",
-  "A feel for how gold sounds at different sizes and depths",
-  "Faster recoveries and good claim etiquette",
-  "Your own detector dialed in for the ground you hunt",
-  "Hours in the field with LDMA trainers",
-  "A certificate of completion",
+  "Settings you trust on mineralized desert ground",
+  "How gold sounds at different sizes and depths",
+  "Your own detector dialed in for the dirt you hunt",
+  "Hours in the field with coaches who dig this ground",
 ];
+
+export const DETECTOR_ACADEMY_WHO_FOR = [
+  {
+    title: "New detectorists",
+    body: "You've got a machine (or a new Axiom Lite) and want real ground, not another YouTube rabbit hole—small groups and coaches who start where you are.",
+  },
+  {
+    title: "Experienced hunters",
+    body: "You already dig gold and want sharper settings, coil choice, and claim craft on Stanton / Rich Hill dirt with people who hunt it year-round.",
+  },
+  {
+    title: "Members and the public",
+    body: "LDMA members and non-members both register. Every participant hunts Stanton's claims during scheduled sessions; camping is separate either way.",
+  },
+];
+
+export const DETECTOR_ACADEMY_PROOF = [
+  {
+    title: "Real gold ground",
+    body: "Stanton sits in Arizona's Rich Hill country—LDMA claims you hunt with trainers, not a parking-lot demo.",
+  },
+  {
+    title: "Built from Diggers Academy",
+    body: "Same LDMA education line that produced Diggers Gold Mining Academy masters—now focused on detectors, with guest coaches from History Seekers and B-Kings Outdoors.",
+  },
+  {
+    title: "Coaches who dig it",
+    body: "From Kevin Hoagland's Metal Detecting 101 and Gold Trails to Dylan Pritchard's Rich Hill nuggets and Heath Jones in the field—instruction from people who swing coils for a living.",
+  },
+];
+
+export const DETECTOR_ACADEMY_TRAINERS_INTRO =
+  "LDMA's operations and Stanton team host the week, joined by guest instructors from History Seekers and B-Kings Outdoors—classroom to one-on-one tuning on the claims.";
+
+export const DETECTOR_ACADEMY_DISCOUNT_ELIGIBILITY =
+  "25% off for GPAA or LDMA members, military (active or veteran), first responders, and teachers. Apply on this page; qualified applicants get code ACADEMY25 by email.";
+
+export const DETECTOR_ACADEMY_PRICE_FRAME = `$${DETECTOR_ACADEMY_PRICE} for four days—about $${DETECTOR_ACADEMY_PRICE / 4}/day of training, claim access, and coaches. Camping and meals are separate.`;
 
 export const DETECTOR_ACADEMY_FAQ = [
   {
@@ -256,16 +291,20 @@ export const DETECTOR_ACADEMY_FAQ = [
     a: `Register on this page for $${DETECTOR_ACADEMY_PRICE}. If you join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, you can reserve your free spot with a $${DETECTOR_ACADEMY_DEPOSIT} deposit instead.`,
   },
   {
+    q: "Who gets a discount?",
+    a: DETECTOR_ACADEMY_DISCOUNT_ELIGIBILITY,
+  },
+  {
     q: "How does free registration with the Axiom Lite bundle work?",
     a: `Join LDMA with the Garrett Axiom Lite bundle by ${ACADEMY_PROMO_DEADLINE_LABEL}, then reserve your spot with a $${DETECTOR_ACADEMY_DEPOSIT} non-refundable deposit. When you attend, the $${DETECTOR_ACADEMY_DEPOSIT} comes back to you as Stanton camp credit for site fees or other camp purchases. If you can't make these dates, it becomes Stanton camp credit instead.`,
   },
   {
     q: "Do I need my own detector?",
-    a: "Yes, please bring your own. Sessions center on the Garrett Axiom / Axiom Lite, GoldMaster 24k, and Pro-Pointer II, and the fundamentals apply to any detector. New members who join with the Axiom Lite bundle train on their new detector.",
+    a: "Yes—bring your own so you leave with it dialed in. Training centers on the Garrett Axiom / Axiom Lite and GoldMaster 24k; fundamentals apply to any detector. Bundle buyers train on their new Axiom Lite.",
   },
   {
-    q: "Is camping included?",
-    a: "No. Book your Stanton campsite separately. LDMA members camp at the member nightly rate.",
+    q: "Are camping and meals included?",
+    a: "No. Book your Stanton campsite separately (LDMA members use the member nightly rate). Plan your own meals—camp kitchens and nearby options in Congress / Wickenburg.",
   },
   {
     q: "Can non-members hunt the claims?",
