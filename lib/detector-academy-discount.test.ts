@@ -28,8 +28,14 @@ describe("parseAcademyDiscount", () => {
     assert.equal(qualifiesForAcademyDiscount(r.value), true);
   });
 
-  it("does not qualify when qualifier is none", () => {
-    const r = parseAcademyDiscount({ ...base, qualifier: "none" });
+  it("qualifies members even without a service/profession tag", () => {
+    const r = parseAcademyDiscount({ ...base, membership: "gpaa", qualifier: "none" });
+    assert.ok(r.ok);
+    assert.equal(qualifiesForAcademyDiscount(r.value), true);
+  });
+
+  it("does not qualify without membership or a service/profession tag", () => {
+    const r = parseAcademyDiscount({ ...base, membership: "none", qualifier: "none" });
     assert.ok(r.ok);
     assert.equal(qualifiesForAcademyDiscount(r.value), false);
   });

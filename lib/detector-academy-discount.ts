@@ -84,9 +84,11 @@ export const ACADEMY_DISCOUNT_APPLIED_METRIC = "Academy Discount Applied";
 /** Shopify discount code emailed to qualified applicants (25% off academy). */
 export const ACADEMY_DISCOUNT_CODE = "ACADEMY25";
 
-/** True when the applicant selected military, first responder, or teacher. */
-export function qualifiesForAcademyDiscount(i: Pick<AcademyDiscountInput, "qualifier">): boolean {
-  return i.qualifier !== "none";
+/** True for GPAA/LDMA members, or military / first responder / teacher. */
+export function qualifiesForAcademyDiscount(
+  i: Pick<AcademyDiscountInput, "membership" | "qualifier">
+): boolean {
+  return i.membership !== "none" || i.qualifier !== "none";
 }
 
 export function parseAcademyDiscount(
