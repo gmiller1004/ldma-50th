@@ -254,7 +254,7 @@ export const DETECTOR_ACADEMY_WHO_FOR = [
   },
   {
     title: "Members and the public",
-    body: "LDMA members and non-members both register. Every participant hunts Stanton's claims during scheduled sessions. Camping is separate either way.",
+    body: "You don't need to be an LDMA member to register. During the academy, every participant hunts Stanton's claims with the trainers.",
   },
 ];
 
@@ -277,7 +277,7 @@ export const DETECTOR_ACADEMY_TRAINERS_INTRO =
   "LDMA's operations and Stanton team host the week, with guest instructors from History Seekers and B-Kings Outdoors. Classroom work, then one-on-one tuning out on the claims.";
 
 export const DETECTOR_ACADEMY_DISCOUNT_ELIGIBILITY =
-  "25% off for GPAA or LDMA members, military (active or veteran), first responders, and teachers. Apply on this page. If you qualify, we'll email your discount code.";
+  "GPAA or LDMA members, military (active or veteran), first responders, and teachers may qualify. Apply on this page. If you qualify, we'll email your discount code.";
 
 export const DETECTOR_ACADEMY_PRICE_FRAME = `$${DETECTOR_ACADEMY_PRICE} for four days (about $${DETECTOR_ACADEMY_PRICE / 4}/day) of training, claim access, and coaches. Camping and meals are separate.`;
 

@@ -144,7 +144,7 @@ function RegistrationCard({
             onClick={onApplyDiscount}
             className="text-[#d4af37] hover:text-[#f0d48f] underline underline-offset-4 text-sm font-medium"
           >
-            Apply for 25% off
+            Apply for a discount
           </button>
           <p className="text-xs text-[#e8e0d5]/65 leading-relaxed">{DETECTOR_ACADEMY_DISCOUNT_ELIGIBILITY}</p>
         </div>
