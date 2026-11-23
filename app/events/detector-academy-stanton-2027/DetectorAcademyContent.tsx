@@ -32,6 +32,7 @@ import {
 } from "@/lib/detector-academy";
 import type { EventProduct } from "@/lib/shopify";
 import { HypeVideo } from "./HypeVideo";
+import { DiscountQuestionnaire } from "./DiscountQuestionnaire";
 import { InterestQuestionnaire } from "./InterestQuestionnaire";
 
 const BUNDLE_HREF = "/memberships#bundle-offer";
@@ -66,10 +67,12 @@ function RegistrationCard({
   event,
   isMemberLoggedIn,
   onInterested,
+  onApplyDiscount,
 }: {
   event: EventProduct | null;
   isMemberLoggedIn: boolean;
   onInterested: () => void;
+  onApplyDiscount: () => void;
 }) {
   const filtered = useMemo(
     () => (event ? filterEventVariantsByMember(event, isMemberLoggedIn) : null),
@@ -118,13 +121,22 @@ function RegistrationCard({
             </button>
           </div>
         )}
-        <button
-          type="button"
-          onClick={onInterested}
-          className="w-full text-center text-sm text-[#d4af37] hover:text-[#f0d48f] underline underline-offset-4"
-        >
-          Questions? Tell us you&apos;re interested
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3 sm:justify-center text-sm">
+          <button
+            type="button"
+            onClick={onApplyDiscount}
+            className="text-center text-[#d4af37] hover:text-[#f0d48f] underline underline-offset-4"
+          >
+            Apply for a discount
+          </button>
+          <button
+            type="button"
+            onClick={onInterested}
+            className="text-center text-[#e8e0d5]/60 hover:text-[#f0d48f] underline underline-offset-4"
+          >
+            Questions? Tell us you&apos;re interested
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -198,6 +210,7 @@ export function DetectorAcademyContent({
   const promoOpen = isAcademyPromoOpen();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [interestOpen, setInterestOpen] = useState(false);
+  const [discountOpen, setDiscountOpen] = useState(false);
 
   return (
     <div className="text-[#e8e0d5]">
@@ -246,10 +259,17 @@ export function DetectorAcademyContent({
             >
               Register now · ${DETECTOR_ACADEMY_PRICE}
             </a>
+            <button
+              type="button"
+              onClick={() => setDiscountOpen(true)}
+              className="inline-flex justify-center items-center px-7 py-4 border-2 border-[#d4af37] text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 transition-colors text-lg"
+            >
+              Apply for a discount
+            </button>
             {promoOpen && (
               <Link
                 href={BUNDLE_HREF}
-                className="inline-flex justify-center items-center px-7 py-4 border-2 border-[#d4af37] text-[#f0d48f] font-semibold rounded-lg hover:bg-[#d4af37]/10 transition-colors text-lg"
+                className="inline-flex justify-center items-center px-7 py-4 border border-[#d4af37]/40 text-[#e8e0d5] font-semibold rounded-lg hover:bg-[#d4af37]/10 transition-colors text-lg"
               >
                 Attend free with the Axiom Lite bundle
               </Link>
@@ -446,6 +466,7 @@ export function DetectorAcademyContent({
               event={event}
               isMemberLoggedIn={isMemberLoggedIn}
               onInterested={() => setInterestOpen(true)}
+              onApplyDiscount={() => setDiscountOpen(true)}
             />
           </div>
         </div>
@@ -481,6 +502,7 @@ export function DetectorAcademyContent({
       </section>
 
       <InterestQuestionnaire open={interestOpen} onClose={() => setInterestOpen(false)} />
+      <DiscountQuestionnaire open={discountOpen} onClose={() => setDiscountOpen(false)} />
     </div>
   );
 }
