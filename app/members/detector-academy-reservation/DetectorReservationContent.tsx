@@ -8,7 +8,6 @@ import {
   DETECTOR_ACADEMY_DEPOSIT,
   DETECTOR_ACADEMY_NAME,
   DETECTOR_ACADEMY_PATH,
-  ACADEMY_PROMO_DEADLINE_LABEL,
 } from "@/lib/detector-academy";
 
 export type ReservationView =
@@ -31,7 +30,7 @@ function CallLine() {
 const MESSAGES: Record<Exclude<ReservationView["state"], "eligible" | "already_reserved">, { title: string; body: string }> = {
   no_bundle_order: {
     title: "We couldn't find a qualifying bundle purchase",
-    body: `Free academy registration is for members who join with the LDMA Lifetime Bundle — Garrett Axiom Lite by ${ACADEMY_PROMO_DEADLINE_LABEL}. If you bought the bundle with a different email address, call us and we'll set up your reservation.`,
+    body: "Free academy registration is for members who bought the LDMA Lifetime Bundle — Garrett Axiom Lite. If you bought the bundle with a different email address, call us and we'll set up your reservation.",
   },
   not_open_yet: {
     title: "Reservations open soon",

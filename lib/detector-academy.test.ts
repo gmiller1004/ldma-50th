@@ -30,14 +30,14 @@ describe("isWithinAcademyPromoWindow", () => {
 });
 
 describe("academyReservationStatus", () => {
-  it("is eligible with a paid bundle order in the window", () => {
+  it("is eligible with a paid bundle order on any date", () => {
     assert.deepEqual(academyReservationStatus([order(bundle)]), { state: "eligible" });
+    assert.deepEqual(academyReservationStatus([order({ ...bundle, createdAt: "2026-09-02T22:16:37Z" })]), {
+      state: "eligible",
+    });
   });
 
-  it("ignores bundle orders outside the window, cancelled, or unpaid", () => {
-    assert.deepEqual(academyReservationStatus([order({ ...bundle, createdAt: "2026-10-20T18:00:00Z" })]), {
-      state: "no_bundle_order",
-    });
+  it("ignores cancelled or unpaid bundle orders", () => {
     assert.deepEqual(academyReservationStatus([order({ ...bundle, cancelled: true })]), { state: "no_bundle_order" });
     assert.deepEqual(academyReservationStatus([order({ ...bundle, financialStatus: "PENDING" })]), {
       state: "no_bundle_order",

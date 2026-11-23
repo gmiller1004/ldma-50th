@@ -2,9 +2,8 @@
  * LDMA Detector Academy at Stanton (March 11–14, 2027): event content, Shopify IDs,
  * and the Axiom Lite bundle reservation rule. Client-safe: no server imports.
  *
- * New members who buy the LDMA Lifetime Bundle (Garrett Axiom Lite) inside the promo window attend
- * free with a $100 non-refundable deposit, returned as Stanton camp credit when they attend, or as camp
- * credit if they can't make these dates.
+ * Members who buy the LDMA Lifetime Bundle (Garrett Axiom Lite) attend free with a $100 non-refundable
+ * deposit, returned as Stanton camp credit when they attend, or as camp credit if they can't make these dates.
  * General and member registration are $800 on the Shopify event product; bundle buyers use the $100 deposit path.
  */
 
@@ -72,14 +71,12 @@ function counts(order: ShopifyOrderSummary): boolean {
   return !order.cancelled && COUNTED_FINANCIAL_STATUSES.has((order.financialStatus ?? "").toUpperCase());
 }
 
-/** Eligible when a paid Axiom Lite bundle order falls in the promo window and no deposit was bought yet. */
+/** Eligible when a paid Axiom Lite bundle order exists (any date) and no deposit was bought yet. */
 export function academyReservationStatus(orders: ShopifyOrderSummary[]): AcademyReservationStatus {
   if (orders.some((o) => counts(o) && o.variantIds.includes(DETECTOR_ACADEMY_DEPOSIT_VARIANT_ID))) {
     return { state: "already_reserved" };
   }
-  const bundle = orders.some(
-    (o) => counts(o) && o.productIds.includes(AXIOM_LITE_BUNDLE_PRODUCT_ID) && isWithinAcademyPromoWindow(o.createdAt)
-  );
+  const bundle = orders.some((o) => counts(o) && o.productIds.includes(AXIOM_LITE_BUNDLE_PRODUCT_ID));
   return bundle ? { state: "eligible" } : { state: "no_bundle_order" };
 }
 
