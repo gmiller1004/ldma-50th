@@ -19,6 +19,8 @@ import {
   DETECTOR_ACADEMY_PRICE,
   DETECTOR_ACADEMY_RESERVATION_PATH,
   DETECTOR_ACADEMY_TRAINERS,
+  DETECTOR_ACADEMY_WEEK_INTRO,
+  DETECTOR_ACADEMY_WEEK_OVERVIEW,
   GARRETT_TRADEMARK_NOTICE,
   isAcademyPromoOpen,
 } from "@/lib/detector-academy";
@@ -275,25 +277,45 @@ export function DetectorAcademyContent() {
         </div>
       </section>
 
-      {/* Schedule */}
+      {/* How the week works */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
-        <SectionHeading eyebrow="Daily schedule" title="Schedule coming soon" />
-        <div className="rounded-2xl border border-[#d4af37]/20 bg-[#0f0a06]/60 p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6">
-          <div className="flex items-start gap-4 flex-1">
-            <Clock className="w-8 h-8 text-[#d4af37] shrink-0" />
-            <p className="text-[#e8e0d5]/85 leading-relaxed">
-              We&apos;re finalizing the four-day schedule overview. Let us know you&apos;re interested and you&apos;ll be
-              among the first to see it.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setInterestOpen(true)}
-            className="inline-flex justify-center items-center gap-2 px-6 py-3 bg-[#d4af37] text-[#1a120b] font-semibold rounded-lg hover:bg-[#f0d48f] transition-colors shrink-0"
-          >
-            <Bell className="w-4 h-4" /> I&apos;m interested
-          </button>
+        <SectionHeading
+          eyebrow="How the week works"
+          title="Six breakouts, groups of 25"
+          intro={DETECTOR_ACADEMY_WEEK_INTRO}
+        />
+        <div className="grid gap-8">
+          {DETECTOR_ACADEMY_WEEK_OVERVIEW.map((block) => (
+            <div key={block.label} className="rounded-2xl border border-[#d4af37]/20 bg-[#0f0a06]/60 p-6 md:p-8">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-[#d4af37]">{block.label}</p>
+                <h3 className="font-serif text-2xl text-[#f0d48f] font-semibold">{block.title}</h3>
+              </div>
+              <p className="text-[#e8e0d5]/85 leading-relaxed mb-6 max-w-3xl">{block.summary}</p>
+              <ul
+                className={`grid gap-4 ${
+                  block.sessions.length >= 4
+                    ? "sm:grid-cols-2 lg:grid-cols-4"
+                    : block.sessions.length === 2
+                      ? "sm:grid-cols-2"
+                      : "sm:grid-cols-1 max-w-xl"
+                }`}
+              >
+                {block.sessions.map((session) => (
+                  <li key={session.title} className="rounded-xl border border-[#d4af37]/15 bg-[#1a120b]/80 p-4">
+                    <p className="font-semibold text-[#f0d48f] mb-1">{session.title}</p>
+                    <p className="text-xs uppercase tracking-[0.15em] text-[#d4af37]/90 mb-2">{session.where}</p>
+                    <p className="text-sm text-[#e8e0d5]/75 leading-relaxed">{session.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
+        <p className="mt-6 text-sm text-[#e8e0d5]/55 flex items-start gap-2">
+          <Clock className="w-4 h-4 text-[#d4af37] shrink-0 mt-0.5" />
+          Exact session times will be in your welcome packet at check-in. This overview is the shape of the week.
+        </p>
       </section>
 
       {/* Trainers */}

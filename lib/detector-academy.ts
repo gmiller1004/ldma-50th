@@ -19,8 +19,8 @@ export const DETECTOR_ACADEMY_DEPOSIT_VARIANT_GID = "gid://shopify/ProductVarian
 export const DETECTOR_ACADEMY_DEPOSIT_VARIANT_ID = "49970472976455";
 
 export const DETECTOR_ACADEMY_DATES_LABEL = "March 11–14, 2027";
-/** Optional secondary date line (empty once exact dates are published). */
-export const DETECTOR_ACADEMY_DATES_NOTE = "";
+/** Optional secondary date line (empty once exact dates are published). Typed as string so `""` isn't narrowed to never in conditionals. */
+export const DETECTOR_ACADEMY_DATES_NOTE: string = "";
 export const DETECTOR_ACADEMY_CAPACITY = 100;
 export const DETECTOR_ACADEMY_PRICE = 800;
 export const DETECTOR_ACADEMY_DEPOSIT = 100;
@@ -83,77 +83,87 @@ export function academyReservationStatus(orders: ShopifyOrderSummary[]): Academy
   return bundle ? { state: "eligible" } : { state: "no_bundle_order" };
 }
 
-export type AcademySession = { time: string; title: string; detail?: string };
-export type AcademyDay = { day: string; theme: string; sessions: AcademySession[] };
+/** One station or half-day topic in the week overview (not a minute-by-minute timetable). */
+export type AcademyOverviewSession = {
+  title: string;
+  where: string;
+  detail: string;
+};
 
-export const DETECTOR_ACADEMY_SCHEDULE: AcademyDay[] = [
+export type AcademyOverviewBlock = {
+  label: string;
+  title: string;
+  summary: string;
+  sessions: AcademyOverviewSession[];
+};
+
+/**
+ * How the week works: ~100 participants rotate in groups of ~25 through six breakouts
+ * (four core stations over Days 1–2, two advanced half-days on Day 3), then open hunt on Day 4.
+ */
+export const DETECTOR_ACADEMY_WEEK_INTRO =
+  "You'll work in groups of about 25. Over the first three days you rotate through six breakout sessions—everyone completes all six. Morning and afternoon run in parallel stations at camp and on the claims so groups stay small. Day 4 is open hunting with trainers available for coaching.";
+
+export const DETECTOR_ACADEMY_WEEK_OVERVIEW: AcademyOverviewBlock[] = [
   {
-    day: "Day 1",
-    theme: "Arrival and the basics",
+    label: "Days 1–2",
+    title: "Four core stations",
+    summary:
+      "Four stations run each half-day. Your group rotates so that by the end of Day 2 you've done classroom basics, the test garden, a PI hunt, and VLF / GoldMaster time in the field.",
     sessions: [
-      { time: "12:00–3:00 pm", title: "Check-in at the clubhouse", detail: "Welcome packets, campsite setup, meet the trainers." },
       {
-        time: "3:00–4:15 pm",
-        title: "Welcome & the Garrett gold lineup",
-        detail: "How the Axiom, Axiom Lite, and GoldMaster 24k compare, and which one suits your ground and the size of gold you're after.",
+        title: "Classroom basics",
+        where: "Camp",
+        detail: "Setup, controls, air tests, and detector fundamentals before you hit the ground.",
       },
       {
-        time: "4:30–5:45 pm",
-        title: "Setup clinic",
-        detail: "Get your detector ready: assembly, coils, charging, firmware updates, headphones, and harness fit.",
+        title: "Test garden",
+        where: "Controlled ground",
+        detail: "Gold at known sizes and depths so you learn what real targets sound like.",
       },
-      { time: "6:30 pm", title: "Welcome campfire social" },
+      {
+        title: "PI hunt",
+        where: "Claims",
+        detail: "Pulse induction in real Stanton ground with trainers in your group.",
+      },
+      {
+        title: "VLF / GoldMaster",
+        where: "Claims",
+        detail: "Smaller gold, different ground response, and coil work with a VLF detector.",
+      },
     ],
   },
   {
-    day: "Day 2",
-    theme: "Axiom & Axiom Lite (pulse induction)",
+    label: "Day 3",
+    title: "Two advanced sessions",
+    summary:
+      "Two half-day advanced breakouts. Groups swap at midday so everyone gets both. Mentored coaching is built into the practice time; longer one-on-ones continue on Day 4.",
     sessions: [
-      { time: "8:00–8:30 am", title: "Coffee, safety briefing, and claim rules", detail: "We split into small groups by detector." },
       {
-        time: "8:30–10:00 am",
-        title: "Classroom: pulse induction setup",
-        detail: "Ground balance and tracking, soil settings, sensitivity, threshold, coil choice, and how to read the signals.",
+        title: "Ground & gear",
+        where: "Camp and claims",
+        detail:
+          "Hot ground and EMI, plus coil selection—short teach, then hands-on comparing coils on the same patch while instructors rotate for quick mentored check-ins.",
       },
-      { time: "10:15 am–12:00 pm", title: "Test garden", detail: "Gold buried at known sizes and depths, so you can hear what real gold sounds like." },
-      { time: "12:00–1:00 pm", title: "Lunch" },
-      { time: "1:00–4:00 pm", title: "Guided hunt on Stanton claims", detail: "Trainers rotate between groups." },
-      { time: "4:15–5:00 pm", title: "Debrief", detail: "Compare the settings that worked, and bring your questions." },
-      { time: "Evening", title: "Gold show-and-tell at the clubhouse" },
+      {
+        title: "Working a claim",
+        where: "Claims",
+        detail:
+          "Mapping and walking a claim, then spread out to practice with trainers floating for mentored coaching blocks.",
+      },
     ],
   },
   {
-    day: "Day 3",
-    theme: "GoldMaster 24k (VLF) & recovery skills",
+    label: "Day 4",
+    title: "Open hunt & coaching",
+    summary:
+      "Hunt Stanton's claims on your own schedule. Trainers stay available for one-on-one coaching and fine-tuning your detector.",
     sessions: [
       {
-        time: "8:30–10:00 am",
-        title: "Classroom: GoldMaster 24k",
-        detail: "Iron discrimination, hot rocks, mineralized ground, and why a VLF detector often finds small, shallow gold that a pulse induction detector misses.",
+        title: "Open hunting",
+        where: "Claims",
+        detail: "Put the week into practice. Ask for coaching whenever you want a second set of ears on your machine.",
       },
-      { time: "10:15 am–12:00 pm", title: "Test garden: the two technologies side by side", detail: "Run both detector types over the same targets." },
-      { time: "12:00–1:00 pm", title: "Lunch" },
-      {
-        time: "1:00–2:15 pm",
-        title: "Recovery techniques",
-        detail: "Pinpointing, digging targets quickly, sorting trash from gold, and claim etiquette, including filling your holes.",
-      },
-      { time: "2:30–5:00 pm", title: "Field hunt in detector groups" },
-      { time: "Evening", title: "Detector care & open Q&A", detail: "Care and maintenance, accessories worth having, and your questions for the trainers." },
-    ],
-  },
-  {
-    day: "Day 4",
-    theme: "Tune your detector",
-    sessions: [
-      { time: "8:00–11:00 am", title: "One-on-one tuning", detail: "Trainers work with each participant, out in the field, to fine-tune their own detector." },
-      { time: "11:00 am–12:00 pm", title: "Final guided hunt" },
-      {
-        time: "12:00–1:00 pm",
-        title: "Wrap-up",
-        detail: "Show off your finds, receive your certificate of completion, and plan your next practice trip to an LDMA camp.",
-      },
-      { time: "Afternoon", title: "Open hunting for members, then departures" },
     ],
   },
 ];
